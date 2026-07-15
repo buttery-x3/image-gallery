@@ -2,7 +2,8 @@ import "dotenv/config";
 import path from "node:path";
 import express from "express";
 import { config } from "./config.js";
-import { GalleryDirectoryError, readGalleryImages, resolveSafeMediaPath } from "./gallery.js";
+import { GalleryDirectoryError, imageKindFor, readGalleryImages, resolveSafeMediaPath } from "./gallery.js";
+import { gifPreviewPath } from "./previews.js";
 import type { ErrorResponse, GalleryResponse } from "../shared/types.js";
 
 const app = express();
@@ -44,6 +45,25 @@ app.get(/^\/media\/(.+)$/, async (request, response, next) => {
   response.sendFile(mediaPath, { dotfiles: "deny", lastModified: true }, (error) => {
     if (error && !response.headersSent) next(error);
   });
+});
+
+app.get(/^\/previews\/(.+)$/, async (request, response, next) => {
+  const requestedPath = request.params[0];
+  if (!requestedPath || imageKindFor(requestedPath) !== "gif") return void response.sendStatus(404);
+
+  const mediaPath = await resolveSafeMediaPath(config.galleryDir, requestedPath);
+  if (!mediaPath) return void response.sendStatus(404);
+
+  try {
+    const previewPath = await gifPreviewPath(mediaPath, requestedPath, config.previewCacheDir);
+    response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    response.type("webp");
+    response.sendFile(previewPath, { dotfiles: "deny", lastModified: true }, (error) => {
+      if (error && !response.headersSent) next(error);
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.use(express.static(config.publicDir, {

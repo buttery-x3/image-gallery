@@ -202,7 +202,7 @@ function createTile(image: GalleryImage): HTMLElement {
 
   const element = document.createElement("img");
   element.className = "gallery-image";
-  element.dataset.src = new URL(image.url, document.baseURI).href;
+  element.dataset.src = new URL(image.previewUrl ?? image.url, document.baseURI).href;
   element.alt = "";
   element.loading = "lazy";
   element.decoding = "async";

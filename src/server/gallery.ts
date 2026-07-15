@@ -58,6 +58,9 @@ export async function readGalleryImages(root: string): Promise<GalleryImage[]> {
         name: entry.name,
         path: relativePath,
         url: `media/${toUrlPath(relativePath)}`,
+        ...(type === "gif" ? {
+          previewUrl: `previews/${toUrlPath(relativePath)}?v=${Math.trunc(stats.mtimeMs)}-${stats.size}`,
+        } : {}),
         modifiedAt: stats.mtime.toISOString(),
         type,
       });

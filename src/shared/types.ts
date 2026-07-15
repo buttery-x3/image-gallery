@@ -6,6 +6,7 @@ export interface GalleryImage {
   name: string;
   path: string;
   url: string;
+  previewUrl?: string;
   modifiedAt: string;
   type: ImageKind;
 }

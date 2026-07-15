@@ -1,0 +1,65 @@
+import { createHash, randomUUID } from "node:crypto";
+import { access, mkdir, rename, rm, stat } from "node:fs/promises";
+import path from "node:path";
+import sharp from "sharp";
+
+const previewWidth = 300;
+const pendingPreviews = new Map<string, Promise<string>>();
+
+function cacheKey(relativePath: string, size: number, modifiedAt: number): string {
+  return createHash("sha256")
+    .update(relativePath)
+    .update("\0")
+    .update(String(size))
+    .update("\0")
+    .update(String(modifiedAt))
+    .digest("hex");
+}
+
+async function exists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function generatePreview(sourcePath: string, outputPath: string): Promise<string> {
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  if (await exists(outputPath)) return outputPath;
+
+  const temporaryPath = `${outputPath}.${process.pid}-${randomUUID()}.tmp`;
+  try {
+    await sharp(sourcePath, { animated: true })
+      .resize({ width: previewWidth })
+      .webp({ quality: 78, effort: 4 })
+      .toFile(temporaryPath);
+    await rename(temporaryPath, outputPath);
+    return outputPath;
+  } catch (error) {
+    await rm(temporaryPath, { force: true });
+    throw error;
+  }
+}
+
+export async function gifPreviewPath(
+  sourcePath: string,
+  relativePath: string,
+  cacheDirectory: string,
+): Promise<string> {
+  const sourceStats = await stat(sourcePath);
+  const key = cacheKey(relativePath, sourceStats.size, sourceStats.mtimeMs);
+  const outputPath = path.join(cacheDirectory, key.slice(0, 2), `${key}.webp`);
+
+  const existing = pendingPreviews.get(outputPath);
+  if (existing) return existing;
+
+  const pending = generatePreview(sourcePath, outputPath);
+  pendingPreviews.set(outputPath, pending);
+  try {
+    return await pending;
+  } finally {
+    pendingPreviews.delete(outputPath);
+  }
+}

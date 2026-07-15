@@ -16,8 +16,8 @@ caddy version
 
 ```sh
 sudo useradd --system --home /opt/image-gallery --shell /usr/sbin/nologin image-gallery
-sudo mkdir -p /opt/image-gallery /srv/image-gallery/images
-sudo chown -R image-gallery:image-gallery /opt/image-gallery /srv/image-gallery
+sudo mkdir -p /opt/image-gallery /srv/image-gallery/images /var/cache/image-gallery
+sudo chown -R image-gallery:image-gallery /opt/image-gallery /srv/image-gallery /var/cache/image-gallery
 ```
 
 Copy or clone the repository into `/opt/image-gallery`, then give the service account ownership:
@@ -41,6 +41,7 @@ Create `/etc/image-gallery.env`:
 
 ```ini
 GALLERY_DIR=/srv/image-gallery/images
+PREVIEW_CACHE_DIR=/var/cache/image-gallery
 HOST=127.0.0.1
 PORT=8080
 ```
@@ -103,16 +104,20 @@ Refresh the gallery page to see additions or removals. The application never mod
 
 Supported formats are JPEG, PNG, GIF, WebP, and AVIF. Hidden files, hidden directories, symbolic links, and other formats are ignored.
 
+GIF gallery tiles use automatically generated 300px-wide animated WebP previews. The previews are cached in
+`PREVIEW_CACHE_DIR`; the original GIF is served unchanged when its tile is opened or its link is copied.
+
 ## Updating
 
 From `/opt/image-gallery`:
 
 ```sh
-sudo -u image-gallery git pull --ff-only
-sudo -u image-gallery npm ci
-sudo -u image-gallery npm run build
-sudo systemctl restart image-gallery
+sudo ./deploy.sh
 ```
+
+The script pulls with fast-forward only, installs the locked dependencies, type-checks and builds the
+application, then restarts the `image-gallery` service. It runs repository commands as the repository
+owner so generated files do not become owned by root.
 
 ## Troubleshooting
 

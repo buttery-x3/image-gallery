@@ -38,10 +38,13 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 | Variable | Default | Description |
 | --- | --- | --- |
 | `GALLERY_DIR` | `./gallery` | Directory scanned recursively for media |
+| `PREVIEW_CACHE_DIR` | `./.cache/previews` | Directory outside the gallery for generated GIF WebP previews |
 | `HOST` | `127.0.0.1` | Address used by the Express server |
 | `PORT` | `8080` | Port used by the Express server |
 
 Hidden entries, symbolic links, and unsupported files are ignored. New files appear after a page refresh; no rebuild is required. Images and GIFs are loaded shortly before they enter the viewport, with no more than four media files loading concurrently.
+
+GIF tiles use automatically generated 300px-wide animated WebP previews. They are created on first view and cached outside the gallery; the original GIF is still used in the lightbox and by the Copy control.
 
 ## Commands
 
@@ -51,6 +54,8 @@ Hidden entries, symbolic links, and unsupported files are ignored. New files app
 | `npm run typecheck` | Check browser and server TypeScript |
 | `npm run build` | Compile the browser and server production output |
 | `npm start` | Run the compiled production server |
+
+On the Linux server described in the installation guide, deploy an update with `sudo ./deploy.sh`.
 
 ## Project layout
 
