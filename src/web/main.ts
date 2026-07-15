@@ -12,6 +12,7 @@ const status = requiredElement<HTMLElement>("#status");
 const imageCount = requiredElement<HTMLElement>("#image-count");
 const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const lightbox = requiredElement<HTMLDialogElement>("#lightbox");
+const lightboxStage = requiredElement<HTMLElement>(".lightbox-stage");
 const lightboxImage = requiredElement<HTMLImageElement>("#lightbox-image");
 const lightboxClose = requiredElement<HTMLButtonElement>("#lightbox-close");
 const lightboxPrevious = requiredElement<HTMLButtonElement>("#lightbox-previous");
@@ -180,7 +181,7 @@ lightbox.addEventListener("keydown", (event) => {
   }
 });
 lightbox.addEventListener("click", (event) => {
-  if (event.target === lightbox) closeLightbox();
+  if (event.target === lightbox || event.target === lightboxStage) closeLightbox();
 });
 lightbox.addEventListener("close", () => {
   document.body.classList.remove("lightbox-open");
