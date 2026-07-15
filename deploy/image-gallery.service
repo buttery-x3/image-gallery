@@ -1,0 +1,22 @@
+[Unit]
+Description=Private image gallery
+After=network.target
+
+[Service]
+Type=simple
+User=image-gallery
+Group=image-gallery
+WorkingDirectory=/opt/image-gallery
+EnvironmentFile=/etc/image-gallery.env
+ExecStart=/usr/bin/node /opt/image-gallery/dist/server/server/server.js
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadOnlyPaths=/srv/image-gallery/images
+
+[Install]
+WantedBy=multi-user.target

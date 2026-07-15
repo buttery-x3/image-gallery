@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0c0e" />
+    <meta name="description" content="A simple private image gallery." />
+    <title>Image Gallery</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <h1>Image Gallery</h1>
+      <p id="image-count" class="image-count" aria-live="polite"></p>
+    </header>
+    <main>
+      <p id="status" class="status">Loading gallery…</p>
+      <section id="gallery" class="gallery" aria-label="Image gallery"></section>
+    </main>
+    <dialog id="lightbox" class="lightbox" aria-label="Image preview">
+      <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Close preview">
+        <span aria-hidden="true">×</span>
+      </button>
+      <div class="lightbox-stage">
+        <button id="lightbox-previous" class="lightbox-nav" type="button" aria-label="Previous image">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </button>
+        <img id="lightbox-image" class="lightbox-image" alt="" />
+        <button id="lightbox-next" class="lightbox-nav" type="button" aria-label="Next image">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </button>
+      </div>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

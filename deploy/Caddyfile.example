@@ -1,0 +1,7 @@
+www.example.com {
+    redir /image-gallery /image-gallery/ 308
+
+    handle_path /image-gallery/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+}
