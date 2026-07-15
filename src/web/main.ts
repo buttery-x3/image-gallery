@@ -10,6 +10,7 @@ function requiredElement<T extends Element>(selector: string): T {
 const gallery = requiredElement<HTMLElement>("#gallery");
 const status = requiredElement<HTMLElement>("#status");
 const imageCount = requiredElement<HTMLElement>("#image-count");
+const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const lightbox = requiredElement<HTMLDialogElement>("#lightbox");
 const lightboxImage = requiredElement<HTMLImageElement>("#lightbox-image");
 const lightboxClose = requiredElement<HTMLButtonElement>("#lightbox-close");
@@ -22,9 +23,35 @@ let activeOpener: HTMLButtonElement | undefined;
 let activeImageIndex = -1;
 let activeImageLoads = 0;
 let galleryImages: GalleryImage[] = [];
+const tilesByImage = new Map<GalleryImage, HTMLElement>();
 
 const maximumConcurrentImageLoads = 4;
 const pendingTiles: HTMLElement[] = [];
+
+function shuffledImages(images: readonly GalleryImage[]): GalleryImage[] {
+  const shuffled = [...images];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    const currentImage = shuffled[index]!;
+    shuffled[index] = shuffled[randomIndex]!;
+    shuffled[randomIndex] = currentImage;
+  }
+
+  if (shuffled.length > 1 && shuffled.every((image, index) => image === images[index])) {
+    shuffled.push(shuffled.shift()!);
+  }
+  return shuffled;
+}
+
+function shuffleGallery(): void {
+  galleryImages = shuffledImages(galleryImages);
+  const fragment = document.createDocumentFragment();
+  for (const image of galleryImages) {
+    const tile = tilesByImage.get(image);
+    if (tile) fragment.append(tile);
+  }
+  gallery.append(fragment);
+}
 
 function showToast(message: string): void {
   window.clearTimeout(toastTimer);
@@ -163,7 +190,7 @@ lightbox.addEventListener("close", () => {
   activeOpener = undefined;
 });
 
-function createTile(image: GalleryImage, index: number): HTMLElement {
+function createTile(image: GalleryImage): HTMLElement {
   const tile = document.createElement("article");
   tile.className = "gallery-item is-loading";
 
@@ -189,7 +216,7 @@ function createTile(image: GalleryImage, index: number): HTMLElement {
 
   openButton.append(element);
   tile.append(openButton, copyButton);
-  openButton.addEventListener("click", () => openLightbox(index, openButton));
+  openButton.addEventListener("click", () => openLightbox(galleryImages.indexOf(image), openButton));
   copyButton.addEventListener("click", async () => {
     try {
       await copyText(new URL(image.url, document.baseURI).href);
@@ -221,15 +248,21 @@ function createTile(image: GalleryImage, index: number): HTMLElement {
 
 function renderImages(images: GalleryImage[]): void {
   galleryImages = images;
+  tilesByImage.clear();
   tileObserver.disconnect();
   lazyImageObserver.disconnect();
   pendingTiles.length = 0;
   gallery.replaceChildren();
   const fragment = document.createDocumentFragment();
-  for (const [index, image] of images.entries()) fragment.append(createTile(image, index));
+  for (const image of images) {
+    const tile = createTile(image);
+    tilesByImage.set(image, tile);
+    fragment.append(tile);
+  }
   gallery.append(fragment);
 
   imageCount.textContent = images.length === 1 ? "1 image" : `${images.length} images`;
+  shuffleButton.disabled = images.length < 2;
   status.hidden = images.length > 0;
   status.textContent = images.length === 0 ? "No images yet. Add some files and refresh." : "";
 }
@@ -243,13 +276,16 @@ async function loadGallery(): Promise<void> {
     if (!response.ok || !("images" in payload)) {
       throw new Error("error" in payload ? payload.error : "The gallery could not be loaded.");
     }
-    renderImages(payload.images);
+    renderImages(shuffledImages(payload.images));
   } catch (error) {
     gallery.replaceChildren();
+    shuffleButton.disabled = true;
     imageCount.textContent = "";
     status.hidden = false;
     status.textContent = error instanceof Error ? error.message : "The gallery could not be loaded.";
   }
 }
+
+shuffleButton.addEventListener("click", shuffleGallery);
 
 void loadGallery();

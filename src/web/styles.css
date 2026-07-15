@@ -38,6 +38,54 @@ button { font: inherit; }
   letter-spacing: -0.025em;
 }
 
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shuffle-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #d7d8da;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.shuffle-button svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shuffle-button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.shuffle-button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.shuffle-button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 .image-count {
   margin: 0;
   color: #8f9298;
@@ -260,7 +308,7 @@ body.lightbox-open { overflow: hidden; }
 }
 
 @media (max-width: 328px) {
-  .site-header { padding-inline: 12px; }
+  .site-header { flex-wrap: wrap; gap: 8px 16px; padding-inline: 12px; }
   .gallery { grid-template-columns: minmax(0, 1fr); padding-inline: 12px; }
   .gallery-item, .gallery-image { width: 100%; }
   .lightbox { padding: 16px; }
