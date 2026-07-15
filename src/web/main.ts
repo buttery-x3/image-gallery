@@ -27,7 +27,15 @@ let galleryImages: GalleryImage[] = [];
 const tilesByImage = new Map<GalleryImage, HTMLElement>();
 
 const maximumConcurrentImageLoads = 4;
+const lazyLoadMargin = 150;
 const pendingTiles: HTMLElement[] = [];
+let queueRefreshFrame: number | undefined;
+
+function cancelQueueRefresh(): void {
+  if (queueRefreshFrame === undefined) return;
+  window.cancelAnimationFrame(queueRefreshFrame);
+  queueRefreshFrame = undefined;
+}
 
 function shuffledImages(images: readonly GalleryImage[]): GalleryImage[] {
   const shuffled = [...images];
@@ -46,12 +54,13 @@ function shuffledImages(images: readonly GalleryImage[]): GalleryImage[] {
 
 function shuffleGallery(): void {
   galleryImages = shuffledImages(galleryImages);
-  const fragment = document.createDocumentFragment();
-  for (const image of galleryImages) {
+  for (const [index, image] of galleryImages.entries()) {
     const tile = tilesByImage.get(image);
-    if (tile) fragment.append(tile);
+    if (tile) tile.style.order = String(index);
   }
-  gallery.append(fragment);
+
+  cancelQueueRefresh();
+  queueRefreshFrame = window.requestAnimationFrame(refreshImageQueue);
 }
 
 function showToast(message: string): void {
@@ -113,10 +122,54 @@ function drainImageQueue(): void {
   }
 }
 
-function enqueueImage(tile: HTMLElement): void {
-  if (tile.dataset.loadState) return;
+function queueImage(tile: HTMLElement): boolean {
+  if (tile.dataset.loadState) return false;
   tile.dataset.loadState = "queued";
   pendingTiles.push(tile);
+  return true;
+}
+
+function enqueueImage(tile: HTMLElement): void {
+  if (!queueImage(tile)) return;
+  drainImageQueue();
+}
+
+function loadPriority(tile: HTMLElement): number {
+  const bounds = tile.getBoundingClientRect();
+  const upperBoundary = -lazyLoadMargin;
+  const lowerBoundary = window.innerHeight + lazyLoadMargin;
+
+  if (bounds.bottom < upperBoundary) return upperBoundary - bounds.bottom;
+  if (bounds.top > lowerBoundary) return bounds.top - lowerBoundary;
+  return 0;
+}
+
+function refreshImageQueue(): void {
+  queueRefreshFrame = undefined;
+  for (let index = pendingTiles.length - 1; index >= 0; index -= 1) {
+    const tile = pendingTiles[index]!;
+    if (tile.dataset.loadState !== "queued") {
+      pendingTiles.splice(index, 1);
+      continue;
+    }
+    if (loadPriority(tile) === 0) continue;
+
+    pendingTiles.splice(index, 1);
+    delete tile.dataset.loadState;
+    lazyImageObserver.observe(tile);
+  }
+
+  for (const image of galleryImages) {
+    const tile = tilesByImage.get(image);
+    if (!tile || loadPriority(tile) !== 0) continue;
+    if (queueImage(tile)) lazyImageObserver.unobserve(tile);
+  }
+
+  pendingTiles.sort((left, right) => {
+    const leftBounds = left.getBoundingClientRect();
+    const rightBounds = right.getBoundingClientRect();
+    return leftBounds.top - rightBounds.top || leftBounds.left - rightBounds.left;
+  });
   drainImageQueue();
 }
 
@@ -135,7 +188,7 @@ const lazyImageObserver = new IntersectionObserver((entries) => {
     lazyImageObserver.unobserve(tile);
     enqueueImage(tile);
   }
-}, { rootMargin: "150px 0px" });
+}, { rootMargin: `${lazyLoadMargin}px 0px` });
 
 function showLightboxImage(index: number): void {
   const image = galleryImages[index];
@@ -248,6 +301,7 @@ function createTile(image: GalleryImage): HTMLElement {
 }
 
 function renderImages(images: GalleryImage[]): void {
+  cancelQueueRefresh();
   galleryImages = images;
   tilesByImage.clear();
   tileObserver.disconnect();
