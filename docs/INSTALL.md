@@ -104,8 +104,18 @@ Refresh the gallery page to see additions or removals. The application never mod
 
 Supported formats are JPEG, PNG, GIF, WebP, and AVIF. Hidden files, hidden directories, symbolic links, and other formats are ignored.
 
-GIF gallery tiles use automatically generated 300px-wide animated WebP previews. The previews are cached in
-`PREVIEW_CACHE_DIR`; the original GIF is served unchanged when its tile is opened or its link is copied.
+GIF and PNG gallery tiles use automatically generated 300px-wide WebP previews. GIF previews remain animated,
+and WebP preserves PNG transparency. The previews are cached in `PREVIEW_CACHE_DIR`; the original file is served
+unchanged when its tile is opened or its link is copied.
+
+To generate every missing preview without scrolling through the gallery, run this while the service is running:
+
+```sh
+sudo -u image-gallery /opt/image-gallery/cache-previews.sh
+```
+
+The script requests up to four previews concurrently through the local service. Existing cached previews return
+immediately.
 
 ## Updating
 
