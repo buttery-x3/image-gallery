@@ -3,7 +3,7 @@ import path from "node:path";
 import express from "express";
 import { config } from "./config.js";
 import { GalleryDirectoryError, imageKindFor, readGalleryImages, resolveSafeMediaPath } from "./gallery.js";
-import { gifPreviewPath } from "./previews.js";
+import { imagePreviewPath } from "./previews.js";
 import type { ErrorResponse, GalleryResponse } from "../shared/types.js";
 
 const app = express();
@@ -49,16 +49,23 @@ app.get(/^\/media\/(.+)$/, async (request, response, next) => {
 
 app.get(/^\/previews\/(.+)$/, async (request, response, next) => {
   const requestedPath = request.params[0];
-  if (!requestedPath || imageKindFor(requestedPath) !== "gif") return void response.sendStatus(404);
+  if (!requestedPath) return void response.sendStatus(404);
+
+  const imageKind = imageKindFor(requestedPath);
+  if (imageKind !== "gif" && imageKind !== "png") return void response.sendStatus(404);
 
   const mediaPath = await resolveSafeMediaPath(config.galleryDir, requestedPath);
   if (!mediaPath) return void response.sendStatus(404);
 
   try {
-    const previewPath = await gifPreviewPath(mediaPath, requestedPath, config.previewCacheDir);
+    const previewPath = await imagePreviewPath(mediaPath, requestedPath, config.previewCacheDir);
     response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     response.type("webp");
-    response.sendFile(previewPath, { dotfiles: "deny", lastModified: true }, (error) => {
+    response.sendFile(path.basename(previewPath), {
+      root: path.dirname(previewPath),
+      dotfiles: "deny",
+      lastModified: true,
+    }, (error) => {
       if (error && !response.headersSent) next(error);
     });
   } catch (error) {

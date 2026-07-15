@@ -38,13 +38,13 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 | Variable | Default | Description |
 | --- | --- | --- |
 | `GALLERY_DIR` | `./gallery` | Directory scanned recursively for media |
-| `PREVIEW_CACHE_DIR` | `./.cache/previews` | Directory outside the gallery for generated GIF WebP previews |
+| `PREVIEW_CACHE_DIR` | `./.cache/previews` | Directory outside the gallery for generated GIF and PNG WebP previews |
 | `HOST` | `127.0.0.1` | Address used by the Express server |
 | `PORT` | `8080` | Port used by the Express server |
 
 Hidden entries, symbolic links, and unsupported files are ignored. New files appear after a page refresh; no rebuild is required. Images and GIFs are loaded shortly before they enter the viewport, with no more than four media files loading concurrently.
 
-GIF tiles use automatically generated 300px-wide animated WebP previews. They are created on first view and cached outside the gallery; the original GIF is still used in the lightbox and by the Copy control.
+GIF and PNG tiles use automatically generated 300px-wide lossy WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. Previews are created on first view and cached outside the gallery; the original file is still used in the lightbox and by the Copy control.
 
 ## Commands
 

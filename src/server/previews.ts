@@ -43,7 +43,7 @@ async function generatePreview(sourcePath: string, outputPath: string): Promise<
   }
 }
 
-export async function gifPreviewPath(
+export async function imagePreviewPath(
   sourcePath: string,
   relativePath: string,
   cacheDirectory: string,
