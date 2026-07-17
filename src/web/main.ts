@@ -10,7 +10,7 @@ function requiredElement<T extends Element>(selector: string): T {
 const gallery = requiredElement<HTMLElement>("#gallery");
 const status = requiredElement<HTMLElement>("#status");
 const imageCount = requiredElement<HTMLElement>("#image-count");
-const siteHeader = requiredElement<HTMLElement>(".site-header");
+const supportHeader = requiredElement<HTMLElement>(".header-meta");
 const supportButton = requiredElement<HTMLElement>("#support-button");
 const supportFooter = requiredElement<HTMLElement>("#support-footer");
 const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
@@ -81,7 +81,7 @@ let queueRefreshFrame: number | undefined;
 
 function syncSupportButtonPlacement(): void {
   const mobile = mobileHeaderQuery.matches;
-  const destination = mobile ? supportFooter : siteHeader;
+  const destination = mobile ? supportFooter : supportHeader;
   if (supportButton.parentElement !== destination) destination.append(supportButton);
   supportFooter.hidden = !mobile;
   supportButton.querySelector<HTMLAnchorElement>(".bmc-btn")?.setAttribute("rel", "noopener noreferrer");
@@ -1053,10 +1053,13 @@ function updateVisibleImages(images: GalleryImage[]): void {
     if (tile) tile.hidden = !visibleImages.has(image);
   }
 
-  if (images.length === allImages.length) {
+  const maximumImages = searchableOnly.checked
+    ? allImages.filter((image) => image.metadata).length
+    : allImages.length;
+  if (images.length === maximumImages) {
     imageCount.textContent = images.length === 1 ? "1 image" : `${images.length} images`;
   } else {
-    imageCount.textContent = `${images.length} of ${allImages.length} images`;
+    imageCount.textContent = `${images.length} of ${maximumImages} images`;
   }
   updateShuffleButtonState();
   status.hidden = images.length > 0;
