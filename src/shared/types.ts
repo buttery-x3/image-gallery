@@ -32,6 +32,15 @@ export interface GalleryResponse {
   images: GalleryImage[];
 }
 
+export interface ImageReportRequest {
+  imagePath: string;
+  imageUrl: string;
+}
+
+export interface ImageReportResponse {
+  message: string;
+}
+
 export interface ErrorResponse {
   error: string;
 }

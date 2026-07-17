@@ -46,7 +46,19 @@ PREVIEW_CACHE_DIR=/var/cache/image-gallery
 # BATCH_NAME_STYLE=japanese-fantasy
 HOST=127.0.0.1
 PORT=8080
+
+# Explicit-content report email (replace with your SMTP provider's values)
+REPORT_SMTP_HOST=smtp.example.com
+REPORT_SMTP_PORT=587
+REPORT_SMTP_SECURE=false
+REPORT_SMTP_USER=gallery@example.com
+REPORT_SMTP_PASSWORD=replace-with-a-secret
+REPORT_EMAIL_FROM="Image Gallery <gallery@example.com>"
 ```
+
+The report recipient is fixed at `admin@flamehorn.com`. Port 587 with
+`REPORT_SMTP_SECURE=false` uses STARTTLS when the SMTP server advertises it;
+for implicit TLS, normally use port 465 with `REPORT_SMTP_SECURE=true`.
 
 Install the service definition:
 

@@ -1,5 +1,11 @@
 import "./styles.css";
-import type { ErrorResponse, GalleryImage, GalleryResponse } from "../shared/types.js";
+import type {
+  ErrorResponse,
+  GalleryImage,
+  GalleryResponse,
+  ImageReportRequest,
+  ImageReportResponse,
+} from "../shared/types.js";
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -8,6 +14,8 @@ function requiredElement<T extends Element>(selector: string): T {
 }
 
 const gallery = requiredElement<HTMLElement>("#gallery");
+const consentDialog = requiredElement<HTMLDialogElement>("#consent-dialog");
+const consentAgree = requiredElement<HTMLButtonElement>("#consent-agree");
 const status = requiredElement<HTMLElement>("#status");
 const imageCount = requiredElement<HTMLElement>("#image-count");
 const supportHeader = requiredElement<HTMLElement>(".header-meta");
@@ -35,16 +43,23 @@ const lightboxNameOverlay = requiredElement<HTMLElement>("#lightbox-name-overlay
 const lightboxShortNameEn = requiredElement<HTMLElement>("#lightbox-short-name-en");
 const lightboxShortNameJa = requiredElement<HTMLElement>("#lightbox-short-name-ja");
 const lightboxFavorite = requiredElement<HTMLButtonElement>("#lightbox-favorite");
+const lightboxReport = requiredElement<HTMLButtonElement>("#lightbox-report");
 const lightboxToggleName = requiredElement<HTMLButtonElement>("#lightbox-toggle-name");
 const lightboxTextPosition = requiredElement<HTMLButtonElement>("#lightbox-text-position");
 const lightboxClose = requiredElement<HTMLButtonElement>("#lightbox-close");
 const lightboxPrevious = requiredElement<HTMLButtonElement>("#lightbox-previous");
 const lightboxNext = requiredElement<HTMLButtonElement>("#lightbox-next");
+const reportDialog = requiredElement<HTMLDialogElement>("#report-dialog");
+const reportNo = requiredElement<HTMLButtonElement>("#report-no");
+const reportYes = requiredElement<HTMLButtonElement>("#report-yes");
 const toast = requiredElement<HTMLElement>("#toast");
 
 let toastTimer: number | undefined;
 let activeOpener: HTMLButtonElement | undefined;
 let activeImageIndex = -1;
+let reportImage: GalleryImage | undefined;
+let reportOpener: HTMLButtonElement | undefined;
+let reportSubmissionPending = false;
 let lightboxTouchStart: { identifier: number; x: number; y: number; startedAt: number } | undefined;
 let activeImageLoads = 0;
 let allImages: GalleryImage[] = [];
@@ -58,7 +73,16 @@ const favoriteButtonsByImage = new Map<GalleryImage, HTMLButtonElement>();
 const favoritesStorageKey = "image-gallery:favorites:v1";
 const nameLanguageStorageKey = "image-gallery:name-language:v1";
 const overlayPreferencesStorageKey = "image-gallery:overlay-preferences:v1";
+const contentConsentStorageKey = "image-gallery:content-consent:v1";
+const reportLimitStorageKey = "image-gallery:report-limit:v1";
 const favoriteImagePaths = loadFavoriteImagePaths();
+const maximumSuccessfulReports = 3;
+const reportBlockDurationMs = 7 * 24 * 60 * 60 * 1_000;
+interface ReportLimitState {
+  successfulReports: number;
+  blockedUntil?: number;
+}
+let fallbackReportLimitState: ReportLimitState = { successfulReports: 0 };
 type NameLanguage = "en" | "ja";
 type OverlayNamePosition = "top-left" | "bottom-left" | "bottom-right" | "top-right";
 const uiCopy = {
@@ -88,6 +112,9 @@ const uiCopy = {
     textPosition: "Text position",
     copyImage: "Copy image",
     copyLink: "Copy link",
+    reportImage: "Report image",
+    reportSent: "Report sent",
+    reportFailed: "The report could not be sent",
     any: "Any",
     addedFavorite: "Added to favorites",
     removedFavorite: "Removed from favorites",
@@ -126,6 +153,9 @@ const uiCopy = {
     textPosition: "テキストの位置",
     copyImage: "画像をコピー",
     copyLink: "リンクをコピー",
+    reportImage: "画像を報告",
+    reportSent: "報告を送信しました",
+    reportFailed: "報告を送信できませんでした",
     any: "指定なし",
     addedFavorite: "お気に入りに追加しました",
     removedFavorite: "お気に入りから削除しました",
@@ -452,6 +482,165 @@ function saveOverlayPreferences(): void {
   }
 }
 
+function contentConsentWasAccepted(): boolean {
+  try {
+    return window.localStorage.getItem(contentConsentStorageKey) === "agreed";
+  } catch {
+    return false;
+  }
+}
+
+function saveContentConsent(): void {
+  try {
+    window.localStorage.setItem(contentConsentStorageKey, "agreed");
+  } catch {
+    // Consent still applies for the current page when storage is unavailable.
+  }
+}
+
+function parseReportLimitState(value: string | null): ReportLimitState {
+  if (!value) return { successfulReports: 0 };
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { successfulReports: 0 };
+    }
+    const record = parsed as Record<string, unknown>;
+    const successfulReports = typeof record.successfulReports === "number" &&
+      Number.isInteger(record.successfulReports) && record.successfulReports >= 0
+      ? Math.min(record.successfulReports, maximumSuccessfulReports)
+      : 0;
+    const blockedUntil = typeof record.blockedUntil === "number" && Number.isFinite(record.blockedUntil)
+      ? record.blockedUntil
+      : undefined;
+    return { successfulReports, ...(blockedUntil ? { blockedUntil } : {}) };
+  } catch {
+    return { successfulReports: 0 };
+  }
+}
+
+function saveReportLimitState(state: ReportLimitState): void {
+  fallbackReportLimitState = state;
+  try {
+    window.localStorage.setItem(reportLimitStorageKey, JSON.stringify(state));
+  } catch {
+    // The current page still enforces the report limit when storage is unavailable.
+  }
+}
+
+function clearReportLimitState(): ReportLimitState {
+  const state = { successfulReports: 0 };
+  fallbackReportLimitState = state;
+  try {
+    window.localStorage.removeItem(reportLimitStorageKey);
+  } catch {
+    // The in-memory state was still cleared.
+  }
+  return state;
+}
+
+function loadReportLimitState(): ReportLimitState {
+  let state = fallbackReportLimitState;
+  try {
+    state = parseReportLimitState(window.localStorage.getItem(reportLimitStorageKey));
+  } catch {
+    // Fall back to the state kept for this page.
+  }
+  if (state.blockedUntil && state.blockedUntil <= Date.now()) return clearReportLimitState();
+  fallbackReportLimitState = state;
+  return state;
+}
+
+function blockedUntilForReportAttempt(): number | undefined {
+  const state = loadReportLimitState();
+  if (state.blockedUntil) return state.blockedUntil;
+  if (state.successfulReports < maximumSuccessfulReports) return undefined;
+  const blockedUntil = Date.now() + reportBlockDurationMs;
+  saveReportLimitState({ successfulReports: maximumSuccessfulReports, blockedUntil });
+  return blockedUntil;
+}
+
+function recordSuccessfulReport(): void {
+  const state = loadReportLimitState();
+  saveReportLimitState({
+    successfulReports: Math.min(maximumSuccessfulReports, state.successfulReports + 1),
+    ...(state.blockedUntil ? { blockedUntil: state.blockedUntil } : {}),
+  });
+}
+
+function blockReportingForSevenDays(): number {
+  const blockedUntil = Date.now() + reportBlockDurationMs;
+  saveReportLimitState({ successfulReports: maximumSuccessfulReports, blockedUntil });
+  return blockedUntil;
+}
+
+function reportBlockedMessage(blockedUntil: number): string {
+  const formattedDate = new Intl.DateTimeFormat(nameLanguage === "ja" ? "ja-JP" : undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(blockedUntil));
+  return nameLanguage === "ja"
+    ? `${formattedDate}まで報告できません`
+    : `Reporting is unavailable until ${formattedDate}`;
+}
+
+function openReportDialog(image: GalleryImage, opener: HTMLButtonElement): void {
+  const blockedUntil = blockedUntilForReportAttempt();
+  if (blockedUntil) {
+    showToast(reportBlockedMessage(blockedUntil));
+    return;
+  }
+  reportImage = image;
+  reportOpener = opener;
+  reportDialog.showModal();
+}
+
+async function submitImageReport(): Promise<void> {
+  if (!reportImage || reportSubmissionPending) return;
+  const blockedUntil = blockedUntilForReportAttempt();
+  if (blockedUntil) {
+    reportDialog.close();
+    showToast(reportBlockedMessage(blockedUntil));
+    return;
+  }
+
+  const image = reportImage;
+  const requestPayload: ImageReportRequest = {
+    imagePath: image.path,
+    imageUrl: new URL(image.url, document.baseURI).href,
+  };
+  reportSubmissionPending = true;
+  reportYes.disabled = true;
+  reportNo.disabled = true;
+  reportYes.setAttribute("aria-busy", "true");
+
+  try {
+    const response = await fetch(new URL("api/reports", document.baseURI), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestPayload),
+    });
+    const payload = (await response.json()) as ImageReportResponse | ErrorResponse;
+    if (response.status === 429) {
+      const serverBlockedUntil = blockReportingForSevenDays();
+      reportDialog.close();
+      showToast(reportBlockedMessage(serverBlockedUntil));
+      return;
+    }
+    if (!response.ok || !("message" in payload)) throw new Error("Report failed");
+    recordSuccessfulReport();
+    reportDialog.close();
+    showToast(t("reportSent"));
+  } catch {
+    showToast(t("reportFailed"));
+  } finally {
+    reportSubmissionPending = false;
+    reportYes.disabled = false;
+    reportNo.disabled = false;
+    reportYes.removeAttribute("aria-busy");
+  }
+}
+
 function displayNameFor(image: GalleryImage): string {
   return image.shortName?.[nameLanguage] ?? image.displayName;
 }
@@ -466,6 +655,10 @@ function copyImageLabel(displayName: string): string {
 
 function copyLinkLabel(displayName: string): string {
   return nameLanguage === "ja" ? `「${displayName}」への直接リンクをコピー` : `Copy direct link to ${displayName}`;
+}
+
+function reportImageLabel(displayName: string): string {
+  return nameLanguage === "ja" ? `「${displayName}」を報告` : `Report ${displayName}`;
 }
 
 function favoriteActionLabel(favorite: boolean, displayName: string): string {
@@ -1107,6 +1300,8 @@ function showLightboxImage(index: number): void {
   lightboxMedia.style.setProperty("--lightbox-name-outline", colors.outline);
   syncLightboxOverlayState(image);
   syncLightboxFavoriteButton(image);
+  lightboxReport.setAttribute("aria-label", reportImageLabel(displayName));
+  lightboxReport.title = t("reportImage");
   lightboxPrevious.disabled = index === 0;
   lightboxNext.disabled = index === galleryImages.length - 1;
 }
@@ -1132,6 +1327,10 @@ function closeLightbox(): void {
 }
 
 lightboxClose.addEventListener("click", closeLightbox);
+lightboxReport.addEventListener("click", () => {
+  const image = galleryImages[activeImageIndex];
+  if (image) openReportDialog(image, lightboxReport);
+});
 lightboxFavorite.addEventListener("click", () => {
   const image = galleryImages[activeImageIndex];
   if (image) toggleFavorite(image);
@@ -1217,6 +1416,19 @@ lightbox.addEventListener("close", () => {
   activeOpener = undefined;
 });
 
+reportNo.addEventListener("click", () => {
+  if (!reportSubmissionPending) reportDialog.close();
+});
+reportYes.addEventListener("click", () => void submitImageReport());
+reportDialog.addEventListener("cancel", (event) => {
+  if (reportSubmissionPending) event.preventDefault();
+});
+reportDialog.addEventListener("close", () => {
+  reportImage = undefined;
+  reportOpener?.focus({ preventScroll: true });
+  reportOpener = undefined;
+});
+
 function createTile(image: GalleryImage): HTMLElement {
   const tile = document.createElement("article");
   tile.className = "gallery-item is-loading";
@@ -1278,9 +1490,20 @@ function createTile(image: GalleryImage): HTMLElement {
 
   actions.append(favoriteButton, imageCopyButton, linkCopyButton);
 
+  const reportButton = document.createElement("button");
+  reportButton.type = "button";
+  reportButton.className = "report-button tile-report-button";
+  reportButton.title = t("reportImage");
+  reportButton.setAttribute("aria-label", reportImageLabel(displayNameFor(image)));
+  const reportSymbol = document.createElement("span");
+  reportSymbol.setAttribute("aria-hidden", "true");
+  reportSymbol.textContent = "!";
+  reportButton.append(reportSymbol);
+
   openButton.append(element, shortName);
-  tile.append(openButton, actions);
+  tile.append(openButton, actions, reportButton);
   openButton.addEventListener("click", () => openLightbox(galleryImages.indexOf(image), openButton));
+  reportButton.addEventListener("click", () => openReportDialog(image, reportButton));
   favoriteButton.addEventListener("click", () => toggleFavorite(image));
   imageCopyButton.addEventListener("click", async () => {
     const absoluteUrl = new URL(image.url, document.baseURI).href;
@@ -1350,6 +1573,9 @@ function syncNameLanguageDisplay(): void {
     const copyLinkButton = tile.querySelector<HTMLButtonElement>('[data-action="copy-link"]');
     copyLinkButton?.setAttribute("aria-label", copyLinkLabel(displayName));
     if (copyLinkButton) copyLinkButton.title = t("copyLink");
+    const reportButton = tile.querySelector<HTMLButtonElement>(".tile-report-button");
+    reportButton?.setAttribute("aria-label", reportImageLabel(displayName));
+    if (reportButton) reportButton.title = t("reportImage");
     const favoriteButton = favoriteButtonsByImage.get(image);
     if (favoriteButton) syncTileFavoriteButton(favoriteButton, image);
   }
@@ -1359,6 +1585,8 @@ function syncNameLanguageDisplay(): void {
     const displayName = displayNameFor(activeImage);
     lightboxName.textContent = displayName;
     lightboxImage.alt = displayName;
+    lightboxReport.setAttribute("aria-label", reportImageLabel(displayName));
+    lightboxReport.title = t("reportImage");
     syncLightboxFavoriteButton(activeImage);
   }
   syncLightboxOverlayState(activeImage);
@@ -1500,4 +1728,18 @@ window.addEventListener("storage", (event) => {
 
 syncNameLanguageDisplay();
 syncLightboxOverlayState();
-void loadGallery();
+
+consentDialog.addEventListener("cancel", (event) => event.preventDefault());
+consentAgree.addEventListener("click", () => {
+  saveContentConsent();
+  consentDialog.close();
+  document.body.classList.remove("consent-pending");
+  void loadGallery();
+});
+
+if (contentConsentWasAccepted()) {
+  document.body.classList.remove("consent-pending");
+  void loadGallery();
+} else {
+  consentDialog.showModal();
+}

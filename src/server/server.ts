@@ -1,14 +1,25 @@
 import "dotenv/config";
 import path from "node:path";
 import express from "express";
+import nodemailer from "nodemailer";
 import { config } from "./config.js";
 import { GalleryDirectoryError, imageKindFor, readGalleryImages, resolveSafeMediaPath } from "./gallery.js";
 import { imagePreviewPath } from "./previews.js";
-import type { ErrorResponse, GalleryResponse } from "../shared/types.js";
+import type {
+  ErrorResponse,
+  GalleryResponse,
+  ImageReportRequest,
+  ImageReportResponse,
+} from "../shared/types.js";
 
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", "loopback");
+
+const reportTransport = config.reportSmtp ? nodemailer.createTransport(config.reportSmtp) : undefined;
+const reportBlockDurationMs = 7 * 24 * 60 * 60 * 1_000;
+const maximumReportsBeforeBlock = 3;
+const reportLimits = new Map<string, { successfulReports: number; blockedUntil?: number }>();
 
 app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
@@ -20,6 +31,89 @@ app.use((_request, response, next) => {
 });
 
 app.get("/healthz", (_request, response) => response.type("text/plain").send("ok"));
+
+app.post("/api/reports", express.json({ limit: "4kb", type: "application/json" }), async (request, response) => {
+  response.setHeader("Cache-Control", "no-store");
+
+  const requestHost = request.get("host");
+  const requestOrigin = requestHost ? `${request.protocol}://${requestHost}` : undefined;
+  if (!requestOrigin || request.get("origin") !== requestOrigin) {
+    return void response.status(403).json({ error: "Report requests must come from this gallery." } satisfies ErrorResponse);
+  }
+
+  if (!reportTransport) {
+    return void response.status(503).json({ error: "Image reporting is not configured." } satisfies ErrorResponse);
+  }
+
+  const body = request.body as Partial<ImageReportRequest> | undefined;
+  if (
+    !body || typeof body.imagePath !== "string" || typeof body.imageUrl !== "string" ||
+    body.imagePath.length > 2_048 || body.imageUrl.length > 4_096
+  ) {
+    return void response.status(400).json({ error: "Invalid image report." } satisfies ErrorResponse);
+  }
+
+  const mediaPath = await resolveSafeMediaPath(config.galleryDir, body.imagePath);
+  if (!mediaPath) {
+    return void response.status(404).json({ error: "The reported image could not be found." } satisfies ErrorResponse);
+  }
+
+  let imageUrl: URL;
+  try {
+    imageUrl = new URL(body.imageUrl);
+  } catch {
+    return void response.status(400).json({ error: "Invalid image URL." } satisfies ErrorResponse);
+  }
+
+  const encodedImagePath = body.imagePath.split("/").map(encodeURIComponent).join("/");
+  const expectedMediaSuffix = `/media/${encodedImagePath}`;
+  if (
+    imageUrl.origin !== requestOrigin || imageUrl.search || imageUrl.hash ||
+    (imageUrl.pathname !== expectedMediaSuffix && !imageUrl.pathname.endsWith(expectedMediaSuffix))
+  ) {
+    return void response.status(400).json({ error: "Invalid image URL." } satisfies ErrorResponse);
+  }
+
+  const now = Date.now();
+  const clientKey = request.ip ?? request.socket.remoteAddress ?? "unknown";
+  let limit = reportLimits.get(clientKey);
+  if (limit?.blockedUntil && limit.blockedUntil <= now) {
+    reportLimits.delete(clientKey);
+    limit = undefined;
+  }
+  if (limit?.blockedUntil && limit.blockedUntil > now) {
+    return void response.status(429).json({ error: "Reporting is temporarily unavailable." } satisfies ErrorResponse);
+  }
+  if ((limit?.successfulReports ?? 0) >= maximumReportsBeforeBlock) {
+    reportLimits.set(clientKey, {
+      successfulReports: maximumReportsBeforeBlock,
+      blockedUntil: now + reportBlockDurationMs,
+    });
+    return void response.status(429).json({ error: "Reporting is temporarily unavailable." } satisfies ErrorResponse);
+  }
+
+  try {
+    await reportTransport.sendMail({
+      from: config.reportEmailFrom,
+      to: config.reportEmailTo,
+      subject: "Explicit sexual content report",
+      text: [
+        "An image was reported as explicit sexual content.",
+        "",
+        imageUrl.href,
+        "",
+        `Gallery path: ${body.imagePath}`,
+      ].join("\n"),
+    });
+  } catch (error) {
+    console.error("Could not send image report email:", error);
+    return void response.status(502).json({ error: "The report could not be sent." } satisfies ErrorResponse);
+  }
+
+  reportLimits.set(clientKey, { successfulReports: (limit?.successfulReports ?? 0) + 1 });
+  const payload: ImageReportResponse = { message: "Report sent." };
+  response.status(202).json(payload);
+});
 
 app.get("/api/images", async (request, response) => {
   response.setHeader("Cache-Control", "no-store");

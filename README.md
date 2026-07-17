@@ -46,6 +46,12 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 | `PM2_APP_NAME` | unset | Existing PM2 process name restarted by `deploy.sh`; must be set per instance |
 | `HOST` | `127.0.0.1` | Address used by the Express server |
 | `PORT` | `8080` | Port used by the Express server |
+| `REPORT_SMTP_HOST` | unset | SMTP server used to send explicit-content reports; reporting returns unavailable when unset |
+| `REPORT_SMTP_PORT` | `587` | SMTP server port |
+| `REPORT_SMTP_SECURE` | `false` | Use implicit TLS (normally enabled with port 465) |
+| `REPORT_SMTP_USER` | unset | Optional SMTP username; must be set together with `REPORT_SMTP_PASSWORD` |
+| `REPORT_SMTP_PASSWORD` | unset | Optional SMTP password; must be set together with `REPORT_SMTP_USER` |
+| `REPORT_EMAIL_FROM` | `Image Gallery <admin@flamehorn.com>` | Sender shown on report emails sent to `admin@flamehorn.com` |
 
 Hidden entries, symbolic links, and unsupported files are ignored. New files appear after a page refresh; no rebuild is required. Images near the viewport are loaded first, then loading continues through the full gallery in the background with no more than four media files loading concurrently.
 

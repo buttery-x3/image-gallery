@@ -23,7 +23,56 @@ body {
   background: radial-gradient(circle at 50% -20%, rgba(255, 255, 255, 0.07), transparent 34rem), #0b0c0e;
 }
 
+body.consent-pending {
+  background: #000;
+  overflow: hidden;
+}
+
+body.consent-pending > :not(#consent-dialog):not(script) { visibility: hidden; }
+
 button { font: inherit; }
+
+.consent-dialog,
+.report-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 14px;
+  background: #15171a;
+  color: #f3f3f1;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.72);
+}
+
+.consent-dialog::backdrop { background: #000; }
+.report-dialog::backdrop { background: rgba(0, 0, 0, 0.82); }
+
+.consent-card,
+.report-card { padding: clamp(22px, 5vw, 34px); }
+
+.consent-card h2 {
+  margin: 0 0 14px;
+  font-size: 1.25rem;
+}
+
+.consent-card p,
+.report-card p {
+  margin: 0;
+  color: #d5d6d8;
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+
+.consent-agree {
+  width: 100%;
+  margin-top: 24px;
+}
+
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 24px;
+}
 
 .visually-hidden {
   position: absolute;
@@ -391,7 +440,9 @@ main { flex: 1 0 auto; }
 .filter-field select:focus-visible,
 .filter-close:focus-visible,
 .secondary-button:focus-visible,
-.primary-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.primary-button:focus-visible,
+.danger-button:focus-visible,
+.report-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 .filter-actions {
   display: flex;
@@ -403,7 +454,8 @@ main { flex: 1 0 auto; }
 }
 
 .secondary-button,
-.primary-button {
+.primary-button,
+.danger-button {
   min-height: 36px;
   padding: 7px 13px;
   border-radius: 8px;
@@ -414,6 +466,8 @@ main { flex: 1 0 auto; }
 
 .secondary-button { border: 1px solid rgba(255, 255, 255, 0.16); background: transparent; color: #d7d8da; }
 .primary-button { border: 1px solid #f3f3f1; background: #f3f3f1; color: #111214; }
+.danger-button { border: 1px solid #e44848; background: #c82f2f; color: #fff; }
+.secondary-button:disabled, .primary-button:disabled, .danger-button:disabled { cursor: wait; opacity: 0.62; }
 
 .status {
   width: min(34rem, calc(100% - 32px));
@@ -535,9 +589,41 @@ main { flex: 1 0 auto; }
 .lightbox-favorite.is-favorite svg { fill: currentColor; }
 
 .gallery-item:hover .tile-actions,
-.gallery-item:focus-within .tile-actions {
+.gallery-item:focus-within .tile-actions,
+.gallery-item:hover .tile-report-button,
+.gallery-item:focus-within .tile-report-button {
   opacity: 1;
   transform: translateY(0);
+}
+
+.report-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 7px;
+  background: rgba(190, 37, 37, 0.94);
+  color: #fff;
+  font-size: 1.18rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.38);
+  transition: background-color 140ms ease, opacity 140ms ease, transform 140ms ease;
+}
+
+.report-button:hover { background: #e03b3b; }
+.report-button:disabled { cursor: wait; opacity: 0.62; }
+
+.tile-report-button {
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(3px);
 }
 
 .tile-action-button:hover { background: rgba(25, 27, 31, 0.96); }
@@ -589,9 +675,18 @@ main { flex: 1 0 auto; }
   max-width: calc(100vw - 164px);
 }
 
+.lightbox-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
 .lightbox-name {
   width: 100%;
-  margin: 0 0 10px;
+  margin: 0;
   color: #f3f3f3;
   font-size: 0.9rem;
   font-weight: 600;
@@ -600,6 +695,8 @@ main { flex: 1 0 auto; }
   text-align: left;
   font-family: Inter, "Noto Sans JP", "Yu Gothic", "Hiragino Sans", ui-sans-serif, system-ui, sans-serif;
 }
+
+.lightbox-report { flex: 0 0 auto; }
 
 .lightbox-media {
   --lightbox-name-en-size: 2.5rem;
@@ -862,7 +959,7 @@ body.lightbox-open { overflow: hidden; }
 }
 
 @media (hover: none), (pointer: coarse) {
-  .tile-actions { display: none; }
+  .tile-actions, .tile-report-button { display: none; }
 }
 
 @media (max-width: 800px) {
@@ -891,7 +988,7 @@ body.lightbox-open { overflow: hidden; }
   .support-card[hidden] { display: none; }
   .support-card p { margin: 0; font-size: 0.72rem; }
   .support-card .support-button-host { display: block; justify-self: auto; }
-  .tile-actions { display: none; }
+  .tile-actions, .tile-report-button { display: none; }
 
   .lightbox { padding: 16px; }
   .lightbox-stage {
@@ -920,12 +1017,10 @@ body.lightbox-open { overflow: hidden; }
   .lightbox-image { max-height: calc(100dvh - 240px); }
   .lightbox-actions { margin-top: 8px; }
   .lightbox-name {
-    grid-column: 1;
-    grid-row: 1;
     width: 100%;
     max-width: none;
-    margin: 0 0 8px;
   }
+  .lightbox-heading { grid-column: 1; grid-row: 1; margin-bottom: 8px; }
   .lightbox-nav {
     position: static;
     width: 38px;
