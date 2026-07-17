@@ -16,6 +16,8 @@ html {
 }
 
 body {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   margin: 0;
   background: radial-gradient(circle at 50% -20%, rgba(255, 255, 255, 0.07), transparent 34rem), #0b0c0e;
@@ -37,12 +39,28 @@ button { font: inherit; }
 
 .site-header {
   display: grid;
-  grid-template-columns: auto minmax(220px, 42rem) auto;
+  grid-template-columns: auto minmax(220px, 42rem) auto auto;
   align-items: center;
   width: 100%;
   padding: 22px 24px 18px;
   gap: 18px;
 }
+
+main { flex: 1 0 auto; }
+
+.support-button-host {
+  justify-self: end;
+  line-height: 0;
+}
+
+.support-footer {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: 20px 16px 28px;
+}
+
+.support-footer[hidden] { display: none; }
 
 .site-header h1 {
   margin: 0;
@@ -441,7 +459,7 @@ button { font: inherit; }
 
 .gallery-short-name {
   position: absolute;
-  top: 9px;
+  bottom: 9px;
   left: 10px;
   z-index: 1;
   max-width: calc(100% - 120px);
@@ -450,6 +468,8 @@ button { font: inherit; }
   font-weight: 600;
   line-height: 1.15;
   text-align: left;
+  -webkit-text-stroke: 1px #fff;
+  paint-order: stroke fill;
   overflow-wrap: anywhere;
   pointer-events: none;
 }
@@ -840,6 +860,8 @@ body.lightbox-open { overflow: hidden; }
 
   .header-controls { grid-column: 1 / -1; grid-row: 2; }
   .image-count { grid-column: 2; grid-row: 1; }
+  .site-header > .support-button-host { display: none; }
+  .support-footer .support-button-host { display: block; }
   .tile-actions { display: none; }
 
   .lightbox { padding: 16px; }

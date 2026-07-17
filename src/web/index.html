@@ -34,11 +34,7 @@
           </svg>
           <input id="search" type="search" placeholder="Search images" autocomplete="off" />
         </label>
-        <label class="searchable-toggle">
-          <input id="searchable-only" type="checkbox" checked />
-          <span class="toggle-track" aria-hidden="true"><span></span></span>
-          <span>Searchable only</span>
-        </label>
+        <input id="searchable-only" type="checkbox" checked hidden />
         <label class="searchable-toggle">
           <input id="favorites-only" type="checkbox" />
           <span class="toggle-track" aria-hidden="true"><span></span></span>
@@ -60,11 +56,15 @@
         </button>
       </div>
       <p id="image-count" class="image-count" aria-live="polite"></p>
+      <div id="support-button" class="support-button-host">
+        <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="buttery_x3" data-color="#FFDD00" data-emoji="☕" data-font="Arial" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#000000" data-coffee-color="#ffffff"></script>
+      </div>
     </header>
     <main>
       <p id="status" class="status">Loading gallery…</p>
       <section id="gallery" class="gallery" aria-label="Image gallery"></section>
     </main>
+    <footer id="support-footer" class="support-footer" aria-label="Support this site" hidden></footer>
     <dialog id="filter-dialog" class="filter-dialog" aria-labelledby="filter-dialog-title">
       <form id="filter-form" class="filter-form">
         <div class="filter-dialog-header">

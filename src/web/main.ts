@@ -10,6 +10,9 @@ function requiredElement<T extends Element>(selector: string): T {
 const gallery = requiredElement<HTMLElement>("#gallery");
 const status = requiredElement<HTMLElement>("#status");
 const imageCount = requiredElement<HTMLElement>("#image-count");
+const siteHeader = requiredElement<HTMLElement>(".site-header");
+const supportButton = requiredElement<HTMLElement>("#support-button");
+const supportFooter = requiredElement<HTMLElement>("#support-footer");
 const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const searchInput = requiredElement<HTMLInputElement>("#search");
 const searchableOnly = requiredElement<HTMLInputElement>("#searchable-only");
@@ -72,8 +75,20 @@ let { nameVisible: overlayNameVisible, namePosition: overlayNamePosition } = loa
 
 const maximumConcurrentImageLoads = 4;
 const lazyLoadMargin = 150;
+const mobileHeaderQuery = window.matchMedia("(max-width: 800px)");
 const pendingTiles: HTMLElement[] = [];
 let queueRefreshFrame: number | undefined;
+
+function syncSupportButtonPlacement(): void {
+  const mobile = mobileHeaderQuery.matches;
+  const destination = mobile ? supportFooter : siteHeader;
+  if (supportButton.parentElement !== destination) destination.append(supportButton);
+  supportFooter.hidden = !mobile;
+  supportButton.querySelector<HTMLAnchorElement>(".bmc-btn")?.setAttribute("rel", "noopener noreferrer");
+}
+
+syncSupportButtonPlacement();
+mobileHeaderQuery.addEventListener("change", syncSupportButtonPlacement);
 
 function cancelQueueRefresh(): void {
   if (queueRefreshFrame === undefined) return;
