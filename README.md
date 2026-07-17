@@ -43,6 +43,7 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 | `GALLERY_DESCRIPTION` | `A simple private image gallery.` | Description used in browser and social metadata (applied at build time) |
 | `SITE_URL` | unset | Full public gallery URL used for canonical and absolute social-preview URLs (applied at build time) |
 | `BATCH_NAME_STYLE` | unset | Set to `japanese-fantasy` to generate long fantasy names while batching |
+| `PM2_APP_NAME` | unset | Existing PM2 process name restarted by `deploy.sh`; must be set per instance |
 | `HOST` | `127.0.0.1` | Address used by the Express server |
 | `PORT` | `8080` | Port used by the Express server |
 
