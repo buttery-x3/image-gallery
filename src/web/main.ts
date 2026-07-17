@@ -11,6 +11,14 @@ const gallery = requiredElement<HTMLElement>("#gallery");
 const status = requiredElement<HTMLElement>("#status");
 const imageCount = requiredElement<HTMLElement>("#image-count");
 const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
+const searchInput = requiredElement<HTMLInputElement>("#search");
+const advancedButton = requiredElement<HTMLButtonElement>("#advanced-filters");
+const advancedFilterCount = requiredElement<HTMLElement>("#advanced-filter-count");
+const filterDialog = requiredElement<HTMLDialogElement>("#filter-dialog");
+const filterForm = requiredElement<HTMLFormElement>("#filter-form");
+const filterGrid = requiredElement<HTMLElement>("#filter-grid");
+const filterClose = requiredElement<HTMLButtonElement>("#filter-close");
+const filterReset = requiredElement<HTMLButtonElement>("#filter-reset");
 const lightbox = requiredElement<HTMLDialogElement>("#lightbox");
 const lightboxStage = requiredElement<HTMLElement>(".lightbox-stage");
 const lightboxImage = requiredElement<HTMLImageElement>("#lightbox-image");
@@ -23,7 +31,11 @@ let toastTimer: number | undefined;
 let activeOpener: HTMLButtonElement | undefined;
 let activeImageIndex = -1;
 let activeImageLoads = 0;
+let allImages: GalleryImage[] = [];
 let galleryImages: GalleryImage[] = [];
+let searchTimer: number | undefined;
+const activeFilters = new Map<string, string>();
+const imageSearchIndexes = new WeakMap<GalleryImage, string>();
 const tilesByImage = new Map<GalleryImage, HTMLElement>();
 
 const maximumConcurrentImageLoads = 4;
@@ -53,14 +65,8 @@ function shuffledImages(images: readonly GalleryImage[]): GalleryImage[] {
 }
 
 function shuffleGallery(): void {
-  galleryImages = shuffledImages(galleryImages);
-  for (const [index, image] of galleryImages.entries()) {
-    const tile = tilesByImage.get(image);
-    if (tile) tile.style.order = String(index);
-  }
-
-  cancelQueueRefresh();
-  queueRefreshFrame = window.requestAnimationFrame(refreshImageQueue);
+  allImages = shuffledImages(allImages);
+  applyFilters();
 }
 
 function showToast(message: string): void {
@@ -87,6 +93,151 @@ async function copyText(value: string): Promise<void> {
   textarea.remove();
   if (!copied) throw new Error("Copy failed");
 }
+
+const filterCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+function normalized(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase();
+}
+
+function tagValue(image: GalleryImage, key: string): string | undefined {
+  return key === "batch" ? image.batch : image.metadata?.tags[key];
+}
+
+function searchIndex(image: GalleryImage): string {
+  const existing = imageSearchIndexes.get(image);
+  if (existing) return existing;
+
+  const metadata = image.metadata;
+  const values = [
+    image.name,
+    image.path,
+    image.batch ?? "",
+    metadata?.schema ?? "",
+    metadata?.resolvedPrompt ?? "",
+    ...Object.values(metadata?.tags ?? {}),
+    ...Object.values(metadata?.searchTokens ?? {}).flat(),
+  ];
+  const index = normalized(values.join("\n"));
+  imageSearchIndexes.set(image, index);
+  return index;
+}
+
+function fieldLabel(key: string): string {
+  return key
+    .split("_")
+    .map((part) => part.charAt(0).toLocaleUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function renderFilterControls(): void {
+  const facets = new Map<string, Map<string, number>>();
+  for (const image of allImages) {
+    const values = new Map<string, string>(Object.entries(image.metadata?.tags ?? {}));
+    if (image.batch) values.set("batch", image.batch);
+    for (const [key, value] of values) {
+      let counts = facets.get(key);
+      if (!counts) {
+        counts = new Map();
+        facets.set(key, counts);
+      }
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+  }
+
+  const keys = [...facets.keys()].sort((left, right) => {
+    if (left === "batch") return -1;
+    if (right === "batch") return 1;
+    return filterCollator.compare(fieldLabel(left), fieldLabel(right));
+  });
+
+  const fragment = document.createDocumentFragment();
+  for (const key of keys) {
+    const label = document.createElement("label");
+    label.className = "filter-field";
+
+    const caption = document.createElement("span");
+    caption.textContent = fieldLabel(key);
+
+    const select = document.createElement("select");
+    select.dataset.filterKey = key;
+    select.setAttribute("aria-label", fieldLabel(key));
+
+    const anyOption = document.createElement("option");
+    anyOption.value = "";
+    anyOption.textContent = "Any";
+    select.append(anyOption);
+
+    const counts = facets.get(key)!;
+    const values = [...counts.keys()].sort(filterCollator.compare);
+    for (const value of values) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = `${value} (${counts.get(value)})`;
+      select.append(option);
+    }
+
+    label.append(caption, select);
+    fragment.append(label);
+  }
+
+  filterGrid.replaceChildren(fragment);
+  advancedButton.disabled = keys.length === 0;
+}
+
+function syncFilterControls(): void {
+  for (const select of filterGrid.querySelectorAll<HTMLSelectElement>("select[data-filter-key]")) {
+    select.value = activeFilters.get(select.dataset.filterKey ?? "") ?? "";
+  }
+}
+
+function updateFilterCount(): void {
+  const count = activeFilters.size;
+  advancedFilterCount.hidden = count === 0;
+  advancedFilterCount.textContent = String(count);
+  advancedButton.setAttribute("aria-label", count === 0 ? "Advanced filters" : `Advanced filters, ${count} active`);
+}
+
+function applyFilters(): void {
+  const terms = normalized(searchInput.value).split(/\s+/).filter(Boolean);
+  const images = allImages.filter((image) => {
+    if (terms.some((term) => !searchIndex(image).includes(term))) return false;
+    for (const [key, value] of activeFilters) {
+      if (tagValue(image, key) !== value) return false;
+    }
+    return true;
+  });
+  renderImages(images);
+  updateFilterCount();
+}
+
+advancedButton.addEventListener("click", () => {
+  syncFilterControls();
+  filterDialog.showModal();
+});
+filterClose.addEventListener("click", () => filterDialog.close());
+filterReset.addEventListener("click", () => {
+  for (const select of filterGrid.querySelectorAll<HTMLSelectElement>("select[data-filter-key]")) {
+    select.value = "";
+  }
+});
+filterForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  activeFilters.clear();
+  for (const select of filterGrid.querySelectorAll<HTMLSelectElement>("select[data-filter-key]")) {
+    const key = select.dataset.filterKey;
+    if (key && select.value) activeFilters.set(key, select.value);
+  }
+  filterDialog.close();
+  applyFilters();
+});
+filterDialog.addEventListener("click", (event) => {
+  if (event.target === filterDialog) filterDialog.close();
+});
+searchInput.addEventListener("input", () => {
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(applyFilters, 120);
+});
 
 function resizeTile(tile: HTMLElement): void {
   const styles = window.getComputedStyle(gallery);
@@ -316,25 +467,36 @@ function renderImages(images: GalleryImage[]): void {
   }
   gallery.append(fragment);
 
-  imageCount.textContent = images.length === 1 ? "1 image" : `${images.length} images`;
-  shuffleButton.disabled = images.length < 2;
+  if (images.length === allImages.length) {
+    imageCount.textContent = images.length === 1 ? "1 image" : `${images.length} images`;
+  } else {
+    imageCount.textContent = `${images.length} of ${allImages.length} images`;
+  }
+  shuffleButton.disabled = allImages.length < 2;
   status.hidden = images.length > 0;
-  status.textContent = images.length === 0 ? "No images yet. Add some files and refresh." : "";
+  status.textContent = images.length === 0
+    ? (allImages.length === 0 ? "No images yet. Add some files and refresh." : "No images match your search and filters.")
+    : "";
 }
 
 async function loadGallery(): Promise<void> {
   status.hidden = false;
-  status.textContent = "Loading gallery…";
+  status.textContent = "Loading gallery\u2026";
   try {
     const response = await fetch(new URL("api/images", document.baseURI), { cache: "no-store" });
     const payload = (await response.json()) as GalleryResponse | ErrorResponse;
     if (!response.ok || !("images" in payload)) {
       throw new Error("error" in payload ? payload.error : "The gallery could not be loaded.");
     }
-    renderImages(shuffledImages(payload.images));
+    allImages = shuffledImages(payload.images);
+    activeFilters.clear();
+    renderFilterControls();
+    applyFilters();
   } catch (error) {
+    allImages = [];
     gallery.replaceChildren();
     shuffleButton.disabled = true;
+    advancedButton.disabled = true;
     imageCount.textContent = "";
     status.hidden = false;
     status.textContent = error instanceof Error ? error.message : "The gallery could not be loaded.";

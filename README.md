@@ -1,6 +1,6 @@
 # Image Gallery
 
-A small, private, self-hosted image gallery. Copy images and GIFs into a folder, refresh the page, and they are displayed in a full-width masonry gallery.
+A small, private, self-hosted image gallery. Copy images and GIFs into a folder, refresh the page, and they are displayed in a full-width masonry gallery. Search is available in the header, with advanced metadata filters when matching JSON sidecars are present.
 
 Gallery media is shown at exactly 300px wide with its natural height. Clicking an image opens it against a dark lightbox, while the hover Copy button copies its direct public URL.
 
@@ -44,6 +44,8 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 
 Hidden entries, symbolic links, and unsupported files are ignored. New files appear after a page refresh; no rebuild is required. Images and GIFs are loaded shortly before they enter the viewport, with no more than four media files loading concurrently.
 
+Images may have a same-name JSON sidecar in the same directory. The `anime_waifu_lite/v1` format is used for prompt search and advanced tag filters; invalid, unsupported, or missing metadata does not prevent the image from appearing. The containing subdirectory is also available as a Batch filter.
+
 GIF and PNG tiles use automatically generated 300px-wide lossy WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. Previews are created on first view and cached outside the gallery; the original file is still used in the lightbox and by the Copy control.
 
 To generate every missing preview without scrolling through the gallery, run this while the server is running:
@@ -52,7 +54,15 @@ To generate every missing preview without scrolling through the gallery, run thi
 ./cache-previews.sh
 ```
 
-The script uses up to four concurrent local requests. Pass a base URL as its first argument if the server does not use the configured local port, for example `./cache-previews.sh https://www.example.com/image-gallery/`.
+The script checks the current preview cache first and requests only missing previews, using up to four concurrent local requests. Pass a base URL as its first argument if the server does not use the configured local port, for example `./cache-previews.sh https://www.example.com/image-gallery/`.
+
+To organize new root-level image/JSON pairs into a timestamped batch and cache only that batch's missing previews, run:
+
+```sh
+npm run process-batch
+```
+
+Existing unpaired root-level images are left in place. Use `npm run process-batch -- --dry-run` to inspect the proposed move, or append the public base URL after `--` when the service is not available on its configured local port. The organization step validates every JSON sidecar before moving anything. If preview caching fails afterward, the organized batch remains intact and caching can be rerun separately.
 
 ## Commands
 
@@ -62,7 +72,8 @@ The script uses up to four concurrent local requests. Pass a base URL as its fir
 | `npm run typecheck` | Check browser and server TypeScript |
 | `npm run build` | Compile the browser and server production output |
 | `npm start` | Run the compiled production server |
-| `./cache-previews.sh` | Generate and cache every PNG and GIF preview |
+| `./cache-previews.sh` | Generate only missing PNG and GIF previews |
+| `npm run process-batch` | Organize paired uploads into a timestamped batch and cache its previews |
 
 On the Linux server described in the installation guide, deploy an update with `sudo ./deploy.sh`.
 

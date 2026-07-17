@@ -94,7 +94,7 @@ gallery.example.com {
 
 ## 6. Add media
 
-Copy supported files into `/srv/image-gallery/images`. Subdirectories are scanned automatically.
+Copy supported files into `/srv/image-gallery/images`. Subdirectories are scanned automatically. A same-name JSON sidecar using the `anime_waifu_lite/v1` schema enables prompt search and advanced tag filters for its image.
 
 ```sh
 sudo -u image-gallery cp /path/to/picture.jpg /srv/image-gallery/images/
@@ -114,8 +114,15 @@ To generate every missing preview without scrolling through the gallery, run thi
 sudo -u image-gallery /opt/image-gallery/cache-previews.sh
 ```
 
-The script requests up to four previews concurrently through the local service. Existing cached previews return
-immediately.
+The script checks cache status first and requests only missing previews, with up to four requests running concurrently through the local service.
+
+For regular paired uploads, place the new images and JSON sidecars directly in `/srv/image-gallery/images`, then run:
+
+```sh
+sudo -u image-gallery npm --prefix /opt/image-gallery run process-batch
+```
+
+The command validates each root-level pair, moves it into one timestamped batch subdirectory, and caches only that batch's missing previews. Existing unpaired root-level images are not moved. Add `--dry-run` to inspect the batch without changing files.
 
 ## Updating
 

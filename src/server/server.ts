@@ -21,10 +21,16 @@ app.use((_request, response, next) => {
 
 app.get("/healthz", (_request, response) => response.type("text/plain").send("ok"));
 
-app.get("/api/images", async (_request, response) => {
+app.get("/api/images", async (request, response) => {
   response.setHeader("Cache-Control", "no-store");
   try {
-    const payload: GalleryResponse = { images: await readGalleryImages(config.galleryDir) };
+    const includePreviewStatus = request.query.includePreviewStatus === "1";
+    const payload: GalleryResponse = {
+      images: await readGalleryImages(config.galleryDir, {
+        includePreviewStatus,
+        previewCacheDir: config.previewCacheDir,
+      }),
+    };
     response.json(payload);
   } catch (error) {
     const payload: ErrorResponse = {

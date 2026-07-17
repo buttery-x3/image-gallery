@@ -16,6 +16,16 @@ function cacheKey(relativePath: string, size: number, modifiedAt: number): strin
     .digest("hex");
 }
 
+export function imagePreviewCachePath(
+  relativePath: string,
+  size: number,
+  modifiedAt: number,
+  cacheDirectory: string,
+): string {
+  const key = cacheKey(relativePath, size, modifiedAt);
+  return path.join(cacheDirectory, key.slice(0, 2), `${key}.webp`);
+}
+
 async function exists(filePath: string): Promise<boolean> {
   try {
     await access(filePath);
@@ -49,8 +59,7 @@ export async function imagePreviewPath(
   cacheDirectory: string,
 ): Promise<string> {
   const sourceStats = await stat(sourcePath);
-  const key = cacheKey(relativePath, sourceStats.size, sourceStats.mtimeMs);
-  const outputPath = path.join(cacheDirectory, key.slice(0, 2), `${key}.webp`);
+  const outputPath = imagePreviewCachePath(relativePath, sourceStats.size, sourceStats.mtimeMs, cacheDirectory);
 
   const existing = pendingPreviews.get(outputPath);
   if (existing) return existing;

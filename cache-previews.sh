@@ -5,16 +5,21 @@ set -Eeuo pipefail
 repository_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repository_dir"
 
-node --input-type=module - "${1:-}" <<'NODE'
+node --input-type=module - "${1:-}" "${2:-}" <<'NODE'
 import "dotenv/config";
 
 const requestedBaseUrl = process.argv[2];
+const requestedPathPrefix = process.argv[3]
+  ?.replaceAll("\\", "/")
+  .replace(/^\/+|\/+$/g, "");
 const baseUrl = new URL(
   requestedBaseUrl || `http://127.0.0.1:${process.env.PORT ?? "8080"}/`,
 );
 if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname += "/";
 
-const galleryResponse = await fetch(new URL("api/images", baseUrl), { cache: "no-store" });
+const galleryUrl = new URL("api/images", baseUrl);
+galleryUrl.searchParams.set("includePreviewStatus", "1");
+const galleryResponse = await fetch(galleryUrl, { cache: "no-store" });
 if (!galleryResponse.ok) {
   throw new Error(`Could not load the gallery (${galleryResponse.status} ${galleryResponse.statusText}).`);
 }
@@ -24,16 +29,28 @@ if (!payload || !Array.isArray(payload.images)) {
   throw new Error("The gallery returned an unexpected response.");
 }
 
-const previewUrls = payload.images
-  .map((image) => image?.previewUrl)
-  .filter((previewUrl) => typeof previewUrl === "string");
+const previewImages = payload.images.filter((image) => {
+  if (!image || typeof image.previewUrl !== "string") return false;
+  if (!requestedPathPrefix) return true;
+  return typeof image.path === "string" && image.path.startsWith(`${requestedPathPrefix}/`);
+});
+const cachedCount = previewImages.filter((image) => image.previewCached === true).length;
+const previewUrls = previewImages
+  .filter((image) => image.previewCached !== true)
+  .map((image) => image.previewUrl);
+
+if (cachedCount > 0) {
+  console.log(`${cachedCount} preview${cachedCount === 1 ? " is" : "s are"} already cached.`);
+}
 
 if (previewUrls.length === 0) {
-  console.log("No PNG or GIF previews need caching.");
+  console.log(requestedPathPrefix
+    ? `No PNG or GIF previews need caching in ${requestedPathPrefix}.`
+    : "No PNG or GIF previews need caching.");
   process.exit(0);
 }
 
-console.log(`Caching ${previewUrls.length} previews through ${baseUrl.href}`);
+console.log(`Caching ${previewUrls.length} missing preview${previewUrls.length === 1 ? "" : "s"} through ${baseUrl.href}`);
 
 let nextIndex = 0;
 let completed = 0;

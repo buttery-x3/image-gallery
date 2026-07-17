@@ -1,6 +1,8 @@
-import { lstat, readdir } from "node:fs/promises";
+import { access, lstat, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { GalleryImage, ImageKind } from "../shared/types.js";
+import { readImageMetadata } from "./metadata.js";
+import { imagePreviewCachePath } from "./previews.js";
 
 const supportedExtensions = new Map<string, ImageKind>([
   [".jpg", "jpeg"],
@@ -23,7 +25,12 @@ function toUrlPath(relativePath: string): string {
   return relativePath.split("/").map(encodeURIComponent).join("/");
 }
 
-export async function readGalleryImages(root: string): Promise<GalleryImage[]> {
+interface GalleryReadOptions {
+  includePreviewStatus?: boolean;
+  previewCacheDir?: string;
+}
+
+export async function readGalleryImages(root: string, options: GalleryReadOptions = {}): Promise<GalleryImage[]> {
   let rootStats;
   try {
     rootStats = await lstat(root);
@@ -39,6 +46,11 @@ export async function readGalleryImages(root: string): Promise<GalleryImage[]> {
 
   async function walk(directory: string): Promise<void> {
     const entries = await readdir(directory, { withFileTypes: true });
+    const metadataFiles = new Map(
+      entries
+        .filter((entry) => !entry.name.startsWith(".") && !entry.isSymbolicLink() && entry.isFile() && path.extname(entry.name).toLowerCase() === ".json")
+        .map((entry) => [path.basename(entry.name, path.extname(entry.name)), path.join(directory, entry.name)]),
+    );
     for (const entry of entries) {
       if (entry.name.startsWith(".") || entry.isSymbolicLink()) continue;
 
@@ -54,15 +66,41 @@ export async function readGalleryImages(root: string): Promise<GalleryImage[]> {
 
       const stats = await lstat(absolutePath);
       const relativePath = path.relative(root, absolutePath).split(path.sep).join("/");
+      const relativeDirectory = path.posix.dirname(relativePath);
+      const previewUrl = type === "gif" || type === "png"
+        ? `previews/${toUrlPath(relativePath)}?v=${Math.trunc(stats.mtimeMs)}-${stats.size}`
+        : undefined;
+      let metadata;
+      const metadataPath = metadataFiles.get(path.basename(entry.name, path.extname(entry.name)));
+      if (metadataPath) {
+        try {
+          metadata = await readImageMetadata(metadataPath);
+        } catch (error) {
+          console.warn(`Ignoring invalid metadata for ${relativePath}:`, error);
+        }
+      }
+
+      let previewCached: boolean | undefined;
+      if (previewUrl && options.includePreviewStatus && options.previewCacheDir) {
+        const cachePath = imagePreviewCachePath(relativePath, stats.size, stats.mtimeMs, options.previewCacheDir);
+        try {
+          await access(cachePath);
+          previewCached = true;
+        } catch {
+          previewCached = false;
+        }
+      }
+
       images.push({
         name: entry.name,
         path: relativePath,
         url: `media/${toUrlPath(relativePath)}`,
-        ...(type === "gif" || type === "png" ? {
-          previewUrl: `previews/${toUrlPath(relativePath)}?v=${Math.trunc(stats.mtimeMs)}-${stats.size}`,
-        } : {}),
+        ...(previewUrl ? { previewUrl } : {}),
+        ...(previewCached === undefined ? {} : { previewCached }),
         modifiedAt: stats.mtime.toISOString(),
         type,
+        ...(relativeDirectory === "." ? {} : { batch: relativeDirectory }),
+        ...(metadata ? { metadata } : {}),
       });
     }
   }

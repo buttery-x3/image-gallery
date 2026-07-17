@@ -22,12 +22,42 @@
           <span>Shuffle</span>
         </button>
       </div>
+      <div class="header-controls">
+        <label class="search-field">
+          <span class="visually-hidden">Search images</span>
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m16 16 5 5" />
+          </svg>
+          <input id="search" type="search" placeholder="Search images" autocomplete="off" />
+        </label>
+        <button id="advanced-filters" class="advanced-button" type="button" disabled>
+          <span>Advanced</span>
+          <span id="advanced-filter-count" class="filter-count" hidden></span>
+        </button>
+      </div>
       <p id="image-count" class="image-count" aria-live="polite"></p>
     </header>
     <main>
       <p id="status" class="status">Loading gallery…</p>
       <section id="gallery" class="gallery" aria-label="Image gallery"></section>
     </main>
+    <dialog id="filter-dialog" class="filter-dialog" aria-labelledby="filter-dialog-title">
+      <form id="filter-form" class="filter-form">
+        <div class="filter-dialog-header">
+          <div>
+            <h2 id="filter-dialog-title">Advanced filters</h2>
+            <p>Choose any combination of metadata tags.</p>
+          </div>
+          <button id="filter-close" class="filter-close" type="button" aria-label="Close filters">×</button>
+        </div>
+        <div id="filter-grid" class="filter-grid"></div>
+        <div class="filter-actions">
+          <button id="filter-reset" class="secondary-button" type="button">Reset</button>
+          <button class="primary-button" type="submit">Apply filters</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="lightbox" class="lightbox" aria-label="Image preview">
       <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Close preview">
         <span aria-hidden="true">×</span>
