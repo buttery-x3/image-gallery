@@ -334,6 +334,34 @@ function resolvedCssColor(value: string): string | undefined {
   return undefined;
 }
 
+const overlayColorSampler = document.createElement("canvas");
+overlayColorSampler.width = 1;
+overlayColorSampler.height = 1;
+const overlayColorContext = overlayColorSampler.getContext("2d", { willReadFrequently: true });
+
+function colorLuminance(color: string): number | undefined {
+  if (!overlayColorContext) return undefined;
+  overlayColorContext.clearRect(0, 0, 1, 1);
+  overlayColorContext.fillStyle = color;
+  overlayColorContext.fillRect(0, 0, 1, 1);
+  const [red, green, blue, alpha] = overlayColorContext.getImageData(0, 0, 1, 1).data;
+  if (red === undefined || green === undefined || blue === undefined || alpha !== 255) return undefined;
+
+  const linear = (channel: number): number => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue);
+}
+
+function colorsContrast(first: string, second: string): boolean {
+  const firstLuminance = colorLuminance(first);
+  const secondLuminance = colorLuminance(second);
+  if (firstLuminance === undefined || secondLuminance === undefined) return false;
+  return (Math.max(firstLuminance, secondLuminance) + 0.05) /
+    (Math.min(firstLuminance, secondLuminance) + 0.05) >= 3;
+}
+
 function overlayColors(image: GalleryImage): { fill: string; outline: string } {
   const colors: string[] = [];
   for (const field of overlayColorFields) {
@@ -341,7 +369,11 @@ function overlayColors(image: GalleryImage): { fill: string; outline: string } {
     if (!value) continue;
     const color = resolvedCssColor(value);
     if (color && !colors.includes(color)) colors.push(color);
-    if (colors.length === 2) return { fill: colors[0]!, outline: colors[1]! };
+  }
+  const fill = colors[0];
+  if (fill) {
+    const outline = colors.slice(1).find((color) => colorsContrast(fill, color));
+    if (outline) return { fill, outline };
   }
   return { fill: "#fff", outline: "#000" };
 }
