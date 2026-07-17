@@ -142,6 +142,13 @@ async function readImageRecords(directory, options = {}) {
     const stem = path.basename(jsonFile.name, path.extname(jsonFile.name));
     const matches = imagesByStem.get(stem) ?? [];
     const displayPath = relativeGalleryPath(path.join(directory, jsonFile.name));
+    if (matches.length === 0 && options.allowOrphanedMetadata) {
+      options.orphanedMetadataFiles?.push(displayPath);
+      if (options.deleteOrphanedMetadata) {
+        await rm(path.join(directory, jsonFile.name));
+      }
+      continue;
+    }
     if (matches.length === 0) throw new Error(`${displayPath} does not have a same-name image.`);
     if (matches.length > 1) throw new Error(`${displayPath} matches more than one image.`);
 
@@ -640,7 +647,35 @@ async function backfillGeneratedNameMetadata() {
 }
 
 async function processIncomingBatch() {
-  const records = await readImageRecords(galleryRoot);
+  const orphanedMetadataFiles = [];
+  const records = await readImageRecords(galleryRoot, {
+    allowOrphanedMetadata: true,
+    deleteOrphanedMetadata: !dryRun,
+    orphanedMetadataFiles,
+  });
+  const incomingMissingMetadata = records.filter((record) => !record.metadataName).length;
+  const printReport = ({
+    added = 0,
+    renamed = 0,
+    generatedMetadataAdded = 0,
+    sourceMetadataPreserved = 0,
+    duplicatesQuarantined = 0,
+    metadataCollisionsRetained = 0,
+  } = {}) => {
+    const planned = dryRun ? " (dry run)" : "";
+    const orphanAction = dryRun ? "would be deleted" : "deleted";
+    console.log(`\nBatch report${planned}:`);
+    console.log(`- Incoming images found: ${records.length}`);
+    console.log(`- Images ${dryRun ? "that would be added" : "added"}: ${added}`);
+    console.log(`- Incoming images missing source JSON: ${incomingMissingMetadata}`);
+    console.log(`- Source metadata files ${dryRun ? "that would be preserved" : "preserved"}: ${sourceMetadataPreserved}`);
+    console.log(`- Images ${dryRun ? "that would be renamed" : "renamed"}: ${renamed}`);
+    console.log(`- Generated name metadata files ${dryRun ? "that would be added" : "added"}: ${generatedMetadataAdded}`);
+    console.log(`- Duplicate images ${dryRun ? "that would be quarantined" : "quarantined"}: ${duplicatesQuarantined}`);
+    console.log(`- Metadata collisions retained: ${metadataCollisionsRetained}`);
+    console.log(`- Orphan source JSON files ${orphanAction}: ${orphanedMetadataFiles.length}`);
+  };
+
   if (records.length === 0) {
     console.log("No root-level images are ready to process. Checking the full gallery for missing previews.");
     try {
@@ -650,6 +685,7 @@ async function processIncomingBatch() {
       console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
     }
+    printReport();
     return;
   }
 
@@ -665,6 +701,7 @@ async function processIncomingBatch() {
   const mappings = [];
   const quarantineMappings = [];
   let metadataCount = 0;
+  let renamedCount = 0;
 
   if (quarantineTarget) {
     newDirectories.push(quarantineTarget.quarantineDirectory);
@@ -697,6 +734,7 @@ async function processIncomingBatch() {
     const targetPath = path.join(batchTarget.batchDirectory, imageTargetName);
     const sourceRelativePath = relativeGalleryPath(sourcePath);
     const targetRelativePath = `${batchTarget.batchName}/${imageTargetName}`;
+    if (record.imageName !== imageTargetName) renamedCount += 1;
     imageMoves.push({ sourcePath, targetPath, sourceRelativePath, targetRelativePath });
     fileMoves.push({ sourcePath, targetPath });
 
@@ -753,6 +791,14 @@ async function processIncomingBatch() {
   }
   if (dryRun) {
     for (const mapping of mappings) console.log(mapping);
+    printReport({
+      added: uniqueRecords.length,
+      renamed: renamedCount,
+      generatedMetadataAdded: fileWrites.length,
+      sourceMetadataPreserved: metadataCount,
+      duplicatesQuarantined: duplicates.length,
+      metadataCollisionsRetained: metadataCollisions.length,
+    });
     return;
   }
 
@@ -770,7 +816,13 @@ async function processIncomingBatch() {
     console.log(`Quarantined duplicates in ${quarantineTarget.quarantineRelativeDirectory}/.`);
   }
 
-  if (!batchTarget) return;
+  if (!batchTarget) {
+    printReport({
+      duplicatesQuarantined: duplicates.length,
+      metadataCollisionsRetained: metadataCollisions.length,
+    });
+    return;
+  }
 
   console.log(`Batch ${batchTarget.batchName}/ is ready.`);
   try {
@@ -780,6 +832,14 @@ async function processIncomingBatch() {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   }
+  printReport({
+    added: uniqueRecords.length,
+    renamed: renamedCount,
+    generatedMetadataAdded: fileWrites.length,
+    sourceMetadataPreserved: metadataCount,
+    duplicatesQuarantined: duplicates.length,
+    metadataCollisionsRetained: metadataCollisions.length,
+  });
 }
 
 const rootStats = await lstat(galleryRoot).catch(() => undefined);
