@@ -12,7 +12,7 @@ const status = requiredElement<HTMLElement>("#status");
 const imageCount = requiredElement<HTMLElement>("#image-count");
 const supportHeader = requiredElement<HTMLElement>(".header-meta");
 const supportButton = requiredElement<HTMLElement>("#support-button");
-const supportFooter = requiredElement<HTMLElement>("#support-footer");
+const supportCard = requiredElement<HTMLElement>("#support-card");
 const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const searchInput = requiredElement<HTMLInputElement>("#search");
 const searchableOnly = requiredElement<HTMLInputElement>("#searchable-only");
@@ -69,6 +69,7 @@ const uiCopy = {
     displayLanguage: "Display name language",
     advanced: "Advanced",
     buyCoffee: "Buy me a coffee",
+    enjoyingGallery: "Enjoying the gallery?",
     loadingGallery: "Loading gallery\u2026",
     imageGallery: "Image gallery",
     supportSite: "Support this site",
@@ -106,6 +107,7 @@ const uiCopy = {
     displayLanguage: "表示言語",
     advanced: "詳細設定",
     buyCoffee: "コーヒーをおごる",
+    enjoyingGallery: "ギャラリーを楽しんでいますか？",
     loadingGallery: "ギャラリーを読み込み中…",
     imageGallery: "画像ギャラリー",
     supportSite: "このサイトを支援",
@@ -163,15 +165,26 @@ let galleryErrorMessage: string = uiCopy.en.loadFailed;
 
 const maximumConcurrentImageLoads = 4;
 const lazyLoadMargin = 150;
+const mobileSupportCardImageIndex = 24;
 const mobileHeaderQuery = window.matchMedia("(max-width: 800px)");
 const pendingTiles: HTMLElement[] = [];
 let queueRefreshFrame: number | undefined;
 
 function syncSupportButtonPlacement(): void {
   const mobile = mobileHeaderQuery.matches;
-  const destination = mobile ? supportFooter : supportHeader;
-  if (supportButton.parentElement !== destination) destination.append(supportButton);
-  supportFooter.hidden = !mobile;
+  const anchorImage = galleryImages[mobileSupportCardImageIndex - 1];
+  const anchorTile = anchorImage ? tilesByImage.get(anchorImage) : undefined;
+  const buttonReady = Boolean(supportButton.querySelector(".bmc-btn"));
+  const showCard = mobile && Boolean(anchorTile) && buttonReady;
+
+  supportCard.hidden = !showCard;
+  if (showCard && anchorTile) {
+    anchorTile.after(supportCard);
+    if (supportButton.parentElement !== supportCard) supportCard.append(supportButton);
+  } else {
+    gallery.insertAdjacentElement("afterend", supportCard);
+    if (supportButton.parentElement !== supportHeader) supportHeader.append(supportButton);
+  }
   supportButton.querySelector<HTMLAnchorElement>(".bmc-btn")?.setAttribute("rel", "noopener noreferrer");
 }
 
@@ -199,6 +212,16 @@ function syncStaticUi(): void {
   }
   const supportText = supportButton.querySelector<HTMLElement>(".bmc-btn-text");
   if (supportText) supportText.textContent = t("buyCoffee");
+}
+
+const supportButtonObserver = new MutationObserver(() => {
+  if (!supportButton.querySelector(".bmc-btn")) return;
+  supportButtonObserver.disconnect();
+  syncStaticUi();
+  syncSupportButtonPlacement();
+});
+if (!supportButton.querySelector(".bmc-btn")) {
+  supportButtonObserver.observe(supportButton, { childList: true, subtree: true });
 }
 
 syncSupportButtonPlacement();
@@ -1368,6 +1391,7 @@ function reorderTiles(): void {
     fragment.append(tile);
   }
   gallery.replaceChildren(fragment);
+  syncSupportButtonPlacement();
   scheduleQueueRefresh();
 }
 
@@ -1393,6 +1417,7 @@ function updateVisibleImages(images: GalleryImage[]): void {
     const tile = tilesByImage.get(image);
     if (tile) tile.hidden = !visibleImages.has(image);
   }
+  syncSupportButtonPlacement();
 
   const maximumImages = searchableOnly.checked
     ? allImages.filter((image) => image.metadata).length
@@ -1434,7 +1459,9 @@ async function loadGallery(): Promise<void> {
     galleryLoadState = "error";
     galleryErrorMessage = error instanceof Error ? error.message : uiCopy.en.loadFailed;
     allImages = [];
+    galleryImages = [];
     gallery.replaceChildren();
+    syncSupportButtonPlacement();
     shuffleButton.disabled = true;
     advancedButton.disabled = true;
     imageCount.textContent = "";
