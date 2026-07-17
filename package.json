@@ -12,6 +12,7 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build": "npm run clean && npm run build:web && npm run build:server",
     "process-batch": "node process-gallery-batch.mjs",
+    "rename-existing": "node process-gallery-batch.mjs --rename-existing",
     "start": "node dist/server/server/server.js"
   },
   "dependencies": {

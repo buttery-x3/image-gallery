@@ -32,7 +32,7 @@
           <input id="search" type="search" placeholder="Search images" autocomplete="off" />
         </label>
         <label class="searchable-toggle">
-          <input id="searchable-only" type="checkbox" />
+          <input id="searchable-only" type="checkbox" checked />
           <span class="toggle-track" aria-hidden="true"><span></span></span>
           <span>Searchable only</span>
         </label>
@@ -63,7 +63,7 @@
         </div>
       </form>
     </dialog>
-    <dialog id="lightbox" class="lightbox" aria-label="Image preview">
+    <dialog id="lightbox" class="lightbox" aria-labelledby="lightbox-name">
       <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Close preview">
         <span aria-hidden="true">×</span>
       </button>
@@ -73,7 +73,10 @@
             <path d="m15 18-6-6 6-6" />
           </svg>
         </button>
-        <img id="lightbox-image" class="lightbox-image" alt="" />
+        <div class="lightbox-content">
+          <p id="lightbox-name" class="lightbox-name"></p>
+          <img id="lightbox-image" class="lightbox-image" alt="" />
+        </div>
         <button id="lightbox-next" class="lightbox-nav" type="button" aria-label="Next image">
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <path d="m9 6 6 6-6 6" />

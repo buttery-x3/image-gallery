@@ -11,6 +11,7 @@ export interface GalleryMetadata {
 
 export interface GalleryImage {
   name: string;
+  displayName: string;
   path: string;
   url: string;
   previewUrl?: string;

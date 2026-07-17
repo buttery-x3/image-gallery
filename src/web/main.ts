@@ -22,6 +22,7 @@ const filterClose = requiredElement<HTMLButtonElement>("#filter-close");
 const filterReset = requiredElement<HTMLButtonElement>("#filter-reset");
 const lightbox = requiredElement<HTMLDialogElement>("#lightbox");
 const lightboxStage = requiredElement<HTMLElement>(".lightbox-stage");
+const lightboxName = requiredElement<HTMLElement>("#lightbox-name");
 const lightboxImage = requiredElement<HTMLImageElement>("#lightbox-image");
 const lightboxClose = requiredElement<HTMLButtonElement>("#lightbox-close");
 const lightboxPrevious = requiredElement<HTMLButtonElement>("#lightbox-previous");
@@ -201,6 +202,7 @@ function searchIndex(image: GalleryImage): string {
 
   const metadata = image.metadata;
   const values = [
+    image.displayName,
     image.name,
     image.path,
     image.batch ?? "",
@@ -444,6 +446,7 @@ function showLightboxImage(index: number): void {
   if (!image) return;
 
   activeImageIndex = index;
+  lightboxName.textContent = image.displayName;
   lightboxImage.src = new URL(image.url, document.baseURI).href;
   lightboxImage.alt = image.name;
   lightboxPrevious.disabled = index === 0;
@@ -487,6 +490,7 @@ lightbox.addEventListener("click", (event) => {
 });
 lightbox.addEventListener("close", () => {
   document.body.classList.remove("lightbox-open");
+  lightboxName.textContent = "";
   lightboxImage.removeAttribute("src");
   activeImageIndex = -1;
   activeOpener?.focus({ preventScroll: true });

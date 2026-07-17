@@ -92,6 +92,7 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
 
       images.push({
         name: entry.name,
+        displayName: path.basename(entry.name, path.extname(entry.name)),
         path: relativePath,
         url: `media/${toUrlPath(relativePath)}`,
         ...(previewUrl ? { previewUrl } : {}),

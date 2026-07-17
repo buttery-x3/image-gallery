@@ -39,12 +39,13 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 | --- | --- | --- |
 | `GALLERY_DIR` | `./gallery` | Directory scanned recursively for media |
 | `PREVIEW_CACHE_DIR` | `./.cache/previews` | Directory outside the gallery for generated GIF and PNG WebP previews |
+| `BATCH_NAME_STYLE` | unset | Set to `japanese-fantasy` to generate long fantasy names while batching |
 | `HOST` | `127.0.0.1` | Address used by the Express server |
 | `PORT` | `8080` | Port used by the Express server |
 
 Hidden entries, symbolic links, and unsupported files are ignored. New files appear after a page refresh; no rebuild is required. Images near the viewport are loaded first, then loading continues through the full gallery in the background with no more than four media files loading concurrently.
 
-Images may have a same-name JSON sidecar in the same directory. The `anime_waifu_lite/v1` format is used for prompt search and advanced tag filters; invalid, unsupported, or missing metadata does not prevent the image from appearing. The containing subdirectory is also available as a Batch filter.
+Images may have a same-name JSON sidecar in the same directory. The `anime_waifu_lite/v1` format is used for prompt search and advanced tag filters; invalid, unsupported, or missing metadata does not prevent the image from appearing. Every image also exposes its filename stem as a searchable display name. The containing subdirectory is available as a Batch filter.
 
 Enable **Searchable only** in the header to temporarily hide images that do not yet have supported metadata.
 
@@ -53,12 +54,21 @@ GIF and PNG tiles use automatically generated 300px-wide lossy WebP previews. GI
 To organize every root-level image into a timestamped batch and cache only that batch's missing previews, run this while the server is running:
 
 ```sh
-npm run process-batch
+bash ./process-batch.sh
 ```
 
-Images without JSON metadata are included. When a same-name JSON sidecar is present, it is validated and moved alongside its image. Orphaned or invalid JSON stops the batch before anything moves. Existing previews remain valid when an image moves into its batch, and only missing previews are requested, with up to four concurrent requests.
+Images without JSON metadata are included. When a same-name JSON sidecar is present, it is validated and moved alongside its image. Orphaned or invalid JSON stops the batch before anything moves. When `BATCH_NAME_STYLE=japanese-fantasy` is set, each image and sidecar receives the same generated name during the move. Existing previews remain valid across moves and renames, and only missing previews are requested, with up to four concurrent requests.
 
-Use `npm run process-batch -- --dry-run` to inspect the proposed move, or append the public base URL after `--` when the service is not available on its configured local port. Running the command when there are no root-level images checks the full gallery and generates only missing previews, which also provides the retry path if preview warming previously failed.
+Use `bash ./process-batch.sh --dry-run` to inspect the proposed move, or pass the public base URL as the final argument when the service is not available on its configured local port. Running the command when there are no root-level images checks the full gallery and generates only missing previews, which also provides the retry path if preview warming previously failed.
+
+To force a one-time rename of every image already inside a batch directory, first enable the same naming style and preview the complete mapping:
+
+```sh
+bash ./rename-existing.sh --dry-run
+bash ./rename-existing.sh
+```
+
+Root-level incoming files are left alone by this alternate command. Existing same-name sidecars are validated and renamed with their images, and cached previews are copied to their new cache keys instead of being regenerated. Re-running the command intentionally generates a fresh set of names.
 
 ## Commands
 
@@ -68,7 +78,8 @@ Use `npm run process-batch -- --dry-run` to inspect the proposed move, or append
 | `npm run typecheck` | Check browser and server TypeScript |
 | `npm run build` | Compile the browser and server production output |
 | `npm start` | Run the compiled production server |
-| `npm run process-batch` | Organize root-level uploads and generate only missing previews |
+| `bash ./process-batch.sh` | Organize root-level uploads and generate only missing previews |
+| `bash ./rename-existing.sh` | Force generated names onto images already inside batch directories |
 
 On the Linux server described in the installation guide, deploy an update with `sudo ./deploy.sh`.
 
@@ -78,8 +89,7 @@ On the Linux server described in the installation guide, deploy an update with `
 src/server/    Express server, directory scanning, and media delivery
 src/shared/    Types shared by the browser and server
 src/web/       Single-page gallery interface
-deploy/        Caddy and systemd examples
-docs/          Installation documentation
+docs/          Installation documentation plus Caddy and systemd examples
 gallery/       Default local media directory (contents are ignored by Git)
 ```
 

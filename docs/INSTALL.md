@@ -42,6 +42,8 @@ Create `/etc/image-gallery.env`:
 ```ini
 GALLERY_DIR=/srv/image-gallery/images
 PREVIEW_CACHE_DIR=/var/cache/image-gallery
+# Optional for the waifu-gallery instance:
+# BATCH_NAME_STYLE=japanese-fantasy
 HOST=127.0.0.1
 PORT=8080
 ```
@@ -49,7 +51,7 @@ PORT=8080
 Install the service definition:
 
 ```sh
-sudo cp deploy/image-gallery.service /etc/systemd/system/image-gallery.service
+sudo cp docs/image-gallery.service /etc/systemd/system/image-gallery.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now image-gallery
 sudo systemctl status image-gallery
@@ -111,12 +113,21 @@ unchanged when its tile is opened or its link is copied.
 For regular uploads, place the new images and any same-name JSON sidecars directly in `/srv/image-gallery/images`, then run:
 
 ```sh
-sudo -u image-gallery npm --prefix /opt/image-gallery run process-batch
+sudo -u image-gallery bash /opt/image-gallery/process-batch.sh
 ```
 
-The command moves every root-level image into one timestamped batch subdirectory and caches only that batch's missing previews. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. Existing previews remain valid across the move and are skipped. Add `--dry-run` to inspect the batch without changing files.
+The command moves every root-level image into one timestamped batch subdirectory and caches only that batch's missing previews. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. When `BATCH_NAME_STYLE=japanese-fantasy` is present, images and sidecars receive matching generated names. Existing previews remain valid across moves and renames and are skipped. Add `--dry-run` to inspect the batch without changing files.
 
-Run the same command with no root-level images to check the full gallery and generate only missing previews. This also retries preview warming after a previous service or network failure.
+To apply generated names once to images already organized into batch directories, inspect and then run the explicit alternate command:
+
+```sh
+sudo -u image-gallery bash /opt/image-gallery/rename-existing.sh --dry-run
+sudo -u image-gallery bash /opt/image-gallery/rename-existing.sh
+```
+
+This command requires `BATCH_NAME_STYLE=japanese-fantasy`, leaves root-level uploads alone, and renames matching JSON sidecars with their images. Running it again deliberately replaces the generated names with new ones.
+
+Run the same script with no root-level images to check the full gallery and generate only missing previews. This also retries preview warming after a previous service or network failure.
 
 ## Updating
 
