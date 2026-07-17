@@ -116,7 +116,7 @@ For regular uploads, place the new images and any same-name JSON sidecars direct
 sudo -u image-gallery bash /opt/image-gallery/process-batch.sh
 ```
 
-The command moves every root-level image into one timestamped batch subdirectory and caches only that batch's missing previews. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. When `BATCH_NAME_STYLE=japanese-fantasy` is present, images and sidecars receive matching generated names. Existing previews remain valid across moves and renames and are skipped. Add `--dry-run` to inspect the batch without changing files.
+The command moves every unique root-level image into one timestamped batch subdirectory and caches only that batch's missing previews. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. Existing metadata and file sizes provide a cheap duplicate candidate index, and SHA-256 confirms image equality before an incoming image is rejected. Exact duplicate pairs are moved to the hidden, recoverable `.duplicates/<timestamp>/` directory; equal metadata with different image content is reported and retained. When `BATCH_NAME_STYLE=japanese-fantasy` is present, images and sidecars receive matching generated names. Existing previews remain valid across moves and renames and are skipped. Add `--dry-run` to inspect both the batch and quarantine without changing files.
 
 To apply generated names once to images already organized into batch directories, inspect and then run the explicit alternate command:
 

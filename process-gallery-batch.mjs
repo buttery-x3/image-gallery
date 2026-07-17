@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { createHash } from "node:crypto";
-import { constants as fileSystemConstants } from "node:fs";
+import { constants as fileSystemConstants, createReadStream } from "node:fs";
 import { access, copyFile, lstat, mkdir, readdir, readFile, rename, rm, rmdir } from "node:fs/promises";
 import path from "node:path";
 import { generateJapaneseFantasyName } from "./gallery-name-generator.mjs";
@@ -36,6 +36,20 @@ function supportedMetadataRecord(parsed) {
   );
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) =>
+      `${JSON.stringify(key)}:${canonicalJson(value[key])}`
+    ).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function metadataFingerprint(metadata) {
+  return createHash("sha256").update(canonicalJson(metadata)).digest("hex");
+}
+
 function timestampedBatchName(date) {
   const twoDigits = (value) => String(value).padStart(2, "0");
   return [date.getFullYear(), twoDigits(date.getMonth() + 1), twoDigits(date.getDate())].join("-") + "_" +
@@ -65,6 +79,18 @@ async function nextBatchTarget() {
   return { batchName, batchDirectory };
 }
 
+async function nextQuarantineTarget() {
+  const quarantineRoot = path.join(galleryRoot, ".duplicates");
+  const timestamp = timestampedBatchName(new Date());
+  let quarantineName = timestamp;
+  let quarantineDirectory = path.join(quarantineRoot, quarantineName);
+  for (let suffix = 2; await exists(quarantineDirectory); suffix += 1) {
+    quarantineName = `${timestamp}-${String(suffix).padStart(2, "0")}`;
+    quarantineDirectory = path.join(quarantineRoot, quarantineName);
+  }
+  return { quarantineDirectory, quarantineRelativeDirectory: `.duplicates/${quarantineName}` };
+}
+
 async function readImageRecords(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const regularFiles = entries.filter(
@@ -72,11 +98,18 @@ async function readImageRecords(directory) {
   );
   const jsonFiles = regularFiles.filter((entry) => path.extname(entry.name).toLowerCase() === ".json");
   const imageFiles = regularFiles.filter((entry) => supportedExtensions.has(path.extname(entry.name).toLowerCase()));
+  const imagesByStem = new Map();
+  for (const imageFile of imageFiles) {
+    const stem = path.basename(imageFile.name, path.extname(imageFile.name));
+    const matches = imagesByStem.get(stem) ?? [];
+    matches.push(imageFile);
+    imagesByStem.set(stem, matches);
+  }
   const metadataByImage = new Map();
 
   for (const jsonFile of jsonFiles) {
     const stem = path.basename(jsonFile.name, path.extname(jsonFile.name));
-    const matches = imageFiles.filter((imageFile) => path.basename(imageFile.name, path.extname(imageFile.name)) === stem);
+    const matches = imagesByStem.get(stem) ?? [];
     const displayPath = relativeGalleryPath(path.join(directory, jsonFile.name));
     if (matches.length === 0) throw new Error(`${displayPath} does not have a same-name image.`);
     if (matches.length > 1) throw new Error(`${displayPath} matches more than one image.`);
@@ -87,17 +120,25 @@ async function readImageRecords(directory) {
     } catch (error) {
       throw new Error(`${displayPath} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
     }
-    if (!supportedMetadataRecord(parsed)) {
+    const metadata = supportedMetadataRecord(parsed);
+    if (!metadata) {
       throw new Error(`${displayPath} does not contain supported anime_waifu_lite/v1 metadata.`);
     }
-    metadataByImage.set(matches[0].name, jsonFile.name);
+    metadataByImage.set(matches[0].name, {
+      metadataName: jsonFile.name,
+      metadataFingerprint: metadataFingerprint(metadata),
+    });
   }
 
-  return imageFiles.map((imageFile) => ({
-    directory,
-    imageName: imageFile.name,
-    metadataName: metadataByImage.get(imageFile.name),
-  }));
+  return imageFiles.map((imageFile) => {
+    const metadata = metadataByImage.get(imageFile.name);
+    return {
+      directory,
+      imageName: imageFile.name,
+      metadataName: metadata?.metadataName,
+      metadataFingerprint: metadata?.metadataFingerprint,
+    };
+  });
 }
 
 async function collectBatchedImageRecords() {
@@ -114,6 +155,100 @@ async function collectBatchedImageRecords() {
 
   await walk(galleryRoot, true);
   return records;
+}
+
+function addCandidate(index, key, candidate) {
+  if (key === undefined) return;
+  const candidates = index.get(key) ?? [];
+  candidates.push(candidate);
+  index.set(key, candidates);
+}
+
+function contentHash(filePath, hashCache) {
+  const existing = hashCache.get(filePath);
+  if (existing) return existing;
+
+  const pending = new Promise((resolve, reject) => {
+    const hash = createHash("sha256");
+    const stream = createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+  hashCache.set(filePath, pending);
+  return pending;
+}
+
+async function classifyIncomingRecords(incomingRecords) {
+  const existingRecords = await collectBatchedImageRecords();
+  const candidatesBySize = new Map();
+  const candidatesByMetadata = new Map();
+  const hashCache = new Map();
+
+  for (const record of existingRecords) {
+    const absolutePath = path.join(record.directory, record.imageName);
+    const stats = await lstat(absolutePath);
+    const candidate = {
+      absolutePath,
+      relativePath: relativeGalleryPath(absolutePath),
+      size: stats.size,
+      metadataFingerprint: record.metadataFingerprint,
+    };
+    addCandidate(candidatesBySize, stats.size, candidate);
+    addCandidate(candidatesByMetadata, record.metadataFingerprint, candidate);
+  }
+
+  const uniqueRecords = [];
+  const duplicates = [];
+  const metadataCollisions = [];
+  for (const record of incomingRecords) {
+    const absolutePath = path.join(record.directory, record.imageName);
+    const stats = await lstat(absolutePath);
+    const sizeCandidates = candidatesBySize.get(stats.size) ?? [];
+    const metadataCandidates = record.metadataFingerprint
+      ? candidatesByMetadata.get(record.metadataFingerprint) ?? []
+      : [];
+    const metadataCandidatePaths = new Set(metadataCandidates.map((candidate) => candidate.absolutePath));
+    const orderedCandidates = [
+      ...sizeCandidates.filter((candidate) => metadataCandidatePaths.has(candidate.absolutePath)),
+      ...sizeCandidates.filter((candidate) => !metadataCandidatePaths.has(candidate.absolutePath)),
+    ];
+
+    let duplicateOf;
+    if (orderedCandidates.length > 0) {
+      const incomingHash = await contentHash(absolutePath, hashCache);
+      for (const candidate of orderedCandidates) {
+        if (await contentHash(candidate.absolutePath, hashCache) === incomingHash) {
+          duplicateOf = candidate;
+          break;
+        }
+      }
+    }
+
+    if (duplicateOf) {
+      duplicates.push({ record, duplicateOf: duplicateOf.relativePath });
+      continue;
+    }
+
+    if (metadataCandidates.length > 0) {
+      metadataCollisions.push({
+        imageName: record.imageName,
+        matches: metadataCandidates.map((candidate) => candidate.relativePath),
+      });
+    }
+
+    const incomingCandidate = {
+      absolutePath,
+      relativePath: relativeGalleryPath(absolutePath),
+      size: stats.size,
+      metadataFingerprint: record.metadataFingerprint,
+    };
+    addCandidate(candidatesBySize, stats.size, incomingCandidate);
+    addCandidate(candidatesByMetadata, record.metadataFingerprint, incomingCandidate);
+    uniqueRecords.push(record);
+  }
+
+  return { duplicates, metadataCollisions, uniqueRecords };
 }
 
 async function collectUsedImageStems() {
@@ -199,10 +334,19 @@ async function preparePreviewCopies(imageMoves) {
   }
 }
 
-async function executeMoves(fileMoves, newDirectory) {
-  if (newDirectory) await mkdir(newDirectory);
+async function executeMoves(fileMoves, newDirectories = []) {
+  const createdDirectories = [];
+  const createdParents = [];
   const completedMoves = [];
   try {
+    for (const directory of newDirectories) {
+      if (await exists(directory)) throw new Error(`Target directory already exists: ${directory}`);
+      const parentDirectory = path.dirname(directory);
+      const parentExisted = await exists(parentDirectory);
+      await mkdir(directory, { recursive: true });
+      createdDirectories.push(directory);
+      if (!parentExisted) createdParents.push(parentDirectory);
+    }
     for (const fileMove of fileMoves) {
       if (await exists(fileMove.targetPath)) throw new Error(`Target already exists: ${fileMove.targetPath}`);
       await rename(fileMove.sourcePath, fileMove.targetPath);
@@ -212,7 +356,12 @@ async function executeMoves(fileMoves, newDirectory) {
     for (const fileMove of completedMoves.reverse()) {
       await rename(fileMove.targetPath, fileMove.sourcePath).catch(() => undefined);
     }
-    if (newDirectory) await rmdir(newDirectory).catch(() => undefined);
+    for (const directory of createdDirectories.reverse()) {
+      await rmdir(directory).catch(() => undefined);
+    }
+    for (const directory of createdParents.reverse()) {
+      await rmdir(directory).catch(() => undefined);
+    }
     throw error;
   }
 }
@@ -345,27 +494,54 @@ async function processIncomingBatch() {
     try {
       await cacheMissingPreviews();
     } catch (error) {
-      console.error("Preview caching failed. Re-run npm run process-batch when the service is available.");
+      console.error("Preview caching failed. Re-run ./process-batch.sh when the service is available.");
       console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
     }
     return;
   }
 
-  const { batchName, batchDirectory } = await nextBatchTarget();
-  const usedNames = namingEnabled ? await collectUsedImageStems() : new Set();
+  const { duplicates, metadataCollisions, uniqueRecords } = await classifyIncomingRecords(records);
+  const quarantineTarget = duplicates.length > 0 ? await nextQuarantineTarget() : undefined;
+  const batchTarget = uniqueRecords.length > 0 ? await nextBatchTarget() : undefined;
+  const usedNames = namingEnabled && uniqueRecords.length > 0 ? await collectUsedImageStems() : new Set();
   const imageMoves = [];
   const fileMoves = [];
+  const newDirectories = [];
   const mappings = [];
+  const quarantineMappings = [];
   let metadataCount = 0;
-  for (const record of records) {
+
+  if (quarantineTarget) {
+    newDirectories.push(quarantineTarget.quarantineDirectory);
+    for (const duplicate of duplicates) {
+      const imageSourcePath = path.join(duplicate.record.directory, duplicate.record.imageName);
+      const imageTargetPath = path.join(quarantineTarget.quarantineDirectory, duplicate.record.imageName);
+      fileMoves.push({ sourcePath: imageSourcePath, targetPath: imageTargetPath });
+      let metadataMapping = "";
+      if (duplicate.record.metadataName) {
+        fileMoves.push({
+          sourcePath: path.join(duplicate.record.directory, duplicate.record.metadataName),
+          targetPath: path.join(quarantineTarget.quarantineDirectory, duplicate.record.metadataName),
+        });
+        metadataMapping = ` + ${duplicate.record.metadataName}`;
+      }
+      quarantineMappings.push(
+        `- ${duplicate.record.imageName}${metadataMapping} -> ${quarantineTarget.quarantineRelativeDirectory}/ ` +
+        `(duplicate of ${duplicate.duplicateOf})`,
+      );
+    }
+  }
+
+  if (batchTarget) newDirectories.push(batchTarget.batchDirectory);
+  for (const record of uniqueRecords) {
     const sourceStem = path.basename(record.imageName, path.extname(record.imageName));
     const targetStem = namingEnabled ? generateJapaneseFantasyName(usedNames) : sourceStem;
     const imageTargetName = `${targetStem}${path.extname(record.imageName)}`;
     const sourcePath = path.join(galleryRoot, record.imageName);
-    const targetPath = path.join(batchDirectory, imageTargetName);
+    const targetPath = path.join(batchTarget.batchDirectory, imageTargetName);
     const sourceRelativePath = relativeGalleryPath(sourcePath);
-    const targetRelativePath = `${batchName}/${imageTargetName}`;
+    const targetRelativePath = `${batchTarget.batchName}/${imageTargetName}`;
     imageMoves.push({ sourcePath, targetPath, sourceRelativePath, targetRelativePath });
     fileMoves.push({ sourcePath, targetPath });
 
@@ -375,7 +551,7 @@ async function processIncomingBatch() {
       const metadataTargetName = namingEnabled ? `${targetStem}.json` : record.metadataName;
       fileMoves.push({
         sourcePath: path.join(galleryRoot, record.metadataName),
-        targetPath: path.join(batchDirectory, metadataTargetName),
+        targetPath: path.join(batchTarget.batchDirectory, metadataTargetName),
       });
       metadataMapping = namingEnabled
         ? ` + ${record.metadataName} -> ${metadataTargetName}`
@@ -386,10 +562,31 @@ async function processIncomingBatch() {
       : `- ${record.imageName}${metadataMapping}`);
   }
 
-  console.log(
-    `${dryRun ? "Would move" : "Moving"} ${records.length} image${records.length === 1 ? "" : "s"} ` +
-    `(${metadataCount} with metadata) to ${batchName}/${namingEnabled ? " using generated names" : ""}`,
-  );
+  if (duplicates.length > 0) {
+    console.log(
+      `${dryRun ? "Would quarantine" : "Quarantining"} ${duplicates.length} duplicate ` +
+      `image${duplicates.length === 1 ? "" : "s"} in ${quarantineTarget.quarantineRelativeDirectory}/`,
+    );
+    for (const mapping of quarantineMappings) console.log(mapping);
+  }
+  if (metadataCollisions.length > 0) {
+    console.log(
+      `${metadataCollisions.length} metadata match${metadataCollisions.length === 1 ? " has" : "es have"} ` +
+      "different image content and will remain in the batch:",
+    );
+    for (const collision of metadataCollisions) {
+      console.log(`- ${collision.imageName} differs from ${collision.matches.join(", ")}`);
+    }
+  }
+  if (batchTarget) {
+    console.log(
+      `${dryRun ? "Would move" : "Moving"} ${uniqueRecords.length} unique ` +
+      `image${uniqueRecords.length === 1 ? "" : "s"} (${metadataCount} with metadata) ` +
+      `to ${batchTarget.batchName}/${namingEnabled ? " using generated names" : ""}`,
+    );
+  } else {
+    console.log("No unique images remain to batch.");
+  }
   if (dryRun) {
     for (const mapping of mappings) console.log(mapping);
     return;
@@ -397,7 +594,7 @@ async function processIncomingBatch() {
 
   const createdCachePaths = await preparePreviewCopies(imageMoves);
   try {
-    await executeMoves(fileMoves, batchDirectory);
+    await executeMoves(fileMoves, newDirectories);
   } catch (error) {
     await Promise.all(createdCachePaths.map((filePath) => rm(filePath, { force: true })));
     throw error;
@@ -405,12 +602,17 @@ async function processIncomingBatch() {
   if (createdCachePaths.length > 0) {
     console.log(`Preserved ${createdCachePaths.length} cached preview${createdCachePaths.length === 1 ? "" : "s"}.`);
   }
+  if (duplicates.length > 0) {
+    console.log(`Quarantined duplicates in ${quarantineTarget.quarantineRelativeDirectory}/.`);
+  }
 
-  console.log(`Batch ${batchName}/ is ready.`);
+  if (!batchTarget) return;
+
+  console.log(`Batch ${batchTarget.batchName}/ is ready.`);
   try {
-    await cacheMissingPreviews(batchName);
+    await cacheMissingPreviews(batchTarget.batchName);
   } catch (error) {
-    console.error("The batch was organized successfully, but preview caching failed. Re-run npm run process-batch when the service is available.");
+    console.error("The batch was organized successfully, but preview caching failed. Re-run ./process-batch.sh when the service is available.");
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   }

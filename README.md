@@ -57,9 +57,11 @@ To organize every root-level image into a timestamped batch and cache only that 
 bash ./process-batch.sh
 ```
 
-Images without JSON metadata are included. When a same-name JSON sidecar is present, it is validated and moved alongside its image. Orphaned or invalid JSON stops the batch before anything moves. When `BATCH_NAME_STYLE=japanese-fantasy` is set, each image and sidecar receives the same generated name during the move. Existing previews remain valid across moves and renames, and only missing previews are requested, with up to four concurrent requests.
+Images without JSON metadata are included. When a same-name JSON sidecar is present, it is validated and moved alongside its image. Orphaned or invalid JSON stops the batch before anything moves. Before moving anything, the batcher indexes existing metadata and file sizes, then SHA-256 hashes only plausible same-size duplicate candidates. Exact duplicate image/JSON pairs are moved recoverably into `GALLERY_DIR/.duplicates/<timestamp>/`, which remains hidden from the site; metadata matches with different image content stay in the normal batch and are reported. Duplicate images are also detected when metadata is missing or has changed.
 
-Use `bash ./process-batch.sh --dry-run` to inspect the proposed move, or pass the public base URL as the final argument when the service is not available on its configured local port. Running the command when there are no root-level images checks the full gallery and generates only missing previews, which also provides the retry path if preview warming previously failed.
+When `BATCH_NAME_STYLE=japanese-fantasy` is set, each unique image and sidecar receives the same generated name during the move. Existing previews remain valid across moves and renames, and only missing previews are requested, with up to four concurrent requests.
+
+Use `bash ./process-batch.sh --dry-run` to inspect the proposed batch and duplicate quarantine without changing files, or pass the public base URL as the final argument when the service is not available on its configured local port. Running the command when there are no root-level images checks the full gallery and generates only missing previews, which also provides the retry path if preview warming previously failed.
 
 To force a one-time rename of every image already inside a batch directory, first enable the same naming style and preview the complete mapping:
 
