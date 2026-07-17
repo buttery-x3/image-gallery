@@ -719,7 +719,7 @@ main { flex: 1 0 auto; }
   align-items: start;
   justify-content: center;
   width: 100%;
-  padding: 0 14px 28px;
+  padding: 12px 14px 28px;
   column-gap: 14px;
   row-gap: 14px;
 }
