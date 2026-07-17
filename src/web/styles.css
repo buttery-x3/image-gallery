@@ -35,6 +35,7 @@ button { font: inherit; }
 .consent-dialog,
 .report-dialog {
   width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.17);
   border-radius: 14px;
@@ -47,14 +48,19 @@ button { font: inherit; }
 .report-dialog::backdrop { background: rgba(0, 0, 0, 0.82); }
 
 .consent-card,
-.report-card { padding: clamp(22px, 5vw, 34px); }
+.report-card {
+  max-height: calc(100dvh - 34px);
+  padding: clamp(22px, 5vw, 34px);
+  overflow-y: auto;
+}
 
 .consent-card h2 {
   margin: 0 0 14px;
   font-size: 1.25rem;
 }
 
-.consent-card p,
+.consent-message p,
+.consent-more-content p,
 .report-card p {
   margin: 0;
   color: #d5d6d8;
@@ -62,10 +68,58 @@ button { font: inherit; }
   line-height: 1.6;
 }
 
+.consent-message {
+  display: grid;
+  gap: 10px;
+}
+
 .consent-agree {
   width: 100%;
   margin-top: 24px;
 }
+
+.consent-more {
+  margin-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.consent-more summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 2px 2px;
+  color: #d5d6d8;
+  font-size: 0.88rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.consent-more summary::-webkit-details-marker { display: none; }
+
+.consent-more summary::after {
+  content: "▾";
+  flex: 0 0 auto;
+  color: #f3f3f1;
+  font-size: 1rem;
+  transition: transform 140ms ease;
+}
+
+.consent-more[open] summary::after { transform: rotate(180deg); }
+
+.consent-more summary:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.consent-more-content {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.consent-more-content a { color: #fff; }
 
 .report-actions {
   display: flex;
