@@ -665,12 +665,16 @@ button { font: inherit; }
   right: auto;
   bottom: auto;
   left: auto;
-  color: #000;
+  color: #000 !important;
+  -webkit-text-fill-color: #000;
+  -webkit-text-stroke: 0 transparent;
   font-size: var(--lightbox-name-ja-size);
   font-weight: 600;
   line-height: 1;
+  mix-blend-mode: normal;
   opacity: 0.5;
   pointer-events: none;
+  text-shadow: none;
   text-transform: lowercase;
 }
 
