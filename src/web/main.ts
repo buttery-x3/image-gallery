@@ -13,6 +13,7 @@ const imageCount = requiredElement<HTMLElement>("#image-count");
 const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const searchInput = requiredElement<HTMLInputElement>("#search");
 const searchableOnly = requiredElement<HTMLInputElement>("#searchable-only");
+const favoritesOnly = requiredElement<HTMLInputElement>("#favorites-only");
 const advancedButton = requiredElement<HTMLButtonElement>("#advanced-filters");
 const advancedFilterCount = requiredElement<HTMLElement>("#advanced-filter-count");
 const filterDialog = requiredElement<HTMLDialogElement>("#filter-dialog");
@@ -24,6 +25,7 @@ const lightbox = requiredElement<HTMLDialogElement>("#lightbox");
 const lightboxStage = requiredElement<HTMLElement>(".lightbox-stage");
 const lightboxName = requiredElement<HTMLElement>("#lightbox-name");
 const lightboxImage = requiredElement<HTMLImageElement>("#lightbox-image");
+const lightboxFavorite = requiredElement<HTMLButtonElement>("#lightbox-favorite");
 const lightboxClose = requiredElement<HTMLButtonElement>("#lightbox-close");
 const lightboxPrevious = requiredElement<HTMLButtonElement>("#lightbox-previous");
 const lightboxNext = requiredElement<HTMLButtonElement>("#lightbox-next");
@@ -41,6 +43,9 @@ let shufflePending = false;
 const activeFilters = new Map<string, string>();
 const imageSearchIndexes = new WeakMap<GalleryImage, string>();
 const tilesByImage = new Map<GalleryImage, HTMLElement>();
+const favoriteButtonsByImage = new Map<GalleryImage, HTMLButtonElement>();
+const favoritesStorageKey = "image-gallery:favorites:v1";
+const favoriteImagePaths = loadFavoriteImagePaths();
 
 const maximumConcurrentImageLoads = 4;
 const lazyLoadMargin = 150;
@@ -187,6 +192,70 @@ function createActionIcon(paths: readonly string[]): SVGSVGElement {
   return icon;
 }
 
+function parseFavoriteImagePaths(value: string | null): Set<string> {
+  if (!value) return new Set();
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((path): path is string => typeof path === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function loadFavoriteImagePaths(): Set<string> {
+  try {
+    return parseFavoriteImagePaths(window.localStorage.getItem(favoritesStorageKey));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveFavoriteImagePaths(): void {
+  try {
+    window.localStorage.setItem(favoritesStorageKey, JSON.stringify([...favoriteImagePaths]));
+  } catch {
+    // Favorites still work for the current page when storage is unavailable.
+  }
+}
+
+function isFavorite(image: GalleryImage): boolean {
+  return favoriteImagePaths.has(image.path);
+}
+
+function syncTileFavoriteButton(button: HTMLButtonElement, image: GalleryImage): void {
+  const favorite = isFavorite(image);
+  button.classList.toggle("is-favorite", favorite);
+  button.title = favorite ? "Remove favorite" : "Add favorite";
+  button.setAttribute("aria-label", `${favorite ? "Remove" : "Add"} ${image.name} ${favorite ? "from" : "to"} favorites`);
+  button.setAttribute("aria-pressed", String(favorite));
+}
+
+function syncLightboxFavoriteButton(image: GalleryImage): void {
+  const favorite = isFavorite(image);
+  lightboxFavorite.classList.toggle("is-favorite", favorite);
+  lightboxFavorite.querySelector("span")!.textContent = favorite ? "Remove favorite" : "Add favorite";
+  lightboxFavorite.setAttribute("aria-label", `${favorite ? "Remove" : "Add"} ${image.name} ${favorite ? "from" : "to"} favorites`);
+  lightboxFavorite.setAttribute("aria-pressed", String(favorite));
+}
+
+function toggleFavorite(image: GalleryImage): void {
+  const favorite = !isFavorite(image);
+  if (favorite) favoriteImagePaths.add(image.path);
+  else favoriteImagePaths.delete(image.path);
+  saveFavoriteImagePaths();
+
+  const tileButton = favoriteButtonsByImage.get(image);
+  if (tileButton) syncTileFavoriteButton(tileButton, image);
+  if (lightbox.open && galleryImages[activeImageIndex] === image) syncLightboxFavoriteButton(image);
+  showToast(favorite ? "Added to favorites" : "Removed from favorites");
+
+  if (favoritesOnly.checked) {
+    applyFilters();
+    if (!favorite && lightbox.open) closeLightbox();
+  }
+}
+
 const filterCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
 function normalized(value: string): string {
@@ -295,6 +364,7 @@ function updateFilterCount(): void {
 function applyFilters(): void {
   const terms = normalized(searchInput.value).split(/\s+/).filter(Boolean);
   const images = allImages.filter((image) => {
+    if (favoritesOnly.checked && !isFavorite(image)) return false;
     if (searchableOnly.checked && !image.metadata) return false;
     if (terms.some((term) => !searchIndex(image).includes(term))) return false;
     for (const [key, value] of activeFilters) {
@@ -334,6 +404,7 @@ searchInput.addEventListener("input", () => {
   searchTimer = window.setTimeout(applyFilters, 120);
 });
 searchableOnly.addEventListener("change", applyFilters);
+favoritesOnly.addEventListener("change", applyFilters);
 
 function resizeTile(tile: HTMLElement): void {
   const styles = window.getComputedStyle(gallery);
@@ -450,6 +521,7 @@ function showLightboxImage(index: number): void {
   lightboxName.textContent = image.displayName;
   lightboxImage.src = new URL(image.url, document.baseURI).href;
   lightboxImage.alt = image.name;
+  syncLightboxFavoriteButton(image);
   lightboxPrevious.disabled = index === 0;
   lightboxNext.disabled = index === galleryImages.length - 1;
 }
@@ -475,6 +547,10 @@ function closeLightbox(): void {
 }
 
 lightboxClose.addEventListener("click", closeLightbox);
+lightboxFavorite.addEventListener("click", () => {
+  const image = galleryImages[activeImageIndex];
+  if (image) toggleFavorite(image);
+});
 lightboxPrevious.addEventListener("click", () => navigateLightbox(-1));
 lightboxNext.addEventListener("click", () => navigateLightbox(1));
 lightbox.addEventListener("keydown", (event) => {
@@ -562,6 +638,15 @@ function createTile(image: GalleryImage): HTMLElement {
   const actions = document.createElement("div");
   actions.className = "tile-actions";
 
+  const favoriteButton = document.createElement("button");
+  favoriteButton.type = "button";
+  favoriteButton.className = "tile-action-button favorite-button";
+  favoriteButton.append(createActionIcon([
+    "m12 2.75 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35-5.7-3-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.75Z",
+  ]));
+  syncTileFavoriteButton(favoriteButton, image);
+  favoriteButtonsByImage.set(image, favoriteButton);
+
   const imageCopyButton = document.createElement("button");
   imageCopyButton.type = "button";
   imageCopyButton.className = "tile-action-button";
@@ -583,11 +668,12 @@ function createTile(image: GalleryImage): HTMLElement {
     "M16.5 7.5 18 6a4 4 0 0 1 5.7 5.7l-3 3A4 4 0 0 1 15 15",
   ]));
 
-  actions.append(imageCopyButton, linkCopyButton);
+  actions.append(favoriteButton, imageCopyButton, linkCopyButton);
 
   openButton.append(element);
   tile.append(openButton, actions);
   openButton.addEventListener("click", () => openLightbox(galleryImages.indexOf(image), openButton));
+  favoriteButton.addEventListener("click", () => toggleFavorite(image));
   imageCopyButton.addEventListener("click", async () => {
     const absoluteUrl = new URL(image.url, document.baseURI).href;
     imageCopyButton.disabled = true;
@@ -629,6 +715,7 @@ function createTile(image: GalleryImage): HTMLElement {
     finishImageLoad(tile);
     tile.remove();
     tilesByImage.delete(image);
+    favoriteButtonsByImage.delete(image);
     tileObserver.unobserve(openButton);
     lazyImageObserver.unobserve(tile);
   }, { once: true });
@@ -657,6 +744,7 @@ function reorderTiles(): void {
 function initializeTiles(): void {
   cancelQueueRefresh();
   tilesByImage.clear();
+  favoriteButtonsByImage.clear();
   tileObserver.disconnect();
   lazyImageObserver.disconnect();
   pendingTiles.length = 0;
@@ -715,5 +803,16 @@ async function loadGallery(): Promise<void> {
 }
 
 shuffleButton.addEventListener("click", shuffleGallery);
+window.addEventListener("storage", (event) => {
+  if (event.key !== favoritesStorageKey) return;
+  const updatedPaths = parseFavoriteImagePaths(event.newValue);
+  favoriteImagePaths.clear();
+  for (const path of updatedPaths) favoriteImagePaths.add(path);
+  for (const [image, button] of favoriteButtonsByImage) syncTileFavoriteButton(button, image);
+  const activeImage = galleryImages[activeImageIndex];
+  if (lightbox.open && activeImage) syncLightboxFavoriteButton(activeImage);
+  if (lightbox.open && favoritesOnly.checked && activeImage && !isFavorite(activeImage)) closeLightbox();
+  applyFilters();
+});
 
 void loadGallery();

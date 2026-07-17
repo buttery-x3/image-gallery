@@ -36,6 +36,11 @@
           <span class="toggle-track" aria-hidden="true"><span></span></span>
           <span>Searchable only</span>
         </label>
+        <label class="searchable-toggle">
+          <input id="favorites-only" type="checkbox" />
+          <span class="toggle-track" aria-hidden="true"><span></span></span>
+          <span>Only favorites</span>
+        </label>
         <button id="advanced-filters" class="advanced-button" type="button" disabled>
           <span>Advanced</span>
           <span id="advanced-filter-count" class="filter-count" hidden></span>
@@ -76,6 +81,12 @@
         <div class="lightbox-content">
           <p id="lightbox-name" class="lightbox-name"></p>
           <img id="lightbox-image" class="lightbox-image" alt="" />
+          <button id="lightbox-favorite" class="lightbox-favorite" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m12 2.75 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35-5.7-3-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.75Z" />
+            </svg>
+            <span>Add favorite</span>
+          </button>
         </div>
         <button id="lightbox-next" class="lightbox-nav" type="button" aria-label="Next image">
           <svg aria-hidden="true" viewBox="0 0 24 24">

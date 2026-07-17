@@ -437,6 +437,10 @@ button { font: inherit; }
   stroke-linejoin: round;
 }
 
+.favorite-button.is-favorite { color: #ffd86b; }
+.favorite-button.is-favorite svg,
+.lightbox-favorite.is-favorite svg { fill: currentColor; }
+
 .gallery-item:hover .tile-actions,
 .gallery-item:focus-within .tile-actions {
   opacity: 1;
@@ -448,7 +452,8 @@ button { font: inherit; }
 
 .tile-action-button:focus-visible,
 .lightbox-close:focus-visible,
-.lightbox-nav:focus-visible {
+.lightbox-nav:focus-visible,
+.lightbox-favorite:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
@@ -485,7 +490,7 @@ button { font: inherit; }
 .lightbox-content {
   display: grid;
   grid-column: 2;
-  grid-template-rows: auto minmax(0, auto);
+  grid-template-rows: auto minmax(0, auto) auto;
   justify-items: start;
   min-width: 0;
   max-width: calc(100vw - 164px);
@@ -506,11 +511,42 @@ button { font: inherit; }
   display: block;
   justify-self: center;
   max-width: 100%;
-  max-height: calc(100dvh - 88px);
+  max-height: calc(100dvh - 160px);
   width: auto;
   height: auto;
   border-radius: 0;
   object-fit: contain;
+}
+
+.lightbox-favorite {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 8px;
+  min-height: 36px;
+  margin-top: 12px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 15, 15, 0.72);
+  color: #e2e3e5;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.lightbox-favorite:hover { background: rgba(35, 35, 35, 0.96); color: #fff; }
+.lightbox-favorite.is-favorite { border-color: rgba(255, 216, 107, 0.42); color: #ffd86b; }
+
+.lightbox-favorite svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .lightbox-nav {
@@ -623,7 +659,7 @@ body.lightbox-open { overflow: hidden; }
     grid-column: 1;
     grid-row: 2;
     max-width: 100%;
-    max-height: calc(100dvh - 152px);
+    max-height: calc(100dvh - 200px);
   }
   .lightbox-name {
     grid-column: 1;
@@ -656,7 +692,7 @@ body.lightbox-open { overflow: hidden; }
   .filter-grid { grid-template-columns: 1fr; }
   .lightbox { padding: 12px; }
   .lightbox-content { max-width: calc(100vw - 24px); }
-  .lightbox-image { max-height: calc(100dvh - 144px); }
+  .lightbox-image { max-height: calc(100dvh - 190px); }
   .lightbox-name { font-size: 0.82rem; }
   .lightbox-nav { width: 36px; height: 36px; }
 }
