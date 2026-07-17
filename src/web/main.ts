@@ -35,6 +35,7 @@ let activeImageLoads = 0;
 let allImages: GalleryImage[] = [];
 let galleryImages: GalleryImage[] = [];
 let searchTimer: number | undefined;
+let shufflePending = false;
 const activeFilters = new Map<string, string>();
 const imageSearchIndexes = new WeakMap<GalleryImage, string>();
 const tilesByImage = new Map<GalleryImage, HTMLElement>();
@@ -48,6 +49,11 @@ function cancelQueueRefresh(): void {
   if (queueRefreshFrame === undefined) return;
   window.cancelAnimationFrame(queueRefreshFrame);
   queueRefreshFrame = undefined;
+}
+
+function scheduleQueueRefresh(): void {
+  if (queueRefreshFrame !== undefined) return;
+  queueRefreshFrame = window.requestAnimationFrame(refreshImageQueue);
 }
 
 function shuffledImages(images: readonly GalleryImage[]): GalleryImage[] {
@@ -66,8 +72,23 @@ function shuffledImages(images: readonly GalleryImage[]): GalleryImage[] {
 }
 
 function shuffleGallery(): void {
-  allImages = shuffledImages(allImages);
-  applyFilters();
+  if (shufflePending || allImages.length < 2) return;
+  shufflePending = true;
+  shuffleButton.disabled = true;
+  shuffleButton.setAttribute("aria-busy", "true");
+
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      allImages = shuffledImages(allImages);
+      reorderTiles();
+      applyFilters();
+      window.requestAnimationFrame(() => {
+        shufflePending = false;
+        shuffleButton.removeAttribute("aria-busy");
+        updateShuffleButtonState();
+      });
+    });
+  });
 }
 
 function showToast(message: string): void {
@@ -209,7 +230,7 @@ function applyFilters(): void {
     }
     return true;
   });
-  renderImages(images);
+  updateVisibleImages(images);
   updateFilterCount();
 }
 
@@ -272,6 +293,7 @@ function drainImageQueue(): void {
     tile.dataset.loadState = "loading";
     activeImageLoads += 1;
     delete image.dataset.src;
+    image.loading = "eager";
     image.src = source;
   }
 }
@@ -283,12 +305,18 @@ function queueImage(tile: HTMLElement): boolean {
   return true;
 }
 
-function enqueueImage(tile: HTMLElement): void {
-  if (!queueImage(tile)) return;
+function prioritizeImage(tile: HTMLElement): void {
+  if (!queueImage(tile) && tile.dataset.loadState !== "queued") return;
+  const pendingIndex = pendingTiles.indexOf(tile);
+  if (pendingIndex > 0) {
+    pendingTiles.splice(pendingIndex, 1);
+    pendingTiles.unshift(tile);
+  }
   drainImageQueue();
 }
 
 function loadPriority(tile: HTMLElement): number {
+  if (tile.hidden) return Number.MAX_SAFE_INTEGER;
   const bounds = tile.getBoundingClientRect();
   const upperBoundary = -lazyLoadMargin;
   const lowerBoundary = window.innerHeight + lazyLoadMargin;
@@ -302,27 +330,23 @@ function refreshImageQueue(): void {
   queueRefreshFrame = undefined;
   for (let index = pendingTiles.length - 1; index >= 0; index -= 1) {
     const tile = pendingTiles[index]!;
-    if (tile.dataset.loadState !== "queued") {
+    if (!tile.isConnected || tile.dataset.loadState !== "queued") {
       pendingTiles.splice(index, 1);
-      continue;
     }
-    if (loadPriority(tile) === 0) continue;
-
-    pendingTiles.splice(index, 1);
-    delete tile.dataset.loadState;
-    lazyImageObserver.observe(tile);
   }
 
-  for (const image of galleryImages) {
+  for (const image of allImages) {
     const tile = tilesByImage.get(image);
-    if (!tile || loadPriority(tile) !== 0) continue;
-    if (queueImage(tile)) lazyImageObserver.unobserve(tile);
+    if (tile) queueImage(tile);
   }
 
   pendingTiles.sort((left, right) => {
+    const priorityDifference = loadPriority(left) - loadPriority(right);
+    if (priorityDifference !== 0) return priorityDifference;
     const leftBounds = left.getBoundingClientRect();
     const rightBounds = right.getBoundingClientRect();
-    return leftBounds.top - rightBounds.top || leftBounds.left - rightBounds.left;
+    return leftBounds.top - rightBounds.top || leftBounds.left - rightBounds.left ||
+      Number(left.dataset.galleryOrder) - Number(right.dataset.galleryOrder);
   });
   drainImageQueue();
 }
@@ -339,10 +363,12 @@ const lazyImageObserver = new IntersectionObserver((entries) => {
   for (const entry of entries) {
     if (!entry.isIntersecting) continue;
     const tile = entry.target as HTMLElement;
-    lazyImageObserver.unobserve(tile);
-    enqueueImage(tile);
+    prioritizeImage(tile);
   }
 }, { rootMargin: `${lazyLoadMargin}px 0px` });
+
+window.addEventListener("scroll", scheduleQueueRefresh, { passive: true });
+window.addEventListener("resize", scheduleQueueRefresh);
 
 function showLightboxImage(index: number): void {
   const image = galleryImages[index];
@@ -437,6 +463,7 @@ function createTile(image: GalleryImage): HTMLElement {
   const markReady = (): void => {
     tile.classList.remove("is-loading");
     openButton.setAttribute("aria-busy", "false");
+    lazyImageObserver.unobserve(tile);
     finishImageLoad(tile);
     window.requestAnimationFrame(() => resizeTile(tile));
   };
@@ -445,6 +472,7 @@ function createTile(image: GalleryImage): HTMLElement {
   element.addEventListener("error", () => {
     finishImageLoad(tile);
     tile.remove();
+    tilesByImage.delete(image);
     tileObserver.unobserve(openButton);
     lazyImageObserver.unobserve(tile);
   }, { once: true });
@@ -454,32 +482,55 @@ function createTile(image: GalleryImage): HTMLElement {
   return tile;
 }
 
-function renderImages(images: GalleryImage[]): void {
+function updateShuffleButtonState(): void {
+  shuffleButton.disabled = shufflePending || allImages.length < 2;
+}
+
+function reorderTiles(): void {
+  const fragment = document.createDocumentFragment();
+  for (const [index, image] of allImages.entries()) {
+    const tile = tilesByImage.get(image);
+    if (!tile) continue;
+    tile.dataset.galleryOrder = String(index);
+    fragment.append(tile);
+  }
+  gallery.replaceChildren(fragment);
+  scheduleQueueRefresh();
+}
+
+function initializeTiles(): void {
   cancelQueueRefresh();
-  galleryImages = images;
   tilesByImage.clear();
   tileObserver.disconnect();
   lazyImageObserver.disconnect();
   pendingTiles.length = 0;
-  gallery.replaceChildren();
-  const fragment = document.createDocumentFragment();
-  for (const image of images) {
+  activeImageLoads = 0;
+  for (const image of allImages) {
     const tile = createTile(image);
     tilesByImage.set(image, tile);
-    fragment.append(tile);
   }
-  gallery.append(fragment);
+  reorderTiles();
+}
+
+function updateVisibleImages(images: GalleryImage[]): void {
+  galleryImages = images;
+  const visibleImages = new Set(images);
+  for (const image of allImages) {
+    const tile = tilesByImage.get(image);
+    if (tile) tile.hidden = !visibleImages.has(image);
+  }
 
   if (images.length === allImages.length) {
     imageCount.textContent = images.length === 1 ? "1 image" : `${images.length} images`;
   } else {
     imageCount.textContent = `${images.length} of ${allImages.length} images`;
   }
-  shuffleButton.disabled = allImages.length < 2;
+  updateShuffleButtonState();
   status.hidden = images.length > 0;
   status.textContent = images.length === 0
     ? (allImages.length === 0 ? "No images yet. Add some files and refresh." : "No images match your search and filters.")
     : "";
+  scheduleQueueRefresh();
 }
 
 async function loadGallery(): Promise<void> {
@@ -494,6 +545,7 @@ async function loadGallery(): Promise<void> {
     allImages = shuffledImages(payload.images);
     activeFilters.clear();
     renderFilterControls();
+    initializeTiles();
     applyFilters();
   } catch (error) {
     allImages = [];

@@ -185,6 +185,14 @@ button { font: inherit; }
   stroke-linejoin: round;
 }
 
+.shuffle-button[aria-busy="true"] svg {
+  animation: shuffle-hold 700ms linear infinite;
+}
+
+@keyframes shuffle-hold {
+  to { transform: rotate(360deg); }
+}
+
 .shuffle-button:hover:not(:disabled) {
   border-color: rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.1);
@@ -574,4 +582,5 @@ body.lightbox-open { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; }
+  .shuffle-button[aria-busy="true"] svg { animation: none; }
 }
