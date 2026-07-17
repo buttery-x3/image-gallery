@@ -116,6 +116,75 @@ async function copyText(value: string): Promise<void> {
   if (!copied) throw new Error("Copy failed");
 }
 
+function imageMimeType(image: GalleryImage): string {
+  return image.type === "jpeg" ? "image/jpeg" : `image/${image.type}`;
+}
+
+function clipboardSupports(mimeType: string): boolean {
+  if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) return false;
+  return typeof ClipboardItem.supports !== "function" || ClipboardItem.supports(mimeType);
+}
+
+async function writeImageBlob(blob: Blob, mimeType: string): Promise<void> {
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    throw new Error("Image clipboard is unavailable");
+  }
+  await navigator.clipboard.write([new ClipboardItem({ [mimeType]: blob })]);
+}
+
+async function convertToPng(blob: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not prepare the image");
+    context.drawImage(bitmap, 0, 0);
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((png) => {
+        if (png) resolve(png);
+        else reject(new Error("Could not convert the image"));
+      }, "image/png");
+    });
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function copyImage(image: GalleryImage, absoluteUrl: string): Promise<void> {
+  const response = await fetch(absoluteUrl, { cache: "force-cache" });
+  if (!response.ok) throw new Error(`Could not load the image (${response.status})`);
+
+  const blob = await response.blob();
+  const mimeType = blob.type || imageMimeType(image);
+  if (clipboardSupports(mimeType)) {
+    try {
+      await writeImageBlob(blob, mimeType);
+      return;
+    } catch {
+      // Static formats get a broadly supported PNG attempt below.
+    }
+  }
+
+  if (image.type === "gif") throw new Error("Animated GIF clipboard is unsupported");
+  const png = mimeType === "image/png" ? blob : await convertToPng(blob);
+  await writeImageBlob(png, "image/png");
+}
+
+function createActionIcon(paths: readonly string[]): SVGSVGElement {
+  const namespace = "http://www.w3.org/2000/svg";
+  const icon = document.createElementNS(namespace, "svg");
+  icon.setAttribute("aria-hidden", "true");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  for (const pathData of paths) {
+    const path = document.createElementNS(namespace, "path");
+    path.setAttribute("d", pathData);
+    icon.append(path);
+  }
+  return icon;
+}
+
 const filterCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
 function normalized(value: string): string {
@@ -442,16 +511,55 @@ function createTile(image: GalleryImage): HTMLElement {
   element.decoding = "async";
   element.fetchPriority = "low";
 
-  const copyButton = document.createElement("button");
-  copyButton.type = "button";
-  copyButton.className = "copy-button";
-  copyButton.textContent = "Copy";
-  copyButton.setAttribute("aria-label", `Copy direct link to ${image.name}`);
+  const actions = document.createElement("div");
+  actions.className = "tile-actions";
+
+  const imageCopyButton = document.createElement("button");
+  imageCopyButton.type = "button";
+  imageCopyButton.className = "tile-action-button";
+  imageCopyButton.title = "Copy image";
+  imageCopyButton.setAttribute("aria-label", `Copy ${image.name} as an image`);
+  imageCopyButton.append(createActionIcon([
+    "M8 8h11v11H8z",
+    "M5 16H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v1",
+  ]));
+
+  const linkCopyButton = document.createElement("button");
+  linkCopyButton.type = "button";
+  linkCopyButton.className = "tile-action-button";
+  linkCopyButton.title = "Copy link";
+  linkCopyButton.setAttribute("aria-label", `Copy direct link to ${image.name}`);
+  linkCopyButton.append(createActionIcon([
+    "M10.5 13.5l3-3",
+    "M7.5 16.5 6 18a4 4 0 0 1-5.7-5.7l3-3A4 4 0 0 1 9 9",
+    "M16.5 7.5 18 6a4 4 0 0 1 5.7 5.7l-3 3A4 4 0 0 1 15 15",
+  ]));
+
+  actions.append(imageCopyButton, linkCopyButton);
 
   openButton.append(element);
-  tile.append(openButton, copyButton);
+  tile.append(openButton, actions);
   openButton.addEventListener("click", () => openLightbox(galleryImages.indexOf(image), openButton));
-  copyButton.addEventListener("click", async () => {
+  imageCopyButton.addEventListener("click", async () => {
+    const absoluteUrl = new URL(image.url, document.baseURI).href;
+    imageCopyButton.disabled = true;
+    imageCopyButton.setAttribute("aria-busy", "true");
+    try {
+      await copyImage(image, absoluteUrl);
+      showToast("Image copied");
+    } catch {
+      try {
+        await copyText(absoluteUrl);
+        showToast("Link copied instead");
+      } catch {
+        showToast("Could not copy image or link");
+      }
+    } finally {
+      imageCopyButton.disabled = false;
+      imageCopyButton.removeAttribute("aria-busy");
+    }
+  });
+  linkCopyButton.addEventListener("click", async () => {
     try {
       await copyText(new URL(image.url, document.baseURI).href);
       showToast("Link copied");

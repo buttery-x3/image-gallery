@@ -20,7 +20,7 @@ This repository is intentionally a small private image gallery. Keep the impleme
 - Lightbox images have square corners and use `object-fit: contain` with a viewport margin.
 - GIF animation must be preserved.
 - Media files must be viewport-prioritized and limited to four concurrent loads, then continue through the full gallery in the background; do not assign every image URL during initial rendering.
-- The Copy control must produce an absolute direct media URL.
+- The Copy link control must produce an absolute direct media URL. Copy image may fall back to that URL when image clipboard writing is unsupported.
 - All browser requests must remain compatible with both `/` and a stripped Caddy prefix such as `/image-gallery/`.
 - The server is read-only and must not add upload, delete, rename, or image-processing behavior unless explicitly requested.
 - Hidden files and symbolic links must not be exposed.

@@ -2,7 +2,7 @@
 
 A small, private, self-hosted image gallery. Copy images and GIFs into a folder, refresh the page, and they are displayed in a full-width masonry gallery. Search is available in the header, with advanced metadata filters when matching JSON sidecars are present.
 
-Gallery media is shown at exactly 300px wide with its natural height. Clicking an image opens it against a dark lightbox, while the hover Copy button copies its direct public URL.
+Gallery media is shown at exactly 300px wide with its natural height. Clicking an image opens it against a dark lightbox. On desktop, hover actions can copy either the image itself or its direct public URL; mobile relies on native image controls.
 
 ## Requirements
 
@@ -48,7 +48,7 @@ Images may have a same-name JSON sidecar in the same directory. The `anime_waifu
 
 Enable **Searchable only** in the header to temporarily hide images that do not yet have supported metadata.
 
-GIF and PNG tiles use automatically generated 300px-wide lossy WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. Previews are created on first view and cached outside the gallery; the original file is still used in the lightbox and by the Copy control.
+GIF and PNG tiles use automatically generated 300px-wide lossy WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. Previews are created on first view and cached outside the gallery; the original file is still used in the lightbox and by the desktop Copy image/Copy link controls.
 
 To organize every root-level image into a timestamped batch and cache only that batch's missing previews, run this while the server is running:
 
