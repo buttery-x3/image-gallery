@@ -51,7 +51,7 @@ Hidden entries, symbolic links, and unsupported files are ignored. New files app
 
 Images may have a same-name JSON sidecar in the same directory. The `anime_waifu_lite/v1` format is used for prompt search and advanced tag filters; invalid, unsupported, or missing metadata does not prevent the image from appearing. Every image also exposes its filename stem as a searchable display name. The containing subdirectory is available as a Batch filter.
 
-Generated fantasy names also receive a `<long-name>.gallery-name.json` sidecar using the `image-gallery/name/v1` schema. It stores a short English display name and its katakana equivalent. The header's **EN / JP** control switches the displayed name in the lightbox and remembers the preference in the browser. Both versions remain searchable in either mode; images without generated-name metadata fall back to their filename stem.
+Generated fantasy names also receive a `<long-name>.gallery-name.json` sidecar using the `image-gallery/name/v1` schema. It stores a short English display name and its katakana equivalent. The lightbox keeps the full filename stem above the image and overlays both short names in its top-left corner, with the English text colored from the first two usable metadata colors and a white/black fallback. A subtle `waiaifu.lol` mark sits at the image's bottom right. Both name versions remain searchable, while the persistent **EN / JP** control is retained for interface-language selection.
 
 Enable **Searchable only** in the header to temporarily hide images that do not yet have supported metadata.
 

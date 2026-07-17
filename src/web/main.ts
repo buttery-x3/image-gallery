@@ -26,7 +26,11 @@ const filterReset = requiredElement<HTMLButtonElement>("#filter-reset");
 const lightbox = requiredElement<HTMLDialogElement>("#lightbox");
 const lightboxStage = requiredElement<HTMLElement>(".lightbox-stage");
 const lightboxName = requiredElement<HTMLElement>("#lightbox-name");
+const lightboxMedia = requiredElement<HTMLElement>("#lightbox-media");
 const lightboxImage = requiredElement<HTMLImageElement>("#lightbox-image");
+const lightboxNameOverlay = requiredElement<HTMLElement>("#lightbox-name-overlay");
+const lightboxShortNameEn = requiredElement<HTMLElement>("#lightbox-short-name-en");
+const lightboxShortNameJa = requiredElement<HTMLElement>("#lightbox-short-name-ja");
 const lightboxFavorite = requiredElement<HTMLButtonElement>("#lightbox-favorite");
 const lightboxClose = requiredElement<HTMLButtonElement>("#lightbox-close");
 const lightboxPrevious = requiredElement<HTMLButtonElement>("#lightbox-previous");
@@ -243,6 +247,60 @@ function saveNameLanguage(): void {
 function displayNameFor(image: GalleryImage): string {
   return image.shortName?.[nameLanguage] ?? image.displayName;
 }
+
+const overlayColorFields = [
+  "hair_color_primary",
+  "hair_color_secondary",
+  "eye_color_primary",
+  "eye_color_secondary",
+  "outfit_color",
+  "trim_color",
+  "jewellery_color",
+] as const;
+
+const unusableCssColors = new Set([
+  "currentcolor", "inherit", "initial", "revert", "revert-layer", "transparent", "unset",
+]);
+
+function resolvedCssColor(value: string): string | undefined {
+  const normalized = value.trim().toLocaleLowerCase();
+  if (!normalized) return undefined;
+
+  const candidates = [
+    normalized,
+    normalized.replace(/[\s_-]+/g, ""),
+    ...normalized.split(/[^a-z0-9#().,%+-]+/).filter(Boolean).reverse(),
+  ];
+  for (const candidate of new Set(candidates)) {
+    if (unusableCssColors.has(candidate) || !CSS.supports("color", candidate)) continue;
+    return candidate;
+  }
+  return undefined;
+}
+
+function overlayColors(image: GalleryImage): { fill: string; outline: string } {
+  const colors: string[] = [];
+  for (const field of overlayColorFields) {
+    const value = image.metadata?.tags[field];
+    if (!value) continue;
+    const color = resolvedCssColor(value);
+    if (color && !colors.includes(color)) colors.push(color);
+    if (colors.length === 2) return { fill: colors[0]!, outline: colors[1]! };
+  }
+  return { fill: "#fff", outline: "#000" };
+}
+
+function syncLightboxOverlayScale(): void {
+  const imageWidth = lightboxImage.getBoundingClientRect().width;
+  if (imageWidth <= 0) return;
+  const englishSize = Math.min(72, Math.max(22, imageWidth * 0.09));
+  lightboxMedia.style.setProperty("--lightbox-name-en-size", `${englishSize}px`);
+  lightboxMedia.style.setProperty("--lightbox-name-ja-size", `${englishSize / 2}px`);
+}
+
+const lightboxImageSizeObserver = new ResizeObserver(syncLightboxOverlayScale);
+lightboxImageSizeObserver.observe(lightboxImage);
+lightboxImage.addEventListener("load", syncLightboxOverlayScale);
 
 function isFavorite(image: GalleryImage): boolean {
   return favoriteImagePaths.has(image.path);
@@ -547,10 +605,16 @@ function showLightboxImage(index: number): void {
   if (!image) return;
 
   activeImageIndex = index;
-  const displayName = displayNameFor(image);
-  lightboxName.textContent = displayName;
+  lightboxName.textContent = image.displayName;
   lightboxImage.src = new URL(image.url, document.baseURI).href;
-  lightboxImage.alt = displayName;
+  lightboxImage.alt = image.displayName;
+  const shortName = image.shortName;
+  lightboxNameOverlay.hidden = !shortName;
+  lightboxShortNameEn.textContent = shortName?.en ?? "";
+  lightboxShortNameJa.textContent = shortName?.ja ?? "";
+  const colors = overlayColors(image);
+  lightboxMedia.style.setProperty("--lightbox-name-fill", colors.fill);
+  lightboxMedia.style.setProperty("--lightbox-name-outline", colors.outline);
   syncLightboxFavoriteButton(image);
   lightboxPrevious.disabled = index === 0;
   lightboxNext.disabled = index === galleryImages.length - 1;
@@ -640,6 +704,9 @@ lightbox.addEventListener("click", (event) => {
 lightbox.addEventListener("close", () => {
   document.body.classList.remove("lightbox-open");
   lightboxName.textContent = "";
+  lightboxNameOverlay.hidden = true;
+  lightboxShortNameEn.textContent = "";
+  lightboxShortNameJa.textContent = "";
   lightboxImage.removeAttribute("src");
   lightboxTouchStart = undefined;
   activeImageIndex = -1;
@@ -772,8 +839,6 @@ function syncNameLanguageDisplay(): void {
 
   const activeImage = galleryImages[activeImageIndex];
   if (lightbox.open && activeImage) {
-    lightboxName.textContent = displayNameFor(activeImage);
-    lightboxImage.alt = displayNameFor(activeImage);
     syncLightboxFavoriteButton(activeImage);
   }
 }
