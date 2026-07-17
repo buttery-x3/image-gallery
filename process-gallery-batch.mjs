@@ -1,11 +1,13 @@
 import "dotenv/config";
 import { createHash } from "node:crypto";
 import { constants as fileSystemConstants, createReadStream } from "node:fs";
-import { access, copyFile, lstat, mkdir, readdir, readFile, rename, rm, rmdir } from "node:fs/promises";
+import { access, copyFile, lstat, mkdir, readdir, readFile, rename, rm, rmdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { generateJapaneseFantasyName } from "./gallery-name-generator.mjs";
+import { generateJapaneseFantasyName, generateShortNameForStem } from "./gallery-name-generator.mjs";
 
 const supportedExtensions = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"]);
+const nameMetadataSuffix = ".gallery-name.json";
+const nameMetadataSchema = "image-gallery/name/v1";
 const namingStyle = process.env.BATCH_NAME_STYLE?.trim() ?? "";
 if (namingStyle && namingStyle !== "japanese-fantasy") {
   throw new Error(`Unsupported BATCH_NAME_STYLE: ${namingStyle}`);
@@ -13,14 +15,20 @@ if (namingStyle && namingStyle !== "japanese-fantasy") {
 const namingEnabled = namingStyle === "japanese-fantasy";
 
 const argumentsToParse = process.argv.slice(2);
-const knownFlags = new Set(["--dry-run", "--rename-existing"]);
+const knownFlags = new Set(["--backfill-name-metadata", "--dry-run", "--rename-existing"]);
 const unknownFlags = argumentsToParse.filter((argument) => argument.startsWith("--") && !knownFlags.has(argument));
 const positionalArguments = argumentsToParse.filter((argument) => !argument.startsWith("--"));
 const dryRun = argumentsToParse.includes("--dry-run");
 const renameExisting = argumentsToParse.includes("--rename-existing");
-if (unknownFlags.length > 0 || positionalArguments.length > 1 || (renameExisting && positionalArguments.length > 0)) {
+const backfillNameMetadata = argumentsToParse.includes("--backfill-name-metadata");
+if (
+  unknownFlags.length > 0 || positionalArguments.length > 1 ||
+  ((renameExisting || backfillNameMetadata) && positionalArguments.length > 0) ||
+  (renameExisting && backfillNameMetadata)
+) {
   console.error("Usage: node process-gallery-batch.mjs [--dry-run] [base-url]");
   console.error("       node process-gallery-batch.mjs --rename-existing [--dry-run]");
+  console.error("       node process-gallery-batch.mjs --backfill-name-metadata [--dry-run]");
   process.exit(2);
 }
 
@@ -34,6 +42,25 @@ function supportedMetadataRecord(parsed) {
   return Object.values(parsed).find(
     (value) => value && typeof value === "object" && !Array.isArray(value) && value.schema === "anime_waifu_lite/v1",
   );
+}
+
+function supportedNameMetadataRecord(parsed) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+  const shortName = parsed.shortName;
+  if (
+    parsed.schema !== nameMetadataSchema || !shortName || typeof shortName !== "object" ||
+    Array.isArray(shortName) || typeof shortName.en !== "string" || !shortName.en.trim() ||
+    typeof shortName.ja !== "string" || !shortName.ja.trim()
+  ) return undefined;
+  return { en: shortName.en.trim(), ja: shortName.ja.trim() };
+}
+
+function nameMetadataContents(shortName) {
+  return `${JSON.stringify({ schema: nameMetadataSchema, shortName }, null, 2)}\n`;
+}
+
+function nameMetadataStem(fileName) {
+  return fileName.endsWith(nameMetadataSuffix) ? fileName.slice(0, -nameMetadataSuffix.length) : undefined;
 }
 
 function canonicalJson(value) {
@@ -91,12 +118,15 @@ async function nextQuarantineTarget() {
   return { quarantineDirectory, quarantineRelativeDirectory: `.duplicates/${quarantineName}` };
 }
 
-async function readImageRecords(directory) {
+async function readImageRecords(directory, options = {}) {
   const entries = await readdir(directory, { withFileTypes: true });
   const regularFiles = entries.filter(
     (entry) => !entry.name.startsWith(".") && entry.isFile() && !entry.isSymbolicLink(),
   );
-  const jsonFiles = regularFiles.filter((entry) => path.extname(entry.name).toLowerCase() === ".json");
+  const nameMetadataFiles = regularFiles.filter((entry) => entry.name.endsWith(nameMetadataSuffix));
+  const jsonFiles = regularFiles.filter(
+    (entry) => path.extname(entry.name).toLowerCase() === ".json" && !entry.name.endsWith(nameMetadataSuffix),
+  );
   const imageFiles = regularFiles.filter((entry) => supportedExtensions.has(path.extname(entry.name).toLowerCase()));
   const imagesByStem = new Map();
   for (const imageFile of imageFiles) {
@@ -106,6 +136,7 @@ async function readImageRecords(directory) {
     imagesByStem.set(stem, matches);
   }
   const metadataByImage = new Map();
+  const nameMetadataByImage = new Map();
 
   for (const jsonFile of jsonFiles) {
     const stem = path.basename(jsonFile.name, path.extname(jsonFile.name));
@@ -130,22 +161,56 @@ async function readImageRecords(directory) {
     });
   }
 
+  for (const nameMetadataFile of nameMetadataFiles) {
+    const stem = nameMetadataStem(nameMetadataFile.name);
+    const matches = stem ? imagesByStem.get(stem) ?? [] : [];
+    const displayPath = relativeGalleryPath(path.join(directory, nameMetadataFile.name));
+    if (!options.allowNameMetadata) {
+      throw new Error(`${displayPath} is reserved generated-name metadata and cannot be supplied as an incoming file.`);
+    }
+    if (matches.length === 0) throw new Error(`${displayPath} does not have a same-name image.`);
+    if (matches.length > 1) throw new Error(`${displayPath} matches more than one image.`);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(await readFile(path.join(directory, nameMetadataFile.name), "utf8"));
+    } catch (error) {
+      throw new Error(`${displayPath} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const shortName = supportedNameMetadataRecord(parsed);
+    if (!shortName && !options.allowInvalidNameMetadata) {
+      throw new Error(`${displayPath} does not contain supported ${nameMetadataSchema} metadata.`);
+    }
+    nameMetadataByImage.set(matches[0].name, {
+      nameMetadataName: nameMetadataFile.name,
+      shortName,
+      nameMetadataInvalid: !shortName,
+    });
+  }
+
   return imageFiles.map((imageFile) => {
     const metadata = metadataByImage.get(imageFile.name);
+    const nameMetadata = nameMetadataByImage.get(imageFile.name);
     return {
       directory,
       imageName: imageFile.name,
       metadataName: metadata?.metadataName,
       metadataFingerprint: metadata?.metadataFingerprint,
+      nameMetadataName: nameMetadata?.nameMetadataName,
+      shortName: nameMetadata?.shortName,
+      nameMetadataInvalid: nameMetadata?.nameMetadataInvalid,
     };
   });
 }
 
-async function collectBatchedImageRecords() {
+async function collectBatchedImageRecords(options = {}) {
   const records = [];
 
   async function walk(directory, isRoot) {
-    if (!isRoot) records.push(...await readImageRecords(directory));
+    if (!isRoot) records.push(...await readImageRecords(directory, {
+      allowNameMetadata: true,
+      allowInvalidNameMetadata: options.allowInvalidNameMetadata,
+    }));
     const entries = await readdir(directory, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.name.startsWith(".") || entry.isSymbolicLink() || !entry.isDirectory()) continue;
@@ -270,6 +335,13 @@ async function collectUsedImageStems() {
   return stems;
 }
 
+async function collectUsedShortNames() {
+  const records = await collectBatchedImageRecords();
+  return new Set(records.flatMap((record) => record.shortName
+    ? [record.shortName.en.toLocaleLowerCase("en-US")]
+    : []));
+}
+
 function previewCacheKey(identifier, size, modifiedAt) {
   return createHash("sha256")
     .update(identifier)
@@ -334,10 +406,11 @@ async function preparePreviewCopies(imageMoves) {
   }
 }
 
-async function executeMoves(fileMoves, newDirectories = []) {
+async function executeMoves(fileMoves, newDirectories = [], fileWrites = []) {
   const createdDirectories = [];
   const createdParents = [];
   const completedMoves = [];
+  const completedWrites = [];
   try {
     for (const directory of newDirectories) {
       if (await exists(directory)) throw new Error(`Target directory already exists: ${directory}`);
@@ -352,7 +425,24 @@ async function executeMoves(fileMoves, newDirectories = []) {
       await rename(fileMove.sourcePath, fileMove.targetPath);
       completedMoves.push(fileMove);
     }
+    for (const fileWrite of fileWrites) {
+      if (fileWrite.replaceExisting) {
+        const previousContents = await readFile(fileWrite.targetPath, "utf8");
+        completedWrites.push({ ...fileWrite, previousContents });
+        await writeFile(fileWrite.targetPath, fileWrite.contents, "utf8");
+      } else {
+        await writeFile(fileWrite.targetPath, fileWrite.contents, { encoding: "utf8", flag: "wx" });
+        completedWrites.push(fileWrite);
+      }
+    }
   } catch (error) {
+    for (const fileWrite of completedWrites.reverse()) {
+      if ("previousContents" in fileWrite) {
+        await writeFile(fileWrite.targetPath, fileWrite.previousContents, "utf8").catch(() => undefined);
+      } else {
+        await rm(fileWrite.targetPath, { force: true }).catch(() => undefined);
+      }
+    }
     for (const fileMove of completedMoves.reverse()) {
       await rename(fileMove.targetPath, fileMove.sourcePath).catch(() => undefined);
     }
@@ -443,12 +533,14 @@ async function renameExistingBatches() {
   }
 
   const usedNames = await collectUsedImageStems();
+  const usedShortNames = await collectUsedShortNames();
   const imageMoves = [];
   const fileMoves = [];
+  const fileWrites = [];
   const mappings = [];
   for (const record of records) {
-    const generatedName = generateJapaneseFantasyName(usedNames);
-    const imageTargetName = `${generatedName}${path.extname(record.imageName).toLowerCase()}`;
+    const generated = generateJapaneseFantasyName(usedNames, usedShortNames);
+    const imageTargetName = `${generated.fileStem}${path.extname(record.imageName).toLowerCase()}`;
     const sourcePath = path.join(record.directory, record.imageName);
     const targetPath = path.join(record.directory, imageTargetName);
     const sourceRelativePath = relativeGalleryPath(sourcePath);
@@ -458,14 +550,29 @@ async function renameExistingBatches() {
 
     let metadataMapping = "";
     if (record.metadataName) {
-      const metadataTargetName = `${generatedName}.json`;
+      const metadataTargetName = `${generated.fileStem}.json`;
       fileMoves.push({
         sourcePath: path.join(record.directory, record.metadataName),
         targetPath: path.join(record.directory, metadataTargetName),
       });
       metadataMapping = ` + ${record.metadataName} -> ${metadataTargetName}`;
     }
-    mappings.push(`- ${sourceRelativePath} -> ${targetRelativePath}${metadataMapping}`);
+    const nameMetadataTargetName = `${generated.fileStem}${nameMetadataSuffix}`;
+    if (record.nameMetadataName) {
+      fileMoves.push({
+        sourcePath: path.join(record.directory, record.nameMetadataName),
+        targetPath: path.join(record.directory, nameMetadataTargetName),
+      });
+    }
+    fileWrites.push({
+      targetPath: path.join(record.directory, nameMetadataTargetName),
+      contents: nameMetadataContents(generated.shortName),
+      replaceExisting: Boolean(record.nameMetadataName),
+    });
+    mappings.push(
+      `- ${sourceRelativePath} -> ${targetRelativePath}${metadataMapping} + ${nameMetadataTargetName} ` +
+      `(${generated.shortName.en} / ${generated.shortName.ja})`,
+    );
   }
 
   console.log(`${dryRun ? "Would rename" : "Renaming"} ${records.length} existing batched image${records.length === 1 ? "" : "s"}.`);
@@ -476,7 +583,7 @@ async function renameExistingBatches() {
 
   const createdCachePaths = await preparePreviewCopies(imageMoves);
   try {
-    await executeMoves(fileMoves);
+    await executeMoves(fileMoves, [], fileWrites);
   } catch (error) {
     await Promise.all(createdCachePaths.map((filePath) => rm(filePath, { force: true })));
     throw error;
@@ -485,6 +592,51 @@ async function renameExistingBatches() {
     console.log(`Preserved ${createdCachePaths.length} cached preview${createdCachePaths.length === 1 ? "" : "s"}.`);
   }
   console.log("Existing batch images have been renamed.");
+}
+
+async function backfillGeneratedNameMetadata() {
+  const records = await collectBatchedImageRecords({ allowInvalidNameMetadata: true });
+  const usedShortNames = new Set(records.flatMap((record) => record.shortName
+    ? [record.shortName.en.toLocaleLowerCase("en-US")]
+    : []));
+  const fileWrites = [];
+  const mappings = [];
+  const skipped = [];
+
+  for (const record of records) {
+    const relativePath = relativeGalleryPath(path.join(record.directory, record.imageName));
+    if (record.nameMetadataName) {
+      skipped.push(`- ${relativePath}: ${record.nameMetadataInvalid ? "invalid name metadata requires manual repair" : "already has name metadata"}`);
+      continue;
+    }
+
+    const fileStem = path.basename(record.imageName, path.extname(record.imageName));
+    let shortName;
+    try {
+      shortName = generateShortNameForStem(fileStem, usedShortNames);
+    } catch (error) {
+      skipped.push(`- ${relativePath}: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
+
+    const targetName = `${fileStem}${nameMetadataSuffix}`;
+    fileWrites.push({
+      targetPath: path.join(record.directory, targetName),
+      contents: nameMetadataContents(shortName),
+    });
+    mappings.push(`- ${relativePath} + ${targetName} (${shortName.en} / ${shortName.ja})`);
+  }
+
+  console.log(`${dryRun ? "Would add" : "Adding"} name metadata for ${fileWrites.length} image${fileWrites.length === 1 ? "" : "s"}.`);
+  for (const mapping of mappings) console.log(mapping);
+  if (skipped.length > 0) {
+    console.log(`Skipping ${skipped.length} image${skipped.length === 1 ? "" : "s"}:`);
+    for (const message of skipped) console.log(message);
+  }
+  if (dryRun || fileWrites.length === 0) return;
+
+  await executeMoves([], [], fileWrites);
+  console.log("Generated-name metadata backfill is complete.");
 }
 
 async function processIncomingBatch() {
@@ -505,8 +657,10 @@ async function processIncomingBatch() {
   const quarantineTarget = duplicates.length > 0 ? await nextQuarantineTarget() : undefined;
   const batchTarget = uniqueRecords.length > 0 ? await nextBatchTarget() : undefined;
   const usedNames = namingEnabled && uniqueRecords.length > 0 ? await collectUsedImageStems() : new Set();
+  const usedShortNames = namingEnabled && uniqueRecords.length > 0 ? await collectUsedShortNames() : new Set();
   const imageMoves = [];
   const fileMoves = [];
+  const fileWrites = [];
   const newDirectories = [];
   const mappings = [];
   const quarantineMappings = [];
@@ -536,7 +690,8 @@ async function processIncomingBatch() {
   if (batchTarget) newDirectories.push(batchTarget.batchDirectory);
   for (const record of uniqueRecords) {
     const sourceStem = path.basename(record.imageName, path.extname(record.imageName));
-    const targetStem = namingEnabled ? generateJapaneseFantasyName(usedNames) : sourceStem;
+    const generated = namingEnabled ? generateJapaneseFantasyName(usedNames, usedShortNames) : undefined;
+    const targetStem = generated?.fileStem ?? sourceStem;
     const imageTargetName = `${targetStem}${path.extname(record.imageName)}`;
     const sourcePath = path.join(galleryRoot, record.imageName);
     const targetPath = path.join(batchTarget.batchDirectory, imageTargetName);
@@ -557,8 +712,17 @@ async function processIncomingBatch() {
         ? ` + ${record.metadataName} -> ${metadataTargetName}`
         : ` + ${record.metadataName}`;
     }
+    let nameMetadataMapping = "";
+    if (generated) {
+      const nameMetadataTargetName = `${targetStem}${nameMetadataSuffix}`;
+      fileWrites.push({
+        targetPath: path.join(batchTarget.batchDirectory, nameMetadataTargetName),
+        contents: nameMetadataContents(generated.shortName),
+      });
+      nameMetadataMapping = ` + ${nameMetadataTargetName} (${generated.shortName.en} / ${generated.shortName.ja})`;
+    }
     mappings.push(namingEnabled
-      ? `- ${record.imageName} -> ${imageTargetName}${metadataMapping}`
+      ? `- ${record.imageName} -> ${imageTargetName}${metadataMapping}${nameMetadataMapping}`
       : `- ${record.imageName}${metadataMapping}`);
   }
 
@@ -594,7 +758,7 @@ async function processIncomingBatch() {
 
   const createdCachePaths = await preparePreviewCopies(imageMoves);
   try {
-    await executeMoves(fileMoves, newDirectories);
+    await executeMoves(fileMoves, newDirectories, fileWrites);
   } catch (error) {
     await Promise.all(createdCachePaths.map((filePath) => rm(filePath, { force: true })));
     throw error;
@@ -631,4 +795,5 @@ if (
 }
 
 if (renameExisting) await renameExistingBatches();
+else if (backfillNameMetadata) await backfillGeneratedNameMetadata();
 else await processIncomingBatch();

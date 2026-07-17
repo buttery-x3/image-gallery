@@ -51,6 +51,8 @@ Hidden entries, symbolic links, and unsupported files are ignored. New files app
 
 Images may have a same-name JSON sidecar in the same directory. The `anime_waifu_lite/v1` format is used for prompt search and advanced tag filters; invalid, unsupported, or missing metadata does not prevent the image from appearing. Every image also exposes its filename stem as a searchable display name. The containing subdirectory is available as a Batch filter.
 
+Generated fantasy names also receive a `<long-name>.gallery-name.json` sidecar using the `image-gallery/name/v1` schema. It stores a short English display name and its katakana equivalent. The header's **EN / JP** control switches the displayed name in the lightbox and remembers the preference in the browser. Both versions remain searchable in either mode; images without generated-name metadata fall back to their filename stem.
+
 Enable **Searchable only** in the header to temporarily hide images that do not yet have supported metadata.
 
 GIF and PNG tiles use automatically generated 300px-wide lossy WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. Previews are created on first view and cached outside the gallery; the original file is still used in the lightbox and by the desktop Copy image/Copy link controls.
@@ -63,7 +65,7 @@ bash ./process-batch.sh
 
 Images without JSON metadata are included. When a same-name JSON sidecar is present, it is validated and moved alongside its image. Orphaned or invalid JSON stops the batch before anything moves. Before moving anything, the batcher indexes existing metadata and file sizes, then SHA-256 hashes only plausible same-size duplicate candidates. Exact duplicate image/JSON pairs are moved recoverably into `GALLERY_DIR/.duplicates/<timestamp>/`, which remains hidden from the site; metadata matches with different image content stay in the normal batch and are reported. Duplicate images are also detected when metadata is missing or has changed.
 
-When `BATCH_NAME_STYLE=japanese-fantasy` is set, each unique image and sidecar receives the same generated name during the move. Existing previews remain valid across moves and renames, and only missing previews are requested, with up to four concurrent requests.
+When `BATCH_NAME_STYLE=japanese-fantasy` is set, each unique image and prompt sidecar receives the same long generated name during the move. The batcher also creates generated-name metadata containing a 1–5-mora given-name prefix, a 2–4-mora family-name prefix, and the matching katakana display name. Existing previews remain valid across moves and renames, and only missing previews are requested, with up to four concurrent requests.
 
 Use `bash ./process-batch.sh --dry-run` to inspect the proposed batch and duplicate quarantine without changing files, or pass the public base URL as the final argument when the service is not available on its configured local port. Running the command when there are no root-level images checks the full gallery and generates only missing previews, which also provides the retry path if preview warming previously failed.
 
@@ -75,6 +77,15 @@ bash ./rename-existing.sh
 ```
 
 Root-level incoming files are left alone by this alternate command. Existing same-name sidecars are validated and renamed with their images, and cached previews are copied to their new cache keys instead of being regenerated. Re-running the command intentionally generates a fresh set of names.
+
+To add generated-name metadata to older, already-named batches without renaming any images, preview and then run the backfill:
+
+```sh
+npm run backfill-name-metadata -- --dry-run
+npm run backfill-name-metadata
+```
+
+The backfill leaves existing name sidecars untouched and reports filenames that cannot be parsed confidently as generated names. Invalid existing name sidecars require manual repair and are never overwritten automatically.
 
 To audit every existing batch without changing the gallery, run `npm run scan-for-duplicates` or `bash ./scan-for-duplicates.sh`. The scan hashes every supported image in non-hidden batch directories with SHA-256, reports complete matching groups, and exits with status 1 when duplicates are found. Root-level incoming files, hidden directories, and symbolic links are excluded.
 
@@ -88,6 +99,7 @@ To audit every existing batch without changing the gallery, run `npm run scan-fo
 | `npm start` | Run the compiled production server |
 | `bash ./process-batch.sh` | Organize root-level uploads and generate only missing previews |
 | `bash ./rename-existing.sh` | Force generated names onto images already inside batch directories |
+| `npm run backfill-name-metadata` | Add missing EN/JP display-name sidecars without renaming images |
 | `npm run scan-for-duplicates` / `bash ./scan-for-duplicates.sh` | SHA-256 scan all batched images and report exact duplicates |
 
 On the Linux server described in the installation guide, deploy an update with `sudo ./deploy.sh`.

@@ -14,6 +14,8 @@ const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const searchInput = requiredElement<HTMLInputElement>("#search");
 const searchableOnly = requiredElement<HTMLInputElement>("#searchable-only");
 const favoritesOnly = requiredElement<HTMLInputElement>("#favorites-only");
+const nameLanguageInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="name-language"]')];
+if (nameLanguageInputs.length !== 2) throw new Error("Missing name language controls");
 const advancedButton = requiredElement<HTMLButtonElement>("#advanced-filters");
 const advancedFilterCount = requiredElement<HTMLElement>("#advanced-filter-count");
 const filterDialog = requiredElement<HTMLDialogElement>("#filter-dialog");
@@ -45,7 +47,10 @@ const imageSearchIndexes = new WeakMap<GalleryImage, string>();
 const tilesByImage = new Map<GalleryImage, HTMLElement>();
 const favoriteButtonsByImage = new Map<GalleryImage, HTMLButtonElement>();
 const favoritesStorageKey = "image-gallery:favorites:v1";
+const nameLanguageStorageKey = "image-gallery:name-language:v1";
 const favoriteImagePaths = loadFavoriteImagePaths();
+type NameLanguage = "en" | "ja";
+let nameLanguage = loadNameLanguage();
 
 const maximumConcurrentImageLoads = 4;
 const lazyLoadMargin = 150;
@@ -219,23 +224,45 @@ function saveFavoriteImagePaths(): void {
   }
 }
 
+function loadNameLanguage(): NameLanguage {
+  try {
+    return window.localStorage.getItem(nameLanguageStorageKey) === "ja" ? "ja" : "en";
+  } catch {
+    return "en";
+  }
+}
+
+function saveNameLanguage(): void {
+  try {
+    window.localStorage.setItem(nameLanguageStorageKey, nameLanguage);
+  } catch {
+    // The language selection still works for the current page when storage is unavailable.
+  }
+}
+
+function displayNameFor(image: GalleryImage): string {
+  return image.shortName?.[nameLanguage] ?? image.displayName;
+}
+
 function isFavorite(image: GalleryImage): boolean {
   return favoriteImagePaths.has(image.path);
 }
 
 function syncTileFavoriteButton(button: HTMLButtonElement, image: GalleryImage): void {
   const favorite = isFavorite(image);
+  const displayName = displayNameFor(image);
   button.classList.toggle("is-favorite", favorite);
   button.title = favorite ? "Remove favorite" : "Add favorite";
-  button.setAttribute("aria-label", `${favorite ? "Remove" : "Add"} ${image.name} ${favorite ? "from" : "to"} favorites`);
+  button.setAttribute("aria-label", `${favorite ? "Remove" : "Add"} ${displayName} ${favorite ? "from" : "to"} favorites`);
   button.setAttribute("aria-pressed", String(favorite));
 }
 
 function syncLightboxFavoriteButton(image: GalleryImage): void {
   const favorite = isFavorite(image);
+  const displayName = displayNameFor(image);
   lightboxFavorite.classList.toggle("is-favorite", favorite);
   lightboxFavorite.querySelector("span")!.textContent = favorite ? "Remove favorite" : "Add favorite";
-  lightboxFavorite.setAttribute("aria-label", `${favorite ? "Remove" : "Add"} ${image.name} ${favorite ? "from" : "to"} favorites`);
+  lightboxFavorite.setAttribute("aria-label", `${favorite ? "Remove" : "Add"} ${displayName} ${favorite ? "from" : "to"} favorites`);
   lightboxFavorite.setAttribute("aria-pressed", String(favorite));
 }
 
@@ -273,6 +300,8 @@ function searchIndex(image: GalleryImage): string {
   const metadata = image.metadata;
   const values = [
     image.displayName,
+    image.shortName?.en ?? "",
+    image.shortName?.ja ?? "",
     image.name,
     image.path,
     image.batch ?? "",
@@ -518,9 +547,10 @@ function showLightboxImage(index: number): void {
   if (!image) return;
 
   activeImageIndex = index;
-  lightboxName.textContent = image.displayName;
+  const displayName = displayNameFor(image);
+  lightboxName.textContent = displayName;
   lightboxImage.src = new URL(image.url, document.baseURI).href;
-  lightboxImage.alt = image.name;
+  lightboxImage.alt = displayName;
   syncLightboxFavoriteButton(image);
   lightboxPrevious.disabled = index === 0;
   lightboxNext.disabled = index === galleryImages.length - 1;
@@ -624,7 +654,7 @@ function createTile(image: GalleryImage): HTMLElement {
   const openButton = document.createElement("button");
   openButton.type = "button";
   openButton.className = "image-open";
-  openButton.setAttribute("aria-label", `Open ${image.name}`);
+  openButton.setAttribute("aria-label", `Open ${displayNameFor(image)}`);
   openButton.setAttribute("aria-busy", "true");
 
   const element = document.createElement("img");
@@ -650,8 +680,9 @@ function createTile(image: GalleryImage): HTMLElement {
   const imageCopyButton = document.createElement("button");
   imageCopyButton.type = "button";
   imageCopyButton.className = "tile-action-button";
+  imageCopyButton.dataset.action = "copy-image";
   imageCopyButton.title = "Copy image";
-  imageCopyButton.setAttribute("aria-label", `Copy ${image.name} as an image`);
+  imageCopyButton.setAttribute("aria-label", `Copy ${displayNameFor(image)} as an image`);
   imageCopyButton.append(createActionIcon([
     "M8 8h11v11H8z",
     "M5 16H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v1",
@@ -660,8 +691,9 @@ function createTile(image: GalleryImage): HTMLElement {
   const linkCopyButton = document.createElement("button");
   linkCopyButton.type = "button";
   linkCopyButton.className = "tile-action-button";
+  linkCopyButton.dataset.action = "copy-link";
   linkCopyButton.title = "Copy link";
-  linkCopyButton.setAttribute("aria-label", `Copy direct link to ${image.name}`);
+  linkCopyButton.setAttribute("aria-label", `Copy direct link to ${displayNameFor(image)}`);
   linkCopyButton.append(createActionIcon([
     "M10.5 13.5l3-3",
     "M7.5 16.5 6 18a4 4 0 0 1-5.7-5.7l3-3A4 4 0 0 1 9 9",
@@ -723,6 +755,33 @@ function createTile(image: GalleryImage): HTMLElement {
   tileObserver.observe(openButton);
   lazyImageObserver.observe(tile);
   return tile;
+}
+
+function syncNameLanguageDisplay(): void {
+  for (const input of nameLanguageInputs) input.checked = input.value === nameLanguage;
+  for (const [image, tile] of tilesByImage) {
+    const displayName = displayNameFor(image);
+    tile.querySelector<HTMLButtonElement>(".image-open")?.setAttribute("aria-label", `Open ${displayName}`);
+    tile.querySelector<HTMLButtonElement>('[data-action="copy-image"]')
+      ?.setAttribute("aria-label", `Copy ${displayName} as an image`);
+    tile.querySelector<HTMLButtonElement>('[data-action="copy-link"]')
+      ?.setAttribute("aria-label", `Copy direct link to ${displayName}`);
+    const favoriteButton = favoriteButtonsByImage.get(image);
+    if (favoriteButton) syncTileFavoriteButton(favoriteButton, image);
+  }
+
+  const activeImage = galleryImages[activeImageIndex];
+  if (lightbox.open && activeImage) {
+    lightboxName.textContent = displayNameFor(activeImage);
+    lightboxImage.alt = displayNameFor(activeImage);
+    syncLightboxFavoriteButton(activeImage);
+  }
+}
+
+function setNameLanguage(value: NameLanguage, persist: boolean): void {
+  nameLanguage = value;
+  if (persist) saveNameLanguage();
+  syncNameLanguageDisplay();
 }
 
 function updateShuffleButtonState(): void {
@@ -803,16 +862,27 @@ async function loadGallery(): Promise<void> {
 }
 
 shuffleButton.addEventListener("click", shuffleGallery);
+for (const input of nameLanguageInputs) {
+  input.addEventListener("change", () => {
+    if (input.checked && (input.value === "en" || input.value === "ja")) {
+      setNameLanguage(input.value, true);
+    }
+  });
+}
 window.addEventListener("storage", (event) => {
-  if (event.key !== favoritesStorageKey) return;
-  const updatedPaths = parseFavoriteImagePaths(event.newValue);
-  favoriteImagePaths.clear();
-  for (const path of updatedPaths) favoriteImagePaths.add(path);
-  for (const [image, button] of favoriteButtonsByImage) syncTileFavoriteButton(button, image);
-  const activeImage = galleryImages[activeImageIndex];
-  if (lightbox.open && activeImage) syncLightboxFavoriteButton(activeImage);
-  if (lightbox.open && favoritesOnly.checked && activeImage && !isFavorite(activeImage)) closeLightbox();
-  applyFilters();
+  if (event.key === nameLanguageStorageKey) {
+    setNameLanguage(event.newValue === "ja" ? "ja" : "en", false);
+  } else if (event.key === favoritesStorageKey) {
+    const updatedPaths = parseFavoriteImagePaths(event.newValue);
+    favoriteImagePaths.clear();
+    for (const path of updatedPaths) favoriteImagePaths.add(path);
+    for (const [image, button] of favoriteButtonsByImage) syncTileFavoriteButton(button, image);
+    const activeImage = galleryImages[activeImageIndex];
+    if (lightbox.open && activeImage) syncLightboxFavoriteButton(activeImage);
+    if (lightbox.open && favoritesOnly.checked && activeImage && !isFavorite(activeImage)) closeLightbox();
+    applyFilters();
+  }
 });
 
+syncNameLanguageDisplay();
 void loadGallery();

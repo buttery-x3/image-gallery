@@ -159,6 +159,51 @@ button { font: inherit; }
   outline-offset: 2px;
 }
 
+.name-language {
+  display: inline-flex;
+  height: 30px;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.name-language label {
+  position: relative;
+  cursor: pointer;
+}
+
+.name-language input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.name-language span {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 24px;
+  border-radius: 5px;
+  color: #999ca2;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.name-language input:checked + span {
+  background: #f3f3f1;
+  color: #111214;
+}
+
+.name-language input:focus-visible + span {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 .shuffle-button {
   display: inline-flex;
   align-items: center;
@@ -505,6 +550,7 @@ button { font: inherit; }
   line-height: 1.25;
   overflow-wrap: anywhere;
   text-align: left;
+  font-family: Inter, "Noto Sans JP", "Yu Gothic", "Hiragino Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 .lightbox-image {

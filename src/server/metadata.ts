@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
-import type { GalleryMetadata } from "../shared/types.js";
+import type { GalleryMetadata, GalleryShortName } from "../shared/types.js";
 
 const supportedSchema = "anime_waifu_lite/v1";
+const supportedNameSchema = "image-gallery/name/v1";
 
 const tagFields = [
   "body_type",
@@ -84,4 +85,13 @@ export async function readImageMetadata(filePath: string): Promise<GalleryMetada
     tags,
     searchTokens,
   };
+}
+
+export async function readImageNameMetadata(filePath: string): Promise<GalleryShortName | undefined> {
+  const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
+  if (!isRecord(parsed) || parsed.schema !== supportedNameSchema || !isRecord(parsed.shortName)) return undefined;
+
+  const en = typeof parsed.shortName.en === "string" ? parsed.shortName.en.trim() : "";
+  const ja = typeof parsed.shortName.ja === "string" ? parsed.shortName.ja.trim() : "";
+  return en && ja ? { en, ja } : undefined;
 }

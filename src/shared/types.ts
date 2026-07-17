@@ -9,6 +9,11 @@ export interface GalleryMetadata {
   searchTokens: Record<string, string[]>;
 }
 
+export interface GalleryShortName {
+  en: string;
+  ja: string;
+}
+
 export interface GalleryImage {
   name: string;
   displayName: string;
@@ -20,6 +25,7 @@ export interface GalleryImage {
   type: ImageKind;
   batch?: string;
   metadata?: GalleryMetadata;
+  shortName?: GalleryShortName;
 }
 
 export interface GalleryResponse {

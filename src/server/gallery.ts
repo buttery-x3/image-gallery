@@ -1,7 +1,7 @@
 import { lstat, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { GalleryImage, ImageKind } from "../shared/types.js";
-import { readImageMetadata } from "./metadata.js";
+import { readImageMetadata, readImageNameMetadata } from "./metadata.js";
 import { imagePreviewIsCached } from "./previews.js";
 
 const supportedExtensions = new Map<string, ImageKind>([
@@ -14,6 +14,7 @@ const supportedExtensions = new Map<string, ImageKind>([
 ]);
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+const nameMetadataSuffix = ".gallery-name.json";
 
 export class GalleryDirectoryError extends Error {}
 
@@ -48,8 +49,19 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
     const entries = await readdir(directory, { withFileTypes: true });
     const metadataFiles = new Map(
       entries
-        .filter((entry) => !entry.name.startsWith(".") && !entry.isSymbolicLink() && entry.isFile() && path.extname(entry.name).toLowerCase() === ".json")
+        .filter((entry) =>
+          !entry.name.startsWith(".") && !entry.isSymbolicLink() && entry.isFile() &&
+          path.extname(entry.name).toLowerCase() === ".json" && !entry.name.endsWith(nameMetadataSuffix)
+        )
         .map((entry) => [path.basename(entry.name, path.extname(entry.name)), path.join(directory, entry.name)]),
+    );
+    const nameMetadataFiles = new Map(
+      entries
+        .filter((entry) =>
+          !entry.name.startsWith(".") && !entry.isSymbolicLink() && entry.isFile() &&
+          entry.name.endsWith(nameMetadataSuffix)
+        )
+        .map((entry) => [entry.name.slice(0, -nameMetadataSuffix.length), path.join(directory, entry.name)]),
     );
     for (const entry of entries) {
       if (entry.name.startsWith(".") || entry.isSymbolicLink()) continue;
@@ -79,6 +91,16 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
           console.warn(`Ignoring invalid metadata for ${relativePath}:`, error);
         }
       }
+      let shortName;
+      const nameMetadataPath = nameMetadataFiles.get(path.basename(entry.name, path.extname(entry.name)));
+      if (nameMetadataPath) {
+        try {
+          shortName = await readImageNameMetadata(nameMetadataPath);
+          if (!shortName) console.warn(`Ignoring unsupported generated-name metadata for ${relativePath}.`);
+        } catch (error) {
+          console.warn(`Ignoring invalid generated-name metadata for ${relativePath}:`, error);
+        }
+      }
 
       let previewCached: boolean | undefined;
       if (previewUrl && options.includePreviewStatus && options.previewCacheDir) {
@@ -101,6 +123,7 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
         type,
         ...(relativeDirectory === "." ? {} : { batch: relativeDirectory }),
         ...(metadata ? { metadata } : {}),
+        ...(shortName ? { shortName } : {}),
       });
     }
   }
