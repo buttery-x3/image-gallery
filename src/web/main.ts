@@ -362,6 +362,26 @@ function colorsContrast(first: string, second: string): boolean {
     (Math.min(firstLuminance, secondLuminance) + 0.05) >= 3;
 }
 
+const overlayFallbackColors = [
+  { fill: "#ff6b6b", outline: "#172554" },
+  { fill: "#facc15", outline: "#3b0764" },
+  { fill: "#22d3ee", outline: "#312e81" },
+  { fill: "#86efac", outline: "#881337" },
+  { fill: "#c4b5fd", outline: "#14532d" },
+  { fill: "#fdba74", outline: "#1e3a8a" },
+  { fill: "#f9a8d4", outline: "#134e4a" },
+  { fill: "#7dd3fc", outline: "#581c87" },
+] as const;
+
+function fallbackOverlayColors(image: GalleryImage): { fill: string; outline: string } {
+  let hash = 2166136261;
+  for (const character of image.path) {
+    hash ^= character.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return overlayFallbackColors[(hash >>> 0) % overlayFallbackColors.length]!;
+}
+
 function overlayColors(image: GalleryImage): { fill: string; outline: string } {
   const colors: string[] = [];
   for (const field of overlayColorFields) {
@@ -375,7 +395,7 @@ function overlayColors(image: GalleryImage): { fill: string; outline: string } {
     const outline = colors.slice(1).find((color) => colorsContrast(fill, color));
     if (outline) return { fill, outline };
   }
-  return { fill: "#fff", outline: "#000" };
+  return fallbackOverlayColors(image);
 }
 
 function syncLightboxOverlayScale(): void {
@@ -851,6 +871,12 @@ function createTile(image: GalleryImage): HTMLElement {
   element.decoding = "async";
   element.fetchPriority = "low";
 
+  const shortName = document.createElement("span");
+  shortName.className = "gallery-short-name";
+  shortName.textContent = image.shortName?.[nameLanguage] ?? "";
+  shortName.lang = nameLanguage === "ja" ? "ja" : "en";
+  shortName.setAttribute("aria-hidden", "true");
+
   const actions = document.createElement("div");
   actions.className = "tile-actions";
 
@@ -888,7 +914,7 @@ function createTile(image: GalleryImage): HTMLElement {
 
   actions.append(favoriteButton, imageCopyButton, linkCopyButton);
 
-  openButton.append(element);
+  openButton.append(element, shortName);
   tile.append(openButton, actions);
   openButton.addEventListener("click", () => openLightbox(galleryImages.indexOf(image), openButton));
   favoriteButton.addEventListener("click", () => toggleFavorite(image));
@@ -948,6 +974,11 @@ function syncNameLanguageDisplay(): void {
   for (const [image, tile] of tilesByImage) {
     const displayName = displayNameFor(image);
     tile.querySelector<HTMLButtonElement>(".image-open")?.setAttribute("aria-label", `Open ${displayName}`);
+    const shortName = tile.querySelector<HTMLElement>(".gallery-short-name");
+    if (shortName) {
+      shortName.textContent = image.shortName?.[nameLanguage] ?? "";
+      shortName.lang = nameLanguage === "ja" ? "ja" : "en";
+    }
     tile.querySelector<HTMLButtonElement>('[data-action="copy-image"]')
       ?.setAttribute("aria-label", `Copy ${displayName} as an image`);
     tile.querySelector<HTMLButtonElement>('[data-action="copy-link"]')
