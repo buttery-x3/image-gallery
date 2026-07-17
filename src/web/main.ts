@@ -32,6 +32,8 @@ const lightboxNameOverlay = requiredElement<HTMLElement>("#lightbox-name-overlay
 const lightboxShortNameEn = requiredElement<HTMLElement>("#lightbox-short-name-en");
 const lightboxShortNameJa = requiredElement<HTMLElement>("#lightbox-short-name-ja");
 const lightboxFavorite = requiredElement<HTMLButtonElement>("#lightbox-favorite");
+const lightboxToggleName = requiredElement<HTMLButtonElement>("#lightbox-toggle-name");
+const lightboxTextPosition = requiredElement<HTMLButtonElement>("#lightbox-text-position");
 const lightboxClose = requiredElement<HTMLButtonElement>("#lightbox-close");
 const lightboxPrevious = requiredElement<HTMLButtonElement>("#lightbox-previous");
 const lightboxNext = requiredElement<HTMLButtonElement>("#lightbox-next");
@@ -52,9 +54,21 @@ const tilesByImage = new Map<GalleryImage, HTMLElement>();
 const favoriteButtonsByImage = new Map<GalleryImage, HTMLButtonElement>();
 const favoritesStorageKey = "image-gallery:favorites:v1";
 const nameLanguageStorageKey = "image-gallery:name-language:v1";
+const overlayPreferencesStorageKey = "image-gallery:overlay-preferences:v1";
 const favoriteImagePaths = loadFavoriteImagePaths();
 type NameLanguage = "en" | "ja";
+type OverlayNamePosition = "top-left" | "bottom-left" | "bottom-right" | "top-right";
+const overlayNamePositions: readonly OverlayNamePosition[] = [
+  "top-left", "bottom-left", "bottom-right", "top-right",
+];
+const overlayPositionLabels: Record<OverlayNamePosition, string> = {
+  "top-left": "top left",
+  "bottom-left": "bottom left",
+  "bottom-right": "bottom right",
+  "top-right": "top right",
+};
 let nameLanguage = loadNameLanguage();
+let { nameVisible: overlayNameVisible, namePosition: overlayNamePosition } = loadOverlayPreferences();
 
 const maximumConcurrentImageLoads = 4;
 const lazyLoadMargin = 150;
@@ -244,6 +258,48 @@ function saveNameLanguage(): void {
   }
 }
 
+function parseOverlayPreferences(value: string | null): {
+  nameVisible: boolean;
+  namePosition: OverlayNamePosition;
+} {
+  if (!value) return { nameVisible: true, namePosition: "top-left" };
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { nameVisible: true, namePosition: "top-left" };
+    }
+    const record = parsed as Record<string, unknown>;
+    const namePosition = overlayNamePositions.includes(record.namePosition as OverlayNamePosition)
+      ? record.namePosition as OverlayNamePosition
+      : "top-left";
+    return {
+      nameVisible: typeof record.nameVisible === "boolean" ? record.nameVisible : true,
+      namePosition,
+    };
+  } catch {
+    return { nameVisible: true, namePosition: "top-left" };
+  }
+}
+
+function loadOverlayPreferences(): { nameVisible: boolean; namePosition: OverlayNamePosition } {
+  try {
+    return parseOverlayPreferences(window.localStorage.getItem(overlayPreferencesStorageKey));
+  } catch {
+    return { nameVisible: true, namePosition: "top-left" };
+  }
+}
+
+function saveOverlayPreferences(): void {
+  try {
+    window.localStorage.setItem(overlayPreferencesStorageKey, JSON.stringify({
+      nameVisible: overlayNameVisible,
+      namePosition: overlayNamePosition,
+    }));
+  } catch {
+    // Overlay controls still work for the current page when storage is unavailable.
+  }
+}
+
 function displayNameFor(image: GalleryImage): string {
   return image.shortName?.[nameLanguage] ?? image.displayName;
 }
@@ -301,6 +357,25 @@ function syncLightboxOverlayScale(): void {
 const lightboxImageSizeObserver = new ResizeObserver(syncLightboxOverlayScale);
 lightboxImageSizeObserver.observe(lightboxImage);
 lightboxImage.addEventListener("load", syncLightboxOverlayScale);
+
+function nextOverlayNamePosition(): OverlayNamePosition {
+  const currentIndex = overlayNamePositions.indexOf(overlayNamePosition);
+  return overlayNamePositions[(currentIndex + 1) % overlayNamePositions.length]!;
+}
+
+function syncLightboxOverlayState(image?: GalleryImage): void {
+  const hasShortName = Boolean(image?.shortName);
+  lightboxMedia.dataset.namePosition = overlayNamePosition;
+  lightboxNameOverlay.hidden = !hasShortName || !overlayNameVisible;
+  lightboxToggleName.disabled = !hasShortName;
+  lightboxToggleName.setAttribute("aria-pressed", String(overlayNameVisible));
+  lightboxToggleName.querySelector("span")!.textContent = overlayNameVisible ? "Hide name" : "Show name";
+
+  const nextPosition = nextOverlayNamePosition();
+  const positionLabel = `Move name to ${overlayPositionLabels[nextPosition]}`;
+  lightboxTextPosition.setAttribute("aria-label", positionLabel);
+  lightboxTextPosition.title = positionLabel;
+}
 
 function isFavorite(image: GalleryImage): boolean {
   return favoriteImagePaths.has(image.path);
@@ -609,12 +684,12 @@ function showLightboxImage(index: number): void {
   lightboxImage.src = new URL(image.url, document.baseURI).href;
   lightboxImage.alt = image.displayName;
   const shortName = image.shortName;
-  lightboxNameOverlay.hidden = !shortName;
   lightboxShortNameEn.textContent = shortName?.en ?? "";
   lightboxShortNameJa.textContent = shortName?.ja ?? "";
   const colors = overlayColors(image);
   lightboxMedia.style.setProperty("--lightbox-name-fill", colors.fill);
   lightboxMedia.style.setProperty("--lightbox-name-outline", colors.outline);
+  syncLightboxOverlayState(image);
   syncLightboxFavoriteButton(image);
   lightboxPrevious.disabled = index === 0;
   lightboxNext.disabled = index === galleryImages.length - 1;
@@ -644,6 +719,18 @@ lightboxClose.addEventListener("click", closeLightbox);
 lightboxFavorite.addEventListener("click", () => {
   const image = galleryImages[activeImageIndex];
   if (image) toggleFavorite(image);
+});
+lightboxToggleName.addEventListener("click", () => {
+  const image = galleryImages[activeImageIndex];
+  if (!image?.shortName) return;
+  overlayNameVisible = !overlayNameVisible;
+  saveOverlayPreferences();
+  syncLightboxOverlayState(image);
+});
+lightboxTextPosition.addEventListener("click", () => {
+  overlayNamePosition = nextOverlayNamePosition();
+  saveOverlayPreferences();
+  syncLightboxOverlayState(galleryImages[activeImageIndex]);
 });
 lightboxPrevious.addEventListener("click", () => navigateLightbox(-1));
 lightboxNext.addEventListener("click", () => navigateLightbox(1));
@@ -937,6 +1024,11 @@ for (const input of nameLanguageInputs) {
 window.addEventListener("storage", (event) => {
   if (event.key === nameLanguageStorageKey) {
     setNameLanguage(event.newValue === "ja" ? "ja" : "en", false);
+  } else if (event.key === overlayPreferencesStorageKey) {
+    const preferences = parseOverlayPreferences(event.newValue);
+    overlayNameVisible = preferences.nameVisible;
+    overlayNamePosition = preferences.namePosition;
+    syncLightboxOverlayState(lightbox.open ? galleryImages[activeImageIndex] : undefined);
   } else if (event.key === favoritesStorageKey) {
     const updatedPaths = parseFavoriteImagePaths(event.newValue);
     favoriteImagePaths.clear();
@@ -950,4 +1042,5 @@ window.addEventListener("storage", (event) => {
 });
 
 syncNameLanguageDisplay();
+syncLightboxOverlayState();
 void loadGallery();

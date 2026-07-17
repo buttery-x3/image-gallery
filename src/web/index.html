@@ -98,14 +98,22 @@
               <span id="lightbox-short-name-en" class="lightbox-short-name-en"></span>
               <span id="lightbox-short-name-ja" class="lightbox-short-name-ja" lang="ja"></span>
             </div>
-            <span class="lightbox-watermark" aria-hidden="true">waiaifu.lol</span>
+            <span class="lightbox-watermark" aria-hidden="true">waifu.lol</span>
           </div>
-          <button id="lightbox-favorite" class="lightbox-favorite" type="button">
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="m12 2.75 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35-5.7-3-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.75Z" />
-            </svg>
-            <span>Add favorite</span>
-          </button>
+          <div class="lightbox-actions">
+            <button id="lightbox-favorite" class="lightbox-action lightbox-favorite" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m12 2.75 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35-5.7-3-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.75Z" />
+              </svg>
+              <span>Add favorite</span>
+            </button>
+            <button id="lightbox-toggle-name" class="lightbox-action" type="button" aria-pressed="true">
+              <span>Hide name</span>
+            </button>
+            <button id="lightbox-text-position" class="lightbox-action" type="button">
+              <span>Text position</span>
+            </button>
+          </div>
         </div>
         <button id="lightbox-next" class="lightbox-nav" type="button" aria-label="Next image">
           <svg aria-hidden="true" viewBox="0 0 24 24">
