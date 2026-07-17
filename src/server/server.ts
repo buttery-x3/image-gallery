@@ -17,9 +17,6 @@ app.disable("x-powered-by");
 app.set("trust proxy", "loopback");
 
 const reportTransport = config.reportSmtp ? nodemailer.createTransport(config.reportSmtp) : undefined;
-const reportBlockDurationMs = 7 * 24 * 60 * 60 * 1_000;
-const maximumReportsBeforeBlock = 3;
-const reportLimits = new Map<string, { successfulReports: number; blockedUntil?: number }>();
 
 app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
@@ -74,24 +71,6 @@ app.post("/api/reports", express.json({ limit: "4kb", type: "application/json" }
     return void response.status(400).json({ error: "Invalid image URL." } satisfies ErrorResponse);
   }
 
-  const now = Date.now();
-  const clientKey = request.ip ?? request.socket.remoteAddress ?? "unknown";
-  let limit = reportLimits.get(clientKey);
-  if (limit?.blockedUntil && limit.blockedUntil <= now) {
-    reportLimits.delete(clientKey);
-    limit = undefined;
-  }
-  if (limit?.blockedUntil && limit.blockedUntil > now) {
-    return void response.status(429).json({ error: "Reporting is temporarily unavailable." } satisfies ErrorResponse);
-  }
-  if ((limit?.successfulReports ?? 0) >= maximumReportsBeforeBlock) {
-    reportLimits.set(clientKey, {
-      successfulReports: maximumReportsBeforeBlock,
-      blockedUntil: now + reportBlockDurationMs,
-    });
-    return void response.status(429).json({ error: "Reporting is temporarily unavailable." } satisfies ErrorResponse);
-  }
-
   try {
     await reportTransport.sendMail({
       from: config.reportEmailFrom,
@@ -110,7 +89,6 @@ app.post("/api/reports", express.json({ limit: "4kb", type: "application/json" }
     return void response.status(502).json({ error: "The report could not be sent." } satisfies ErrorResponse);
   }
 
-  reportLimits.set(clientKey, { successfulReports: (limit?.successfulReports ?? 0) + 1 });
   const payload: ImageReportResponse = { message: "Report sent." };
   response.status(202).json(payload);
 });

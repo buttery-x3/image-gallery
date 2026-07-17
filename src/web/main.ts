@@ -3,8 +3,6 @@ import type {
   ErrorResponse,
   GalleryImage,
   GalleryResponse,
-  ImageReportRequest,
-  ImageReportResponse,
 } from "../shared/types.js";
 
 function requiredElement<T extends Element>(selector: string): T {
@@ -52,15 +50,13 @@ const lightboxPrevious = requiredElement<HTMLButtonElement>("#lightbox-previous"
 const lightboxNext = requiredElement<HTMLButtonElement>("#lightbox-next");
 const reportDialog = requiredElement<HTMLDialogElement>("#report-dialog");
 const reportNo = requiredElement<HTMLButtonElement>("#report-no");
-const reportYes = requiredElement<HTMLButtonElement>("#report-yes");
+const reportYes = requiredElement<HTMLAnchorElement>("#report-yes");
 const toast = requiredElement<HTMLElement>("#toast");
 
 let toastTimer: number | undefined;
 let activeOpener: HTMLButtonElement | undefined;
 let activeImageIndex = -1;
-let reportImage: GalleryImage | undefined;
 let reportOpener: HTMLButtonElement | undefined;
-let reportSubmissionPending = false;
 let lightboxTouchStart: { identifier: number; x: number; y: number; startedAt: number } | undefined;
 let activeImageLoads = 0;
 let allImages: GalleryImage[] = [];
@@ -75,16 +71,8 @@ const favoritesStorageKey = "image-gallery:favorites:v1";
 const nameLanguageStorageKey = "image-gallery:name-language:v1";
 const overlayPreferencesStorageKey = "image-gallery:overlay-preferences:v1";
 const contentConsentStorageKey = "image-gallery:content-consent:v1";
-const reportLimitStorageKey = "image-gallery:report-limit:v1";
 const themeStorageKey = "image-gallery:theme:v1";
 const favoriteImagePaths = loadFavoriteImagePaths();
-const maximumSuccessfulReports = 3;
-const reportBlockDurationMs = 7 * 24 * 60 * 60 * 1_000;
-interface ReportLimitState {
-  successfulReports: number;
-  blockedUntil?: number;
-}
-let fallbackReportLimitState: ReportLimitState = { successfulReports: 0 };
 type NameLanguage = "en" | "ja";
 type GalleryTheme = "editorial" | "glass" | "studio" | "classic" | "daylight" | "neon" | "accessible";
 type OverlayNamePosition = "top-left" | "bottom-left" | "bottom-right" | "top-right";
@@ -117,8 +105,6 @@ const uiCopy = {
     copyImage: "Copy image",
     copyLink: "Copy link",
     reportImage: "Report image",
-    reportSent: "Report sent",
-    reportFailed: "The report could not be sent",
     any: "Any",
     addedFavorite: "Added to favorites",
     removedFavorite: "Removed from favorites",
@@ -158,8 +144,6 @@ const uiCopy = {
     copyImage: "画像をコピー",
     copyLink: "リンクをコピー",
     reportImage: "画像を報告",
-    reportSent: "報告を送信しました",
-    reportFailed: "報告を送信できませんでした",
     any: "指定なし",
     addedFavorite: "お気に入りに追加しました",
     removedFavorite: "お気に入りから削除しました",
@@ -537,147 +521,15 @@ function saveContentConsent(): void {
   }
 }
 
-function parseReportLimitState(value: string | null): ReportLimitState {
-  if (!value) return { successfulReports: 0 };
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return { successfulReports: 0 };
-    }
-    const record = parsed as Record<string, unknown>;
-    const successfulReports = typeof record.successfulReports === "number" &&
-      Number.isInteger(record.successfulReports) && record.successfulReports >= 0
-      ? Math.min(record.successfulReports, maximumSuccessfulReports)
-      : 0;
-    const blockedUntil = typeof record.blockedUntil === "number" && Number.isFinite(record.blockedUntil)
-      ? record.blockedUntil
-      : undefined;
-    return { successfulReports, ...(blockedUntil ? { blockedUntil } : {}) };
-  } catch {
-    return { successfulReports: 0 };
-  }
-}
-
-function saveReportLimitState(state: ReportLimitState): void {
-  fallbackReportLimitState = state;
-  try {
-    window.localStorage.setItem(reportLimitStorageKey, JSON.stringify(state));
-  } catch {
-    // The current page still enforces the report limit when storage is unavailable.
-  }
-}
-
-function clearReportLimitState(): ReportLimitState {
-  const state = { successfulReports: 0 };
-  fallbackReportLimitState = state;
-  try {
-    window.localStorage.removeItem(reportLimitStorageKey);
-  } catch {
-    // The in-memory state was still cleared.
-  }
-  return state;
-}
-
-function loadReportLimitState(): ReportLimitState {
-  let state = fallbackReportLimitState;
-  try {
-    state = parseReportLimitState(window.localStorage.getItem(reportLimitStorageKey));
-  } catch {
-    // Fall back to the state kept for this page.
-  }
-  if (state.blockedUntil && state.blockedUntil <= Date.now()) return clearReportLimitState();
-  fallbackReportLimitState = state;
-  return state;
-}
-
-function blockedUntilForReportAttempt(): number | undefined {
-  const state = loadReportLimitState();
-  if (state.blockedUntil) return state.blockedUntil;
-  if (state.successfulReports < maximumSuccessfulReports) return undefined;
-  const blockedUntil = Date.now() + reportBlockDurationMs;
-  saveReportLimitState({ successfulReports: maximumSuccessfulReports, blockedUntil });
-  return blockedUntil;
-}
-
-function recordSuccessfulReport(): void {
-  const state = loadReportLimitState();
-  saveReportLimitState({
-    successfulReports: Math.min(maximumSuccessfulReports, state.successfulReports + 1),
-    ...(state.blockedUntil ? { blockedUntil: state.blockedUntil } : {}),
-  });
-}
-
-function blockReportingForSevenDays(): number {
-  const blockedUntil = Date.now() + reportBlockDurationMs;
-  saveReportLimitState({ successfulReports: maximumSuccessfulReports, blockedUntil });
-  return blockedUntil;
-}
-
-function reportBlockedMessage(blockedUntil: number): string {
-  const formattedDate = new Intl.DateTimeFormat(nameLanguage === "ja" ? "ja-JP" : undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(blockedUntil));
-  return nameLanguage === "ja"
-    ? `${formattedDate}まで報告できません`
-    : `Reporting is unavailable until ${formattedDate}`;
-}
-
 function openReportDialog(image: GalleryImage, opener: HTMLButtonElement): void {
-  const blockedUntil = blockedUntilForReportAttempt();
-  if (blockedUntil) {
-    showToast(reportBlockedMessage(blockedUntil));
-    return;
-  }
-  reportImage = image;
   reportOpener = opener;
+  const imageUrl = new URL(image.url, document.baseURI).href;
+  const query = new URLSearchParams({
+    subject: "waiaifu report",
+    body: imageUrl,
+  });
+  reportYes.href = `mailto:admin@flamehorn.com?${query}`;
   reportDialog.showModal();
-}
-
-async function submitImageReport(): Promise<void> {
-  if (!reportImage || reportSubmissionPending) return;
-  const blockedUntil = blockedUntilForReportAttempt();
-  if (blockedUntil) {
-    reportDialog.close();
-    showToast(reportBlockedMessage(blockedUntil));
-    return;
-  }
-
-  const image = reportImage;
-  const requestPayload: ImageReportRequest = {
-    imagePath: image.path,
-    imageUrl: new URL(image.url, document.baseURI).href,
-  };
-  reportSubmissionPending = true;
-  reportYes.disabled = true;
-  reportNo.disabled = true;
-  reportYes.setAttribute("aria-busy", "true");
-
-  try {
-    const response = await fetch(new URL("api/reports", document.baseURI), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestPayload),
-    });
-    const payload = (await response.json()) as ImageReportResponse | ErrorResponse;
-    if (response.status === 429) {
-      const serverBlockedUntil = blockReportingForSevenDays();
-      reportDialog.close();
-      showToast(reportBlockedMessage(serverBlockedUntil));
-      return;
-    }
-    if (!response.ok || !("message" in payload)) throw new Error("Report failed");
-    recordSuccessfulReport();
-    reportDialog.close();
-    showToast(t("reportSent"));
-  } catch {
-    showToast(t("reportFailed"));
-  } finally {
-    reportSubmissionPending = false;
-    reportYes.disabled = false;
-    reportNo.disabled = false;
-    reportYes.removeAttribute("aria-busy");
-  }
 }
 
 function displayNameFor(image: GalleryImage): string {
@@ -1455,15 +1307,9 @@ lightbox.addEventListener("close", () => {
   activeOpener = undefined;
 });
 
-reportNo.addEventListener("click", () => {
-  if (!reportSubmissionPending) reportDialog.close();
-});
-reportYes.addEventListener("click", () => void submitImageReport());
-reportDialog.addEventListener("cancel", (event) => {
-  if (reportSubmissionPending) event.preventDefault();
-});
+reportNo.addEventListener("click", () => reportDialog.close());
+reportYes.addEventListener("click", () => reportDialog.close());
 reportDialog.addEventListener("close", () => {
-  reportImage = undefined;
   reportOpener?.focus({ preventScroll: true });
   reportOpener = undefined;
 });

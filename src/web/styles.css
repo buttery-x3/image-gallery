@@ -690,11 +690,17 @@ main { flex: 1 0 auto; }
 .secondary-button,
 .primary-button,
 .danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 36px;
   padding: 7px 13px;
   border-radius: 8px;
+  font-family: inherit;
   font-size: 0.8rem;
   font-weight: 650;
+  line-height: normal;
+  text-decoration: none;
   cursor: pointer;
 }
 
