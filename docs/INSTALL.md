@@ -108,21 +108,15 @@ GIF and PNG gallery tiles use automatically generated 300px-wide WebP previews. 
 and WebP preserves PNG transparency. The previews are cached in `PREVIEW_CACHE_DIR`; the original file is served
 unchanged when its tile is opened or its link is copied.
 
-To generate every missing preview without scrolling through the gallery, run this while the service is running:
-
-```sh
-sudo -u image-gallery /opt/image-gallery/cache-previews.sh
-```
-
-The script checks cache status first and requests only missing previews, with up to four requests running concurrently through the local service.
-
-For regular paired uploads, place the new images and JSON sidecars directly in `/srv/image-gallery/images`, then run:
+For regular uploads, place the new images and any same-name JSON sidecars directly in `/srv/image-gallery/images`, then run:
 
 ```sh
 sudo -u image-gallery npm --prefix /opt/image-gallery run process-batch
 ```
 
-The command validates each root-level pair, moves it into one timestamped batch subdirectory, and caches only that batch's missing previews. Existing unpaired root-level images are not moved. Add `--dry-run` to inspect the batch without changing files.
+The command moves every root-level image into one timestamped batch subdirectory and caches only that batch's missing previews. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. Existing previews remain valid across the move and are skipped. Add `--dry-run` to inspect the batch without changing files.
+
+Run the same command with no root-level images to check the full gallery and generate only missing previews. This also retries preview warming after a previous service or network failure.
 
 ## Updating
 

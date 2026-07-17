@@ -1,8 +1,8 @@
-import { access, lstat, readdir } from "node:fs/promises";
+import { lstat, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { GalleryImage, ImageKind } from "../shared/types.js";
 import { readImageMetadata } from "./metadata.js";
-import { imagePreviewCachePath } from "./previews.js";
+import { imagePreviewIsCached } from "./previews.js";
 
 const supportedExtensions = new Map<string, ImageKind>([
   [".jpg", "jpeg"],
@@ -82,13 +82,12 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
 
       let previewCached: boolean | undefined;
       if (previewUrl && options.includePreviewStatus && options.previewCacheDir) {
-        const cachePath = imagePreviewCachePath(relativePath, stats.size, stats.mtimeMs, options.previewCacheDir);
-        try {
-          await access(cachePath);
-          previewCached = true;
-        } catch {
-          previewCached = false;
-        }
+        previewCached = await imagePreviewIsCached(
+          relativePath,
+          stats.size,
+          stats.mtimeMs,
+          options.previewCacheDir,
+        );
       }
 
       images.push({

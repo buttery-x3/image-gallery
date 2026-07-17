@@ -46,23 +46,19 @@ Hidden entries, symbolic links, and unsupported files are ignored. New files app
 
 Images may have a same-name JSON sidecar in the same directory. The `anime_waifu_lite/v1` format is used for prompt search and advanced tag filters; invalid, unsupported, or missing metadata does not prevent the image from appearing. The containing subdirectory is also available as a Batch filter.
 
+Enable **Searchable only** in the header to temporarily hide images that do not yet have supported metadata.
+
 GIF and PNG tiles use automatically generated 300px-wide lossy WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. Previews are created on first view and cached outside the gallery; the original file is still used in the lightbox and by the Copy control.
 
-To generate every missing preview without scrolling through the gallery, run this while the server is running:
-
-```sh
-./cache-previews.sh
-```
-
-The script checks the current preview cache first and requests only missing previews, using up to four concurrent local requests. Pass a base URL as its first argument if the server does not use the configured local port, for example `./cache-previews.sh https://www.example.com/image-gallery/`.
-
-To organize new root-level image/JSON pairs into a timestamped batch and cache only that batch's missing previews, run:
+To organize every root-level image into a timestamped batch and cache only that batch's missing previews, run this while the server is running:
 
 ```sh
 npm run process-batch
 ```
 
-Existing unpaired root-level images are left in place. Use `npm run process-batch -- --dry-run` to inspect the proposed move, or append the public base URL after `--` when the service is not available on its configured local port. The organization step validates every JSON sidecar before moving anything. If preview caching fails afterward, the organized batch remains intact and caching can be rerun separately.
+Images without JSON metadata are included. When a same-name JSON sidecar is present, it is validated and moved alongside its image. Orphaned or invalid JSON stops the batch before anything moves. Existing previews remain valid when an image moves into its batch, and only missing previews are requested, with up to four concurrent requests.
+
+Use `npm run process-batch -- --dry-run` to inspect the proposed move, or append the public base URL after `--` when the service is not available on its configured local port. Running the command when there are no root-level images checks the full gallery and generates only missing previews, which also provides the retry path if preview warming previously failed.
 
 ## Commands
 
@@ -72,8 +68,7 @@ Existing unpaired root-level images are left in place. Use `npm run process-batc
 | `npm run typecheck` | Check browser and server TypeScript |
 | `npm run build` | Compile the browser and server production output |
 | `npm start` | Run the compiled production server |
-| `./cache-previews.sh` | Generate only missing PNG and GIF previews |
-| `npm run process-batch` | Organize paired uploads into a timestamped batch and cache its previews |
+| `npm run process-batch` | Organize root-level uploads and generate only missing previews |
 
 On the Linux server described in the installation guide, deploy an update with `sudo ./deploy.sh`.
 

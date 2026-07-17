@@ -12,6 +12,7 @@ const status = requiredElement<HTMLElement>("#status");
 const imageCount = requiredElement<HTMLElement>("#image-count");
 const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const searchInput = requiredElement<HTMLInputElement>("#search");
+const searchableOnly = requiredElement<HTMLInputElement>("#searchable-only");
 const advancedButton = requiredElement<HTMLButtonElement>("#advanced-filters");
 const advancedFilterCount = requiredElement<HTMLElement>("#advanced-filter-count");
 const filterDialog = requiredElement<HTMLDialogElement>("#filter-dialog");
@@ -201,6 +202,7 @@ function updateFilterCount(): void {
 function applyFilters(): void {
   const terms = normalized(searchInput.value).split(/\s+/).filter(Boolean);
   const images = allImages.filter((image) => {
+    if (searchableOnly.checked && !image.metadata) return false;
     if (terms.some((term) => !searchIndex(image).includes(term))) return false;
     for (const [key, value] of activeFilters) {
       if (tagValue(image, key) !== value) return false;
@@ -238,6 +240,7 @@ searchInput.addEventListener("input", () => {
   window.clearTimeout(searchTimer);
   searchTimer = window.setTimeout(applyFilters, 120);
 });
+searchableOnly.addEventListener("change", applyFilters);
 
 function resizeTile(tile: HTMLElement): void {
   const styles = window.getComputedStyle(gallery);

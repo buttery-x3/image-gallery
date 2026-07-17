@@ -6,9 +6,9 @@ import sharp from "sharp";
 const previewWidth = 300;
 const pendingPreviews = new Map<string, Promise<string>>();
 
-function cacheKey(relativePath: string, size: number, modifiedAt: number): string {
+function cacheKey(identifier: string, size: number, modifiedAt: number): string {
   return createHash("sha256")
-    .update(relativePath)
+    .update(identifier)
     .update("\0")
     .update(String(size))
     .update("\0")
@@ -17,6 +17,16 @@ function cacheKey(relativePath: string, size: number, modifiedAt: number): strin
 }
 
 export function imagePreviewCachePath(
+  relativePath: string,
+  size: number,
+  modifiedAt: number,
+  cacheDirectory: string,
+): string {
+  const key = cacheKey(path.posix.basename(relativePath), size, modifiedAt);
+  return path.join(cacheDirectory, key.slice(0, 2), `${key}.webp`);
+}
+
+function legacyImagePreviewCachePath(
   relativePath: string,
   size: number,
   modifiedAt: number,
@@ -33,6 +43,29 @@ async function exists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function existingImagePreviewPath(
+  relativePath: string,
+  size: number,
+  modifiedAt: number,
+  cacheDirectory: string,
+): Promise<string | undefined> {
+  const stablePath = imagePreviewCachePath(relativePath, size, modifiedAt, cacheDirectory);
+  if (await exists(stablePath)) return stablePath;
+
+  const legacyPath = legacyImagePreviewCachePath(relativePath, size, modifiedAt, cacheDirectory);
+  if (legacyPath !== stablePath && await exists(legacyPath)) return legacyPath;
+  return undefined;
+}
+
+export async function imagePreviewIsCached(
+  relativePath: string,
+  size: number,
+  modifiedAt: number,
+  cacheDirectory: string,
+): Promise<boolean> {
+  return (await existingImagePreviewPath(relativePath, size, modifiedAt, cacheDirectory)) !== undefined;
 }
 
 async function generatePreview(sourcePath: string, outputPath: string): Promise<string> {
@@ -59,6 +92,14 @@ export async function imagePreviewPath(
   cacheDirectory: string,
 ): Promise<string> {
   const sourceStats = await stat(sourcePath);
+  const cachedPath = await existingImagePreviewPath(
+    relativePath,
+    sourceStats.size,
+    sourceStats.mtimeMs,
+    cacheDirectory,
+  );
+  if (cachedPath) return cachedPath;
+
   const outputPath = imagePreviewCachePath(relativePath, sourceStats.size, sourceStats.mtimeMs, cacheDirectory);
 
   const existing = pendingPreviews.get(outputPath);

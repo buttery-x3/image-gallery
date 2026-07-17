@@ -56,8 +56,8 @@ async function cacheMissingPreviews(batchName) {
   if (!payload || !Array.isArray(payload.images)) throw new Error("The gallery returned an unexpected response.");
 
   const previewImages = payload.images.filter(
-    (image) => image && typeof image.previewUrl === "string" &&
-      typeof image.path === "string" && image.path.startsWith(`${batchName}/`),
+    (image) => image && typeof image.previewUrl === "string" && (!batchName ||
+      (typeof image.path === "string" && image.path.startsWith(`${batchName}/`))),
   );
   const cachedCount = previewImages.filter((image) => image.previewCached === true).length;
   const previewUrls = previewImages
@@ -68,7 +68,9 @@ async function cacheMissingPreviews(batchName) {
     console.log(`${cachedCount} preview${cachedCount === 1 ? " is" : "s are"} already cached.`);
   }
   if (previewUrls.length === 0) {
-    console.log(`No PNG or GIF previews need caching in ${batchName}.`);
+    console.log(batchName
+      ? `No PNG or GIF previews need caching in ${batchName}.`
+      : "No PNG or GIF previews need caching.");
     return;
   }
 
@@ -111,7 +113,7 @@ const entries = await readdir(galleryRoot, { withFileTypes: true });
 const regularFiles = entries.filter((entry) => !entry.name.startsWith(".") && entry.isFile() && !entry.isSymbolicLink());
 const jsonFiles = regularFiles.filter((entry) => path.extname(entry.name).toLowerCase() === ".json");
 const imageFiles = regularFiles.filter((entry) => supportedExtensions.has(path.extname(entry.name).toLowerCase()));
-const pairs = [];
+const metadataByImage = new Map();
 
 for (const jsonFile of jsonFiles) {
   const stem = path.basename(jsonFile.name, path.extname(jsonFile.name));
@@ -128,24 +130,38 @@ for (const jsonFile of jsonFiles) {
   if (!supportedMetadataRecord(parsed)) {
     throw new Error(`${jsonFile.name} does not contain supported anime_waifu_lite/v1 metadata.`);
   }
-  pairs.push({ image: matches[0].name, metadata: jsonFile.name });
+  metadataByImage.set(matches[0].name, jsonFile.name);
 }
 
-if (pairs.length === 0) {
-  console.log("No root-level image and JSON pairs are ready to process.");
-  process.exit(0);
-}
-
+if (imageFiles.length === 0) {
+  console.log("No root-level images are ready to process. Checking the full gallery for missing previews.");
+  try {
+    await cacheMissingPreviews();
+  } catch (error) {
+    console.error("Preview caching failed. Re-run npm run process-batch when the service is available.");
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+} else {
 const { batchName, batchDirectory } = await nextBatchTarget();
-console.log(`${dryRun ? "Would move" : "Moving"} ${pairs.length} image/metadata pair${pairs.length === 1 ? "" : "s"} to ${batchName}/`);
-for (const pair of pairs) console.log(`- ${pair.image} + ${pair.metadata}`);
+console.log(
+  `${dryRun ? "Would move" : "Moving"} ${imageFiles.length} image${imageFiles.length === 1 ? "" : "s"} ` +
+  `(${metadataByImage.size} with metadata) to ${batchName}/`,
+);
+if (dryRun) {
+  for (const imageFile of imageFiles) {
+    const metadata = metadataByImage.get(imageFile.name);
+    console.log(`- ${imageFile.name}${metadata ? ` + ${metadata}` : ""}`);
+  }
+}
 if (dryRun) process.exit(0);
 
 await mkdir(batchDirectory);
 const movedFiles = [];
 try {
-  for (const pair of pairs) {
-    for (const fileName of [pair.image, pair.metadata]) {
+  for (const imageFile of imageFiles) {
+    const metadata = metadataByImage.get(imageFile.name);
+    for (const fileName of [imageFile.name, ...(metadata ? [metadata] : [])]) {
       await rename(path.join(galleryRoot, fileName), path.join(batchDirectory, fileName));
       movedFiles.push(fileName);
     }
@@ -162,7 +178,8 @@ console.log(`Batch ${batchName}/ is ready.`);
 try {
   await cacheMissingPreviews(batchName);
 } catch (error) {
-  console.error("The batch was organized successfully, but preview caching failed. Re-run cache-previews.sh when the service is available.");
+  console.error("The batch was organized successfully, but preview caching failed. Re-run npm run process-batch when the service is available.");
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
+}
 }
