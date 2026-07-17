@@ -49,8 +49,19 @@ button { font: inherit; }
 main { flex: 1 0 auto; }
 
 .support-button-host {
+  position: relative;
   justify-self: end;
+  width: 137px;
+  height: 30px;
   line-height: 0;
+}
+
+.support-button-host .bmc-btn-container {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: scale(0.5);
+  transform-origin: top right;
 }
 
 .support-footer {
@@ -465,7 +476,7 @@ main { flex: 1 0 auto; }
   max-width: calc(100% - 120px);
   color: #000;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 800;
   line-height: 1.15;
   text-align: left;
   -webkit-text-stroke: 1px #fff;
