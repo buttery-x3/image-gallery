@@ -18,6 +18,7 @@ const consentDialog = requiredElement<HTMLDialogElement>("#consent-dialog");
 const consentAgree = requiredElement<HTMLButtonElement>("#consent-agree");
 const status = requiredElement<HTMLElement>("#status");
 const imageCount = requiredElement<HTMLElement>("#image-count");
+const themeSelect = requiredElement<HTMLSelectElement>("#theme");
 const supportHeader = requiredElement<HTMLElement>(".header-meta");
 const supportButton = requiredElement<HTMLElement>("#support-button");
 const supportCard = requiredElement<HTMLElement>("#support-card");
@@ -75,6 +76,7 @@ const nameLanguageStorageKey = "image-gallery:name-language:v1";
 const overlayPreferencesStorageKey = "image-gallery:overlay-preferences:v1";
 const contentConsentStorageKey = "image-gallery:content-consent:v1";
 const reportLimitStorageKey = "image-gallery:report-limit:v1";
+const themeStorageKey = "image-gallery:theme:v1";
 const favoriteImagePaths = loadFavoriteImagePaths();
 const maximumSuccessfulReports = 3;
 const reportBlockDurationMs = 7 * 24 * 60 * 60 * 1_000;
@@ -84,7 +86,9 @@ interface ReportLimitState {
 }
 let fallbackReportLimitState: ReportLimitState = { successfulReports: 0 };
 type NameLanguage = "en" | "ja";
+type GalleryTheme = "editorial" | "glass" | "studio" | "classic" | "daylight" | "neon" | "accessible";
 type OverlayNamePosition = "top-left" | "bottom-left" | "bottom-right" | "top-right";
+const galleryThemes = new Set<GalleryTheme>(["editorial", "glass", "studio", "classic", "daylight", "neon", "accessible"]);
 const uiCopy = {
   en: {
     shuffle: "Shuffle",
@@ -479,6 +483,41 @@ function saveOverlayPreferences(): void {
     }));
   } catch {
     // Overlay controls still work for the current page when storage is unavailable.
+  }
+}
+
+function parseTheme(value: string | null | undefined): GalleryTheme {
+  return galleryThemes.has(value as GalleryTheme) ? value as GalleryTheme : "editorial";
+}
+
+function loadTheme(): GalleryTheme {
+  try {
+    return parseTheme(window.localStorage.getItem(themeStorageKey));
+  } catch {
+    return "editorial";
+  }
+}
+
+function setTheme(theme: GalleryTheme, persist: boolean): void {
+  document.documentElement.dataset.theme = theme;
+  themeSelect.value = theme;
+  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute(
+    "content",
+    {
+      editorial: "#10110f",
+      glass: "#111528",
+      studio: "#171613",
+      classic: "#0b0c0e",
+      daylight: "#f4f1e9",
+      neon: "#05070d",
+      accessible: "#000000",
+    }[theme],
+  );
+  if (!persist) return;
+  try {
+    window.localStorage.setItem(themeStorageKey, theme);
+  } catch {
+    // The selected style still works for the current page when storage is unavailable.
   }
 }
 
@@ -1699,6 +1738,7 @@ async function loadGallery(): Promise<void> {
 }
 
 shuffleButton.addEventListener("click", shuffleGallery);
+themeSelect.addEventListener("change", () => setTheme(parseTheme(themeSelect.value), true));
 for (const input of nameLanguageInputs) {
   input.addEventListener("change", () => {
     if (input.checked && (input.value === "en" || input.value === "ja")) {
@@ -1707,7 +1747,9 @@ for (const input of nameLanguageInputs) {
   });
 }
 window.addEventListener("storage", (event) => {
-  if (event.key === nameLanguageStorageKey) {
+  if (event.key === themeStorageKey) {
+    setTheme(parseTheme(event.newValue), false);
+  } else if (event.key === nameLanguageStorageKey) {
     setNameLanguage(event.newValue === "ja" ? "ja" : "en", false);
   } else if (event.key === overlayPreferencesStorageKey) {
     const preferences = parseOverlayPreferences(event.newValue);
@@ -1726,6 +1768,7 @@ window.addEventListener("storage", (event) => {
   }
 });
 
+setTheme(loadTheme(), false);
 syncNameLanguageDisplay();
 syncLightboxOverlayState();
 

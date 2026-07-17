@@ -81,6 +81,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         "/api": "http://127.0.0.1:8080",
         "/media": "http://127.0.0.1:8080",
+        "/previews": "http://127.0.0.1:8080",
         "/healthz": "http://127.0.0.1:8080",
       },
     },
