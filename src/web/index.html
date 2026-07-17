@@ -22,25 +22,25 @@
             <path d="M16 21h5v-5" />
             <path d="m21 21-6.5-6.5a4 4 0 0 0-5.7 0L3 20.3" />
           </svg>
-          <span>Shuffle</span>
+          <span data-i18n="shuffle">Shuffle</span>
         </button>
       </div>
       <div class="header-controls">
         <label class="search-field">
-          <span class="visually-hidden">Search images</span>
+          <span class="visually-hidden" data-i18n="searchImages">Search images</span>
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="7" />
             <path d="m16 16 5 5" />
           </svg>
-          <input id="search" type="search" placeholder="Search images" autocomplete="off" />
+          <input id="search" type="search" placeholder="Search images" data-i18n-placeholder="searchImages" autocomplete="off" />
         </label>
         <input id="searchable-only" type="checkbox" checked hidden />
         <label class="searchable-toggle">
           <input id="favorites-only" type="checkbox" />
           <span class="toggle-track" aria-hidden="true"><span></span></span>
-          <span>Only favorites</span>
+          <span data-i18n="onlyFavorites">Only favorites</span>
         </label>
-        <fieldset class="name-language" aria-label="Display name language">
+        <fieldset class="name-language" aria-label="Display name language" data-i18n-aria-label="displayLanguage">
           <label>
             <input type="radio" name="name-language" value="en" checked />
             <span>EN</span>
@@ -51,44 +51,44 @@
           </label>
         </fieldset>
         <button id="advanced-filters" class="advanced-button" type="button" disabled>
-          <span>Advanced</span>
+          <span data-i18n="advanced">Advanced</span>
           <span id="advanced-filter-count" class="filter-count" hidden></span>
         </button>
       </div>
       <div class="header-meta">
         <p id="image-count" class="image-count" aria-live="polite"></p>
         <div id="support-button" class="support-button-host">
-          <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="buttery_x3" data-color="#FFDD00" data-emoji="☕" data-font="Arial" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#000000" data-coffee-color="#ffffff"></script>
+          <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="buttery_x3" data-color="#FFDD00" data-emoji="☕" data-font="Arial" data-text="Buy me a coffee" data-i18n-data-text="buyCoffee" data-outline-color="#000000" data-font-color="#000000" data-coffee-color="#ffffff"></script>
         </div>
       </div>
     </header>
     <main>
-      <p id="status" class="status">Loading gallery…</p>
-      <section id="gallery" class="gallery" aria-label="Image gallery"></section>
+      <p id="status" class="status" data-i18n="loadingGallery">Loading gallery…</p>
+      <section id="gallery" class="gallery" aria-label="Image gallery" data-i18n-aria-label="imageGallery"></section>
     </main>
-    <footer id="support-footer" class="support-footer" aria-label="Support this site" hidden></footer>
+    <footer id="support-footer" class="support-footer" aria-label="Support this site" data-i18n-aria-label="supportSite" hidden></footer>
     <dialog id="filter-dialog" class="filter-dialog" aria-labelledby="filter-dialog-title">
       <form id="filter-form" class="filter-form">
         <div class="filter-dialog-header">
           <div>
-            <h2 id="filter-dialog-title">Advanced filters</h2>
-            <p>Choose any combination of metadata tags.</p>
+            <h2 id="filter-dialog-title" data-i18n="advancedFilters">Advanced filters</h2>
+            <p data-i18n="filterHelp">Choose any combination of metadata tags.</p>
           </div>
-          <button id="filter-close" class="filter-close" type="button" aria-label="Close filters">×</button>
+          <button id="filter-close" class="filter-close" type="button" aria-label="Close filters" data-i18n-aria-label="closeFilters">×</button>
         </div>
         <div id="filter-grid" class="filter-grid"></div>
         <div class="filter-actions">
-          <button id="filter-reset" class="secondary-button" type="button">Reset</button>
-          <button class="primary-button" type="submit">Apply filters</button>
+          <button id="filter-reset" class="secondary-button" type="button" data-i18n="reset">Reset</button>
+          <button class="primary-button" type="submit" data-i18n="applyFilters">Apply filters</button>
         </div>
       </form>
     </dialog>
     <dialog id="lightbox" class="lightbox" aria-labelledby="lightbox-name">
-      <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Close preview">
+      <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Close preview" data-i18n-aria-label="closePreview">
         <span aria-hidden="true">×</span>
       </button>
       <div class="lightbox-stage">
-        <button id="lightbox-previous" class="lightbox-nav" type="button" aria-label="Previous image">
+        <button id="lightbox-previous" class="lightbox-nav" type="button" aria-label="Previous image" data-i18n-aria-label="previousImage">
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <path d="m15 18-6-6 6-6" />
           </svg>
@@ -108,17 +108,17 @@
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="m12 2.75 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35-5.7-3-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.75Z" />
               </svg>
-              <span>Add favorite</span>
+              <span data-i18n="addFavorite">Add favorite</span>
             </button>
             <button id="lightbox-toggle-name" class="lightbox-action" type="button" aria-pressed="true">
-              <span>Hide name</span>
+              <span data-i18n="hideName">Hide name</span>
             </button>
             <button id="lightbox-text-position" class="lightbox-action" type="button">
-              <span>Text position</span>
+              <span data-i18n="textPosition">Text position</span>
             </button>
           </div>
         </div>
-        <button id="lightbox-next" class="lightbox-nav" type="button" aria-label="Next image">
+        <button id="lightbox-next" class="lightbox-nav" type="button" aria-label="Next image" data-i18n-aria-label="nextImage">
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <path d="m9 6 6 6-6 6" />
           </svg>

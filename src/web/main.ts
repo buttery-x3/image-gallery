@@ -61,17 +61,105 @@ const overlayPreferencesStorageKey = "image-gallery:overlay-preferences:v1";
 const favoriteImagePaths = loadFavoriteImagePaths();
 type NameLanguage = "en" | "ja";
 type OverlayNamePosition = "top-left" | "bottom-left" | "bottom-right" | "top-right";
+const uiCopy = {
+  en: {
+    shuffle: "Shuffle",
+    searchImages: "Search images",
+    onlyFavorites: "Only favorites",
+    displayLanguage: "Display name language",
+    advanced: "Advanced",
+    buyCoffee: "Buy me a coffee",
+    loadingGallery: "Loading gallery\u2026",
+    imageGallery: "Image gallery",
+    supportSite: "Support this site",
+    advancedFilters: "Advanced filters",
+    filterHelp: "Choose any combination of metadata tags.",
+    closeFilters: "Close filters",
+    reset: "Reset",
+    applyFilters: "Apply filters",
+    closePreview: "Close preview",
+    previousImage: "Previous image",
+    nextImage: "Next image",
+    addFavorite: "Add favorite",
+    removeFavorite: "Remove favorite",
+    hideName: "Hide name",
+    showName: "Show name",
+    textPosition: "Text position",
+    copyImage: "Copy image",
+    copyLink: "Copy link",
+    any: "Any",
+    addedFavorite: "Added to favorites",
+    removedFavorite: "Removed from favorites",
+    imageCopied: "Image copied",
+    linkCopiedInstead: "Link copied instead",
+    copyImageOrLinkFailed: "Could not copy image or link",
+    linkCopied: "Link copied",
+    copyLinkFailed: "Could not copy link",
+    noImages: "No images yet. Add some files and refresh.",
+    noMatches: "No images match your search and filters.",
+    loadFailed: "The gallery could not be loaded.",
+  },
+  ja: {
+    shuffle: "シャッフル",
+    searchImages: "画像を検索",
+    onlyFavorites: "お気に入りのみ",
+    displayLanguage: "表示言語",
+    advanced: "詳細設定",
+    buyCoffee: "コーヒーをおごる",
+    loadingGallery: "ギャラリーを読み込み中…",
+    imageGallery: "画像ギャラリー",
+    supportSite: "このサイトを支援",
+    advancedFilters: "詳細フィルター",
+    filterHelp: "メタデータタグを自由に組み合わせてください。",
+    closeFilters: "フィルターを閉じる",
+    reset: "リセット",
+    applyFilters: "フィルターを適用",
+    closePreview: "プレビューを閉じる",
+    previousImage: "前の画像",
+    nextImage: "次の画像",
+    addFavorite: "お気に入りに追加",
+    removeFavorite: "お気に入りから削除",
+    hideName: "名前を非表示",
+    showName: "名前を表示",
+    textPosition: "テキストの位置",
+    copyImage: "画像をコピー",
+    copyLink: "リンクをコピー",
+    any: "指定なし",
+    addedFavorite: "お気に入りに追加しました",
+    removedFavorite: "お気に入りから削除しました",
+    imageCopied: "画像をコピーしました",
+    linkCopiedInstead: "代わりにリンクをコピーしました",
+    copyImageOrLinkFailed: "画像またはリンクをコピーできませんでした",
+    linkCopied: "リンクをコピーしました",
+    copyLinkFailed: "リンクをコピーできませんでした",
+    noImages: "画像はまだありません。ファイルを追加して更新してください。",
+    noMatches: "検索条件やフィルターに一致する画像がありません。",
+    loadFailed: "ギャラリーを読み込めませんでした。",
+  },
+} as const;
+type UiCopyKey = keyof typeof uiCopy.en;
+
 const overlayNamePositions: readonly OverlayNamePosition[] = [
   "top-left", "bottom-left", "bottom-right", "top-right",
 ];
-const overlayPositionLabels: Record<OverlayNamePosition, string> = {
-  "top-left": "top left",
-  "bottom-left": "bottom left",
-  "bottom-right": "bottom right",
-  "top-right": "top right",
+const overlayPositionLabels: Record<NameLanguage, Record<OverlayNamePosition, string>> = {
+  en: {
+    "top-left": "top left",
+    "bottom-left": "bottom left",
+    "bottom-right": "bottom right",
+    "top-right": "top right",
+  },
+  ja: {
+    "top-left": "左上",
+    "bottom-left": "左下",
+    "bottom-right": "右下",
+    "top-right": "右上",
+  },
 };
 let nameLanguage = loadNameLanguage();
 let { nameVisible: overlayNameVisible, namePosition: overlayNamePosition } = loadOverlayPreferences();
+let galleryLoadState: "loading" | "ready" | "error" = "loading";
+let galleryErrorMessage: string = uiCopy.en.loadFailed;
 
 const maximumConcurrentImageLoads = 4;
 const lazyLoadMargin = 150;
@@ -85,6 +173,32 @@ function syncSupportButtonPlacement(): void {
   if (supportButton.parentElement !== destination) destination.append(supportButton);
   supportFooter.hidden = !mobile;
   supportButton.querySelector<HTMLAnchorElement>(".bmc-btn")?.setAttribute("rel", "noopener noreferrer");
+}
+
+function t(key: UiCopyKey): string {
+  return uiCopy[nameLanguage][key];
+}
+
+function syncStaticUi(): void {
+  document.documentElement.lang = nameLanguage;
+  for (const element of document.querySelectorAll<HTMLElement>("[data-i18n]")) {
+    const key = element.dataset.i18n as UiCopyKey | undefined;
+    if (key) element.textContent = t(key);
+  }
+  for (const element of document.querySelectorAll<HTMLElement>("[data-i18n-aria-label]")) {
+    const key = element.dataset.i18nAriaLabel as UiCopyKey | undefined;
+    if (key) element.setAttribute("aria-label", t(key));
+  }
+  for (const element of document.querySelectorAll<HTMLInputElement>("[data-i18n-placeholder]")) {
+    const key = element.dataset.i18nPlaceholder as UiCopyKey | undefined;
+    if (key) element.placeholder = t(key);
+  }
+  for (const element of document.querySelectorAll<HTMLElement>("[data-i18n-data-text]")) {
+    const key = element.dataset.i18nDataText as UiCopyKey | undefined;
+    if (key) element.dataset.text = t(key);
+  }
+  const supportText = supportButton.querySelector<HTMLElement>(".bmc-btn-text");
+  if (supportText) supportText.textContent = t("buyCoffee");
 }
 
 syncSupportButtonPlacement();
@@ -319,6 +433,25 @@ function displayNameFor(image: GalleryImage): string {
   return image.shortName?.[nameLanguage] ?? image.displayName;
 }
 
+function openImageLabel(displayName: string): string {
+  return nameLanguage === "ja" ? `「${displayName}」を開く` : `Open ${displayName}`;
+}
+
+function copyImageLabel(displayName: string): string {
+  return nameLanguage === "ja" ? `「${displayName}」を画像としてコピー` : `Copy ${displayName} as an image`;
+}
+
+function copyLinkLabel(displayName: string): string {
+  return nameLanguage === "ja" ? `「${displayName}」への直接リンクをコピー` : `Copy direct link to ${displayName}`;
+}
+
+function favoriteActionLabel(favorite: boolean, displayName: string): string {
+  if (nameLanguage === "ja") {
+    return favorite ? `「${displayName}」をお気に入りから削除` : `「${displayName}」をお気に入りに追加`;
+  }
+  return `${favorite ? "Remove" : "Add"} ${displayName} ${favorite ? "from" : "to"} favorites`;
+}
+
 const overlayColorFields = [
   "hair_color_primary",
   "hair_color_secondary",
@@ -436,10 +569,12 @@ function syncLightboxOverlayState(image?: GalleryImage): void {
   lightboxNameOverlay.hidden = !hasShortName || !overlayNameVisible;
   lightboxToggleName.disabled = !hasShortName;
   lightboxToggleName.setAttribute("aria-pressed", String(overlayNameVisible));
-  lightboxToggleName.querySelector("span")!.textContent = overlayNameVisible ? "Hide name" : "Show name";
+  lightboxToggleName.querySelector("span")!.textContent = t(overlayNameVisible ? "hideName" : "showName");
 
   const nextPosition = nextOverlayNamePosition();
-  const positionLabel = `Move name to ${overlayPositionLabels[nextPosition]}`;
+  const positionLabel = nameLanguage === "ja"
+    ? `名前を${overlayPositionLabels.ja[nextPosition]}に移動`
+    : `Move name to ${overlayPositionLabels.en[nextPosition]}`;
   lightboxTextPosition.setAttribute("aria-label", positionLabel);
   lightboxTextPosition.title = positionLabel;
 }
@@ -452,8 +587,8 @@ function syncTileFavoriteButton(button: HTMLButtonElement, image: GalleryImage):
   const favorite = isFavorite(image);
   const displayName = displayNameFor(image);
   button.classList.toggle("is-favorite", favorite);
-  button.title = favorite ? "Remove favorite" : "Add favorite";
-  button.setAttribute("aria-label", `${favorite ? "Remove" : "Add"} ${displayName} ${favorite ? "from" : "to"} favorites`);
+  button.title = t(favorite ? "removeFavorite" : "addFavorite");
+  button.setAttribute("aria-label", favoriteActionLabel(favorite, displayName));
   button.setAttribute("aria-pressed", String(favorite));
 }
 
@@ -461,8 +596,8 @@ function syncLightboxFavoriteButton(image: GalleryImage): void {
   const favorite = isFavorite(image);
   const displayName = displayNameFor(image);
   lightboxFavorite.classList.toggle("is-favorite", favorite);
-  lightboxFavorite.querySelector("span")!.textContent = favorite ? "Remove favorite" : "Add favorite";
-  lightboxFavorite.setAttribute("aria-label", `${favorite ? "Remove" : "Add"} ${displayName} ${favorite ? "from" : "to"} favorites`);
+  lightboxFavorite.querySelector("span")!.textContent = t(favorite ? "removeFavorite" : "addFavorite");
+  lightboxFavorite.setAttribute("aria-label", favoriteActionLabel(favorite, displayName));
   lightboxFavorite.setAttribute("aria-pressed", String(favorite));
 }
 
@@ -475,7 +610,7 @@ function toggleFavorite(image: GalleryImage): void {
   const tileButton = favoriteButtonsByImage.get(image);
   if (tileButton) syncTileFavoriteButton(tileButton, image);
   if (lightbox.open && galleryImages[activeImageIndex] === image) syncLightboxFavoriteButton(image);
-  showToast(favorite ? "Added to favorites" : "Removed from favorites");
+  showToast(t(favorite ? "addedFavorite" : "removedFavorite"));
 
   if (favoritesOnly.checked) {
     applyFilters();
@@ -515,7 +650,195 @@ function searchIndex(image: GalleryImage): string {
   return index;
 }
 
+const japaneseFieldLabels: Record<string, string> = {
+  batch: "バッチ",
+  body_type: "体型",
+  breast_type: "胸のタイプ",
+  hair_style: "髪型",
+  hair_color_primary: "メインの髪色",
+  hair_color_secondary: "サブの髪色",
+  hair_accent: "髪のアクセント",
+  eye_shape: "目の形",
+  eye_color_primary: "メインの瞳色",
+  eye_color_secondary: "サブの瞳色",
+  eye_accent: "目のアクセント",
+  outfit: "衣装",
+  outfit_color: "衣装の色",
+  trim: "縁取り",
+  trim_color: "縁取りの色",
+  jewellery: "アクセサリー",
+  jewellery_color: "アクセサリーの色",
+  pose: "ポーズ",
+  facing_direction: "向き",
+  scene: "シーン",
+  scene_detail: "シーンの詳細",
+  lighting: "照明",
+  secondary_lighting: "補助照明",
+  finish_style: "仕上げスタイル",
+};
+
+const japaneseFilterValueLabels: Record<string, string> = {
+  none: "なし",
+  other: "その他",
+  average: "標準",
+  petite: "小柄",
+  slim: "スリム",
+  slender: "細身",
+  athletic: "アスリート体型",
+  curvy: "曲線的",
+  voluptuous: "豊満",
+  flat: "平ら",
+  small: "小",
+  medium: "中",
+  large: "大",
+  very_large: "特大",
+  short: "ショート",
+  medium_length: "ミディアム",
+  long: "ロング",
+  straight: "ストレート",
+  wavy: "ウェーブ",
+  curly: "カール",
+  messy: "無造作",
+  bob: "ボブ",
+  bob_cut: "ボブカット",
+  pixie_cut: "ピクシーカット",
+  hime_cut: "姫カット",
+  ponytail: "ポニーテール",
+  high_ponytail: "ハイポニーテール",
+  low_ponytail: "ローポニーテール",
+  twin_tails: "ツインテール",
+  twintails: "ツインテール",
+  braid: "三つ編み",
+  braided: "三つ編み",
+  bun: "お団子",
+  double_bun: "ツインお団子",
+  black: "黒",
+  white: "白",
+  brown: "茶",
+  blonde: "金",
+  blond: "金",
+  red: "赤",
+  orange: "オレンジ",
+  yellow: "黄",
+  green: "緑",
+  blue: "青",
+  purple: "紫",
+  pink: "ピンク",
+  silver: "銀",
+  gray: "グレー",
+  grey: "グレー",
+  gold: "金",
+  teal: "青緑",
+  cyan: "シアン",
+  aqua: "水色",
+  navy: "紺",
+  maroon: "えんじ",
+  highlights: "ハイライト",
+  streaks: "メッシュ",
+  gradient: "グラデーション",
+  ombre: "オンブレ",
+  colored_tips: "毛先カラー",
+  split_color: "ツートーン",
+  round: "丸目",
+  almond: "アーモンド形",
+  narrow: "細目",
+  upturned: "つり目",
+  downturned: "たれ目",
+  sharp: "鋭い目",
+  droopy: "たれ目",
+  dress: "ドレス",
+  school_uniform: "学生服",
+  sailor_uniform: "セーラー服",
+  kimono: "着物",
+  yukata: "浴衣",
+  maid_outfit: "メイド服",
+  casual: "カジュアル",
+  formal: "フォーマル",
+  armor: "鎧",
+  swimsuit: "水着",
+  bikini: "ビキニ",
+  hoodie: "パーカー",
+  sweater: "セーター",
+  jacket: "ジャケット",
+  shirt: "シャツ",
+  blouse: "ブラウス",
+  skirt: "スカート",
+  shorts: "ショートパンツ",
+  pants: "パンツ",
+  suit: "スーツ",
+  lace: "レース",
+  ribbon: "リボン",
+  ribbons: "リボン",
+  frills: "フリル",
+  embroidery: "刺繍",
+  fur: "ファー",
+  earrings: "イヤリング",
+  necklace: "ネックレス",
+  choker: "チョーカー",
+  bracelet: "ブレスレット",
+  ring: "指輪",
+  hairpin: "ヘアピン",
+  tiara: "ティアラ",
+  crown: "王冠",
+  standing: "立ち姿",
+  sitting: "座り姿",
+  kneeling: "ひざまずき",
+  lying: "横たわり",
+  walking: "歩行",
+  running: "走行",
+  looking_back: "振り返り",
+  arms_crossed: "腕組み",
+  hands_on_hips: "腰に手",
+  front: "正面",
+  left: "左向き",
+  right: "右向き",
+  back: "後ろ向き",
+  three_quarter: "斜め向き",
+  profile: "横顔",
+  studio: "スタジオ",
+  bedroom: "寝室",
+  classroom: "教室",
+  city: "都市",
+  street: "通り",
+  forest: "森",
+  beach: "海辺",
+  garden: "庭園",
+  shrine: "神社",
+  cafe: "カフェ",
+  night_sky: "夜空",
+  sunset: "夕暮れ",
+  soft: "柔らかい光",
+  hard: "硬い光",
+  natural: "自然光",
+  warm: "暖色光",
+  cool: "寒色光",
+  dramatic: "ドラマチック",
+  cinematic: "シネマティック",
+  rim_light: "リムライト",
+  backlight: "逆光",
+  neon: "ネオン",
+  moonlight: "月明かり",
+  sunlight: "日光",
+  anime: "アニメ調",
+  painterly: "絵画調",
+  cel_shaded: "セル画調",
+  realistic: "写実的",
+  semi_realistic: "半写実的",
+  watercolor: "水彩画調",
+  illustration: "イラスト調",
+  glossy: "光沢仕上げ",
+  matte: "マット仕上げ",
+  detailed: "精密仕上げ",
+};
+
+function filterValueLabel(value: string): string {
+  if (nameLanguage !== "ja") return value;
+  const normalizedValue = value.trim().toLocaleLowerCase("en-US").replace(/[\s-]+/g, "_");
+  return japaneseFilterValueLabels[normalizedValue] ?? value;
+}
+
 function fieldLabel(key: string): string {
+  if (nameLanguage === "ja" && japaneseFieldLabels[key]) return japaneseFieldLabels[key];
   return key
     .split("_")
     .map((part) => part.charAt(0).toLocaleUpperCase() + part.slice(1))
@@ -557,7 +880,7 @@ function renderFilterControls(): void {
 
     const anyOption = document.createElement("option");
     anyOption.value = "";
-    anyOption.textContent = "Any";
+    anyOption.textContent = t("any");
     select.append(anyOption);
 
     const counts = facets.get(key)!;
@@ -565,7 +888,7 @@ function renderFilterControls(): void {
     for (const value of values) {
       const option = document.createElement("option");
       option.value = value;
-      option.textContent = `${value} (${counts.get(value)})`;
+      option.textContent = `${filterValueLabel(value)} (${counts.get(value)})`;
       select.append(option);
     }
 
@@ -587,7 +910,9 @@ function updateFilterCount(): void {
   const count = activeFilters.size;
   advancedFilterCount.hidden = count === 0;
   advancedFilterCount.textContent = String(count);
-  advancedButton.setAttribute("aria-label", count === 0 ? "Advanced filters" : `Advanced filters, ${count} active`);
+  advancedButton.setAttribute("aria-label", count === 0
+    ? t("advancedFilters")
+    : (nameLanguage === "ja" ? `${count}件のフィルターが有効` : `Advanced filters, ${count} active`));
 }
 
 function applyFilters(): void {
@@ -747,9 +1072,10 @@ function showLightboxImage(index: number): void {
   if (!image) return;
 
   activeImageIndex = index;
-  lightboxName.textContent = image.displayName;
+  const displayName = displayNameFor(image);
+  lightboxName.textContent = displayName;
   lightboxImage.src = new URL(image.url, document.baseURI).href;
-  lightboxImage.alt = image.displayName;
+  lightboxImage.alt = displayName;
   const shortName = image.shortName;
   lightboxShortNameEn.textContent = shortName?.en ?? "";
   lightboxShortNameJa.textContent = shortName?.ja ?? "";
@@ -875,7 +1201,7 @@ function createTile(image: GalleryImage): HTMLElement {
   const openButton = document.createElement("button");
   openButton.type = "button";
   openButton.className = "image-open";
-  openButton.setAttribute("aria-label", `Open ${displayNameFor(image)}`);
+  openButton.setAttribute("aria-label", openImageLabel(displayNameFor(image)));
   openButton.setAttribute("aria-busy", "true");
 
   const element = document.createElement("img");
@@ -908,8 +1234,8 @@ function createTile(image: GalleryImage): HTMLElement {
   imageCopyButton.type = "button";
   imageCopyButton.className = "tile-action-button";
   imageCopyButton.dataset.action = "copy-image";
-  imageCopyButton.title = "Copy image";
-  imageCopyButton.setAttribute("aria-label", `Copy ${displayNameFor(image)} as an image`);
+  imageCopyButton.title = t("copyImage");
+  imageCopyButton.setAttribute("aria-label", copyImageLabel(displayNameFor(image)));
   imageCopyButton.append(createActionIcon([
     "M8 8h11v11H8z",
     "M5 16H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v1",
@@ -919,8 +1245,8 @@ function createTile(image: GalleryImage): HTMLElement {
   linkCopyButton.type = "button";
   linkCopyButton.className = "tile-action-button";
   linkCopyButton.dataset.action = "copy-link";
-  linkCopyButton.title = "Copy link";
-  linkCopyButton.setAttribute("aria-label", `Copy direct link to ${displayNameFor(image)}`);
+  linkCopyButton.title = t("copyLink");
+  linkCopyButton.setAttribute("aria-label", copyLinkLabel(displayNameFor(image)));
   linkCopyButton.append(createActionIcon([
     "M10.5 13.5l3-3",
     "M7.5 16.5 6 18a4 4 0 0 1-5.7-5.7l3-3A4 4 0 0 1 9 9",
@@ -939,13 +1265,13 @@ function createTile(image: GalleryImage): HTMLElement {
     imageCopyButton.setAttribute("aria-busy", "true");
     try {
       await copyImage(image, absoluteUrl);
-      showToast("Image copied");
+      showToast(t("imageCopied"));
     } catch {
       try {
         await copyText(absoluteUrl);
-        showToast("Link copied instead");
+        showToast(t("linkCopiedInstead"));
       } catch {
-        showToast("Could not copy image or link");
+        showToast(t("copyImageOrLinkFailed"));
       }
     } finally {
       imageCopyButton.disabled = false;
@@ -955,9 +1281,9 @@ function createTile(image: GalleryImage): HTMLElement {
   linkCopyButton.addEventListener("click", async () => {
     try {
       await copyText(new URL(image.url, document.baseURI).href);
-      showToast("Link copied");
+      showToast(t("linkCopied"));
     } catch {
-      showToast("Could not copy link");
+      showToast(t("copyLinkFailed"));
     }
   });
 
@@ -985,26 +1311,41 @@ function createTile(image: GalleryImage): HTMLElement {
 }
 
 function syncNameLanguageDisplay(): void {
+  syncStaticUi();
   for (const input of nameLanguageInputs) input.checked = input.value === nameLanguage;
   for (const [image, tile] of tilesByImage) {
     const displayName = displayNameFor(image);
-    tile.querySelector<HTMLButtonElement>(".image-open")?.setAttribute("aria-label", `Open ${displayName}`);
+    tile.querySelector<HTMLButtonElement>(".image-open")?.setAttribute("aria-label", openImageLabel(displayName));
     const shortName = tile.querySelector<HTMLElement>(".gallery-short-name");
     if (shortName) {
       shortName.textContent = image.shortName?.[nameLanguage] ?? "";
       shortName.lang = nameLanguage === "ja" ? "ja" : "en";
     }
-    tile.querySelector<HTMLButtonElement>('[data-action="copy-image"]')
-      ?.setAttribute("aria-label", `Copy ${displayName} as an image`);
-    tile.querySelector<HTMLButtonElement>('[data-action="copy-link"]')
-      ?.setAttribute("aria-label", `Copy direct link to ${displayName}`);
+    const copyImageButton = tile.querySelector<HTMLButtonElement>('[data-action="copy-image"]');
+    copyImageButton?.setAttribute("aria-label", copyImageLabel(displayName));
+    if (copyImageButton) copyImageButton.title = t("copyImage");
+    const copyLinkButton = tile.querySelector<HTMLButtonElement>('[data-action="copy-link"]');
+    copyLinkButton?.setAttribute("aria-label", copyLinkLabel(displayName));
+    if (copyLinkButton) copyLinkButton.title = t("copyLink");
     const favoriteButton = favoriteButtonsByImage.get(image);
     if (favoriteButton) syncTileFavoriteButton(favoriteButton, image);
   }
 
   const activeImage = galleryImages[activeImageIndex];
   if (lightbox.open && activeImage) {
+    const displayName = displayNameFor(activeImage);
+    lightboxName.textContent = displayName;
+    lightboxImage.alt = displayName;
     syncLightboxFavoriteButton(activeImage);
+  }
+  syncLightboxOverlayState(activeImage);
+  if (galleryLoadState === "ready") {
+    renderFilterControls();
+    syncFilterControls();
+    applyFilters();
+  } else if (galleryLoadState === "error") {
+    status.hidden = false;
+    status.textContent = nameLanguage === "ja" ? t("loadFailed") : galleryErrorMessage;
   }
 }
 
@@ -1057,21 +1398,26 @@ function updateVisibleImages(images: GalleryImage[]): void {
     ? allImages.filter((image) => image.metadata).length
     : allImages.length;
   if (images.length === maximumImages) {
-    imageCount.textContent = images.length === 1 ? "1 image" : `${images.length} images`;
+    imageCount.textContent = nameLanguage === "ja"
+      ? `${images.length}枚`
+      : (images.length === 1 ? "1 image" : `${images.length} images`);
   } else {
-    imageCount.textContent = `${images.length} of ${maximumImages} images`;
+    imageCount.textContent = nameLanguage === "ja"
+      ? `${maximumImages}枚中${images.length}枚`
+      : `${images.length} of ${maximumImages} images`;
   }
   updateShuffleButtonState();
   status.hidden = images.length > 0;
   status.textContent = images.length === 0
-    ? (allImages.length === 0 ? "No images yet. Add some files and refresh." : "No images match your search and filters.")
+    ? t(allImages.length === 0 ? "noImages" : "noMatches")
     : "";
   scheduleQueueRefresh();
 }
 
 async function loadGallery(): Promise<void> {
+  galleryLoadState = "loading";
   status.hidden = false;
-  status.textContent = "Loading gallery\u2026";
+  status.textContent = t("loadingGallery");
   try {
     const response = await fetch(new URL("api/images", document.baseURI), { cache: "no-store" });
     const payload = (await response.json()) as GalleryResponse | ErrorResponse;
@@ -1079,18 +1425,21 @@ async function loadGallery(): Promise<void> {
       throw new Error("error" in payload ? payload.error : "The gallery could not be loaded.");
     }
     allImages = shuffledImages(payload.images);
+    galleryLoadState = "ready";
     activeFilters.clear();
     renderFilterControls();
     initializeTiles();
     applyFilters();
   } catch (error) {
+    galleryLoadState = "error";
+    galleryErrorMessage = error instanceof Error ? error.message : uiCopy.en.loadFailed;
     allImages = [];
     gallery.replaceChildren();
     shuffleButton.disabled = true;
     advancedButton.disabled = true;
     imageCount.textContent = "";
     status.hidden = false;
-    status.textContent = error instanceof Error ? error.message : "The gallery could not be loaded.";
+    status.textContent = nameLanguage === "ja" ? t("loadFailed") : galleryErrorMessage;
   }
 }
 
