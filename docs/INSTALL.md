@@ -129,6 +129,14 @@ This command requires `BATCH_NAME_STYLE=japanese-fantasy`, leaves root-level upl
 
 Run the same script with no root-level images to check the full gallery and generate only missing previews. This also retries preview warming after a previous service or network failure.
 
+To permanently remove an image using the absolute direct URL copied from the gallery, run:
+
+```sh
+sudo -u image-gallery bash /opt/image-gallery/remove-image.sh 'https://www.example.com/image-gallery/media/2026-07-17_15-25-59/example.png'
+```
+
+The command does not prompt. It removes the original image, matching metadata sidecars, and its generated preview cache entries. No rebuild or service restart is required.
+
 ## Updating
 
 From `/opt/image-gallery`:

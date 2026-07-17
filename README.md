@@ -89,6 +89,14 @@ The backfill leaves existing name sidecars untouched and reports filenames that 
 
 To audit every existing batch without changing the gallery, run `npm run scan-for-duplicates` or `bash ./scan-for-duplicates.sh`. The scan hashes every supported image in non-hidden batch directories with SHA-256, reports complete matching groups, and exits with status 1 when duplicates are found. Root-level incoming files, hidden directories, and symbolic links are excluded.
 
+To permanently remove an image, pass its absolute direct media URL to the removal command:
+
+```sh
+bash ./remove-image.sh 'https://gallery.example.com/media/2026-07-17_15-25-59/example.png'
+```
+
+The command does not prompt. It validates the URL and gallery path, then removes the original image, its matching metadata sidecars, and any current or legacy generated preview. It also accepts deployments whose media route is below a stripped prefix, such as `/image-gallery/media/...`. Run it as the account that owns the gallery files; on the documented Linux installation, use `sudo -u image-gallery bash /opt/image-gallery/remove-image.sh '<url>'`.
+
 ## Commands
 
 | Command | Purpose |
@@ -100,6 +108,7 @@ To audit every existing batch without changing the gallery, run `npm run scan-fo
 | `bash ./process-batch.sh` | Organize root-level uploads and generate only missing previews |
 | `bash ./rename-existing.sh` | Force generated names onto images already inside batch directories |
 | `npm run backfill-name-metadata` | Add missing EN/JP display-name sidecars without renaming images |
+| `bash ./remove-image.sh '<url>'` | Permanently remove an image, its sidecars, and generated preview |
 | `npm run scan-for-duplicates` / `bash ./scan-for-duplicates.sh` | SHA-256 scan all batched images and report exact duplicates |
 
 On the Linux server described in the installation guide, deploy an update with `sudo ./deploy.sh`.
