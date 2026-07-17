@@ -32,6 +32,7 @@ const toast = requiredElement<HTMLElement>("#toast");
 let toastTimer: number | undefined;
 let activeOpener: HTMLButtonElement | undefined;
 let activeImageIndex = -1;
+let lightboxTouchStart: { identifier: number; x: number; y: number; startedAt: number } | undefined;
 let activeImageLoads = 0;
 let allImages: GalleryImage[] = [];
 let galleryImages: GalleryImage[] = [];
@@ -477,14 +478,56 @@ lightboxClose.addEventListener("click", closeLightbox);
 lightboxPrevious.addEventListener("click", () => navigateLightbox(-1));
 lightboxNext.addEventListener("click", () => navigateLightbox(1));
 lightbox.addEventListener("keydown", (event) => {
-  if (event.key === "ArrowLeft") {
+  if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
     event.preventDefault();
     navigateLightbox(-1);
-  } else if (event.key === "ArrowRight") {
+  } else if (event.key === "ArrowRight" || event.key === "ArrowDown") {
     event.preventDefault();
     navigateLightbox(1);
   }
 });
+lightboxStage.addEventListener("touchstart", (event) => {
+  const target = event.target instanceof Element ? event.target : undefined;
+  if (event.touches.length !== 1 || !target?.closest(".lightbox-content") || target.closest("button")) {
+    lightboxTouchStart = undefined;
+    return;
+  }
+
+  const touch = event.touches.item(0);
+  if (!touch) return;
+  lightboxTouchStart = {
+    identifier: touch.identifier,
+    x: touch.clientX,
+    y: touch.clientY,
+    startedAt: Date.now(),
+  };
+}, { passive: true });
+lightboxStage.addEventListener("touchend", (event) => {
+  const start = lightboxTouchStart;
+  lightboxTouchStart = undefined;
+  if (!start || Date.now() - start.startedAt > 800) return;
+
+  let touch: Touch | undefined;
+  for (let index = 0; index < event.changedTouches.length; index += 1) {
+    const candidate = event.changedTouches.item(index);
+    if (candidate?.identifier === start.identifier) {
+      touch = candidate;
+      break;
+    }
+  }
+  if (!touch) return;
+
+  const horizontalDistance = touch.clientX - start.x;
+  const verticalDistance = touch.clientY - start.y;
+  if (Math.max(Math.abs(horizontalDistance), Math.abs(verticalDistance)) < 48) return;
+  const forward = Math.abs(horizontalDistance) > Math.abs(verticalDistance)
+    ? horizontalDistance < 0
+    : verticalDistance < 0;
+  navigateLightbox(forward ? 1 : -1);
+}, { passive: true });
+lightboxStage.addEventListener("touchcancel", () => {
+  lightboxTouchStart = undefined;
+}, { passive: true });
 lightbox.addEventListener("click", (event) => {
   if (event.target === lightbox || event.target === lightboxStage) closeLightbox();
 });
@@ -492,6 +535,7 @@ lightbox.addEventListener("close", () => {
   document.body.classList.remove("lightbox-open");
   lightboxName.textContent = "";
   lightboxImage.removeAttribute("src");
+  lightboxTouchStart = undefined;
   activeImageIndex = -1;
   activeOpener?.focus({ preventScroll: true });
   activeOpener = undefined;
