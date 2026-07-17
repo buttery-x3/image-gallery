@@ -13,6 +13,7 @@
     "build": "npm run clean && npm run build:web && npm run build:server",
     "process-batch": "node process-gallery-batch.mjs",
     "rename-existing": "node process-gallery-batch.mjs --rename-existing",
+    "scan-for-duplicates": "node scan-for-duplicates.mjs",
     "start": "node dist/server/server/server.js"
   },
   "dependencies": {

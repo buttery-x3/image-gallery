@@ -76,6 +76,8 @@ bash ./rename-existing.sh
 
 Root-level incoming files are left alone by this alternate command. Existing same-name sidecars are validated and renamed with their images, and cached previews are copied to their new cache keys instead of being regenerated. Re-running the command intentionally generates a fresh set of names.
 
+To audit every existing batch without changing the gallery, run `npm run scan-for-duplicates` or `bash ./scan-for-duplicates.sh`. The scan hashes every supported image in non-hidden batch directories with SHA-256, reports complete matching groups, and exits with status 1 when duplicates are found. Root-level incoming files, hidden directories, and symbolic links are excluded.
+
 ## Commands
 
 | Command | Purpose |
@@ -86,6 +88,7 @@ Root-level incoming files are left alone by this alternate command. Existing sam
 | `npm start` | Run the compiled production server |
 | `bash ./process-batch.sh` | Organize root-level uploads and generate only missing previews |
 | `bash ./rename-existing.sh` | Force generated names onto images already inside batch directories |
+| `npm run scan-for-duplicates` / `bash ./scan-for-duplicates.sh` | SHA-256 scan all batched images and report exact duplicates |
 
 On the Linux server described in the installation guide, deploy an update with `sudo ./deploy.sh`.
 
