@@ -1135,7 +1135,12 @@ function updateFilterCount(): void {
     : (nameLanguage === "ja" ? `${count}件のフィルターが有効` : `Advanced filters, ${count} active`));
 }
 
-function applyFilters(): void {
+function applyFilters(showBusy = false): void {
+  if (showBusy) {
+    status.hidden = false;
+    status.dataset.state = "busy";
+    status.textContent = nameLanguage === "ja" ? "検索中…" : "Searching…";
+  }
   const terms = normalized(searchInput.value).split(/\s+/).filter(Boolean);
   const images = allImages.filter((image) => {
     if (favoritesOnly.checked && !isFavorite(image)) return false;
@@ -1167,16 +1172,16 @@ filterForm.addEventListener("submit", (event) => {
     if (key && select.value) activeFilters.set(key, select.value);
   }
   filterDialog.close();
-  applyFilters();
+  applyFilters(true);
 });
 filterDialog.addEventListener("click", (event) => {
   if (event.target === filterDialog) filterDialog.close();
 });
 searchInput.addEventListener("input", () => {
   window.clearTimeout(searchTimer);
-  searchTimer = window.setTimeout(applyFilters, 120);
+  searchTimer = window.setTimeout(() => applyFilters(true), 120);
 });
-favoritesOnly.addEventListener("change", applyFilters);
+favoritesOnly.addEventListener("change", () => applyFilters(true));
 
 function resizeTile(tile: HTMLElement): void {
   const styles = window.getComputedStyle(gallery);
@@ -1794,6 +1799,7 @@ function updateVisibleImages(images: GalleryImage[]): void {
   }
   updateShuffleButtonState();
   status.hidden = images.length > 0;
+  status.dataset.state = images.length > 0 ? "" : "empty";
   status.textContent = images.length === 0
     ? t(allImages.length === 0 ? "noImages" : "noMatches")
     : "";
@@ -1803,6 +1809,7 @@ function updateVisibleImages(images: GalleryImage[]): void {
 async function loadGallery(): Promise<void> {
   galleryLoadState = "loading";
   status.hidden = false;
+  status.dataset.state = "busy";
   status.textContent = t("loadingGallery");
   try {
     const imagesUrl = new URL("api/images", document.baseURI);
@@ -1835,6 +1842,7 @@ function showGalleryLoadError(message: string): void {
   advancedButton.disabled = true;
   imageCount.textContent = "";
   status.hidden = false;
+  status.dataset.state = "error";
   status.textContent = nameLanguage === "ja" ? t("loadFailed") : galleryErrorMessage;
 }
 

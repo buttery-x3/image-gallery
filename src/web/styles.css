@@ -713,10 +713,21 @@ main { flex: 1 0 auto; }
 .secondary-button:disabled, .primary-button:disabled, .danger-button:disabled { cursor: wait; opacity: 0.62; }
 
 .status {
+  position: fixed;
+  top: max(5.5rem, calc(env(safe-area-inset-top) + 3.5rem));
+  left: 50%;
+  z-index: 100;
   width: min(34rem, calc(100% - 32px));
-  margin: 16vh auto 0;
-  color: #9da0a6;
+  margin: 0;
+  padding: 12px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--control-radius);
+  background: var(--surface-raised);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
+  color: var(--text);
   text-align: center;
+  pointer-events: none;
+  transform: translateX(-50%);
 }
 
 .status[hidden] { display: none; }

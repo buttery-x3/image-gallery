@@ -17,6 +17,7 @@
     "rename-existing": "node process-gallery-batch.mjs --rename-existing",
     "backfill-name-metadata": "node process-gallery-batch.mjs --backfill-name-metadata",
     "remove-image": "node remove-gallery-image.mjs",
+    "clear-untagged": "node clear-untagged-images.mjs",
     "scan-for-duplicates": "node scan-for-duplicates.mjs",
     "start": "node dist/server/server/server.js"
   },
