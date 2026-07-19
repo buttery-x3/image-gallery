@@ -234,6 +234,8 @@ let nameLanguage = loadNameLanguage();
 let { nameVisible: overlayNameVisible, namePosition: overlayNamePosition } = loadOverlayPreferences();
 let galleryLoadState: "loading" | "ready" | "error" = "loading";
 let galleryErrorMessage: string = uiCopy.en.loadFailed;
+let galleryDetailsReady = !(galleryConfig.searchMetadata || galleryConfig.showNames);
+let galleryDetailsPromise: Promise<void> | undefined;
 
 const maximumConcurrentImageLoads = 4;
 const lazyLoadMargin = 150;
@@ -1222,9 +1224,16 @@ async function applyFiltersWithBusy(dialog?: HTMLDialogElement): Promise<void> {
 
 statusClose.addEventListener("click", closeStatusModal);
 
-advancedButton.addEventListener("click", () => {
+advancedButton.addEventListener("click", async () => {
   syncFilterControls();
   filterDialog.showModal();
+  if (!galleryDetailsReady && galleryDetailsPromise) {
+    showStatusModal(loadingMessage(), "busy");
+    await galleryDetailsPromise;
+    closeStatusModal();
+    renderFilterControls();
+    syncFilterControls();
+  }
 });
 filterClose.addEventListener("click", () => filterDialog.close());
 filterReset.addEventListener("click", () => {
@@ -1320,14 +1329,14 @@ function refreshImageQueue(): void {
   queueRefreshFrame = undefined;
   for (let index = pendingTiles.length - 1; index >= 0; index -= 1) {
     const tile = pendingTiles[index]!;
-    if (!tile.isConnected || tile.dataset.loadState !== "queued") {
+    if (!tile.isConnected || tile.dataset.loadState !== "queued" || loadPriority(tile) > 0) {
       pendingTiles.splice(index, 1);
+      if (tile.dataset.loadState === "queued") delete tile.dataset.loadState;
     }
   }
 
-  for (const image of allImages) {
-    const tile = tilesByImage.get(image);
-    if (tile) queueImage(tile);
+  for (const tile of tilesByImage.values()) {
+    if (!tile.hidden && loadPriority(tile) === 0) queueImage(tile);
   }
 
   pendingTiles.sort((left, right) => {
@@ -1924,7 +1933,7 @@ function initializeTiles(): void {
       if (nextIndex === batchSize) {
         reorderTiles();
         applyFilters();
-        showStatusModal(loadingMessage(), "busy");
+        closeStatusModal();
       }
       tileBuildFrame = window.requestAnimationFrame(buildBatch);
       return;
@@ -1967,10 +1976,9 @@ function updateVisibleImages(images: GalleryImage[]): void {
 
 async function loadGallery(): Promise<void> {
   galleryLoadState = "loading";
-  closeStatusModal();
+  showStatusModal(loadingMessage(), "busy");
   try {
     const imagesUrl = new URL("api/images", document.baseURI);
-    if (galleryConfig.searchMetadata || galleryConfig.showNames) imagesUrl.searchParams.set("details", "1");
     const response = await fetch(imagesUrl, { cache: "no-store" });
     const payload = (await response.json()) as GalleryResponse | ErrorResponse;
     if (!response.ok || !("images" in payload)) {
@@ -1982,8 +1990,31 @@ async function loadGallery(): Promise<void> {
     activeFilters.clear();
     renderFilterControls();
     initializeTiles();
+    if (galleryConfig.searchMetadata || galleryConfig.showNames) {
+      galleryDetailsPromise = loadGalleryDetails();
+    }
   } catch (error) {
     showGalleryLoadError(error instanceof Error ? error.message : uiCopy.en.loadFailed);
+  }
+}
+
+async function loadGalleryDetails(): Promise<void> {
+  try {
+    const imagesUrl = new URL("api/images", document.baseURI);
+    imagesUrl.searchParams.set("details", "1");
+    const response = await fetch(imagesUrl, { cache: "no-store" });
+    const payload = await response.json() as GalleryResponse | ErrorResponse;
+    if (!response.ok || !("images" in payload)) return;
+    const detailsByPath = new Map(payload.images.map((image) => [image.path, image]));
+    for (const image of allImages) {
+      const details = detailsByPath.get(image.path);
+      if (details) Object.assign(image, details);
+    }
+    syncNameLanguageDisplay();
+  } catch (error) {
+    console.warn("Could not load gallery metadata in the background:", error);
+  } finally {
+    galleryDetailsReady = true;
   }
 }
 
