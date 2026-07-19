@@ -1367,7 +1367,8 @@ body.lightbox-open, body.slideshow-open { overflow: hidden; }
   margin: auto;
   padding: 0;
   border: 0;
-  border-radius: 14px;
+  /* This dialog clips its panel, so its radius must change with the selected style too. */
+  border-radius: var(--panel-radius);
   background: transparent;
   color: var(--text);
   overflow: hidden;
