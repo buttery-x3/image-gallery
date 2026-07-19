@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import express from "express";
@@ -18,8 +19,14 @@ app.disable("x-powered-by");
 app.set("trust proxy", "loopback");
 
 const galleryCacheTtlMs = 10_000;
-const galleryCache = new Map<string, { images: GalleryResponse["images"]; expiresAt: number }>();
-const galleryReadsInFlight = new Map<string, Promise<GalleryResponse["images"]>>();
+type GalleryCacheEntry = {
+  images: GalleryResponse["images"];
+  body: string;
+  etag: string;
+  expiresAt: number;
+};
+const galleryCache = new Map<string, GalleryCacheEntry>();
+const galleryReadsInFlight = new Map<string, Promise<GalleryCacheEntry>>();
 
 try {
   fs.watch(config.galleryDir, { recursive: true }, () => galleryCache.clear());
@@ -31,10 +38,10 @@ function galleryCacheKey(includeDetails: boolean, includePreviewStatus: boolean)
   return `${includeDetails ? "details" : "compact"}:${includePreviewStatus ? "preview-status" : "no-preview-status"}`;
 }
 
-async function readCachedGalleryImages(includeDetails: boolean, includePreviewStatus: boolean): Promise<GalleryResponse["images"]> {
+async function readCachedGalleryImages(includeDetails: boolean, includePreviewStatus: boolean): Promise<GalleryCacheEntry> {
   const key = galleryCacheKey(includeDetails, includePreviewStatus);
   const cached = galleryCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.images;
+  if (cached && cached.expiresAt > Date.now()) return cached;
 
   const existingRead = galleryReadsInFlight.get(key);
   if (existingRead) return existingRead;
@@ -44,8 +51,15 @@ async function readCachedGalleryImages(includeDetails: boolean, includePreviewSt
     includePreviewStatus,
     previewCacheDir: config.previewCacheDir,
   }).then((images) => {
-    galleryCache.set(key, { images, expiresAt: Date.now() + galleryCacheTtlMs });
-    return images;
+    const body = JSON.stringify({ images } satisfies GalleryResponse);
+    const entry: GalleryCacheEntry = {
+      images,
+      body,
+      etag: `W/"${createHash("sha256").update(body).digest("base64url")}"`,
+      expiresAt: Date.now() + galleryCacheTtlMs,
+    };
+    galleryCache.set(key, entry);
+    return entry;
   }).finally(() => {
     galleryReadsInFlight.delete(key);
   });
@@ -135,15 +149,18 @@ app.post("/api/reports", express.json({ limit: "4kb", type: "application/json" }
 });
 
 app.get("/api/images", async (request, response) => {
-  response.setHeader("Cache-Control", "no-store");
   try {
     const includePreviewStatus = request.query.includePreviewStatus === "1";
     const includeDetails = request.query.details === "1";
-    const payload: GalleryResponse = {
-      images: await readCachedGalleryImages(includeDetails, includePreviewStatus),
-    };
-    response.json(payload);
+    const cached = await readCachedGalleryImages(includeDetails, includePreviewStatus);
+    response.setHeader("Cache-Control", "private, max-age=0, must-revalidate");
+    response.setHeader("ETag", cached.etag);
+    if (request.get("if-none-match")?.split(",").some((value) => value.trim() === cached.etag)) {
+      return void response.status(304).end();
+    }
+    response.type("application/json").send(cached.body);
   } catch (error) {
+    response.setHeader("Cache-Control", "no-store");
     const payload: ErrorResponse = {
       error: error instanceof GalleryDirectoryError ? error.message : "The gallery could not be loaded.",
     };

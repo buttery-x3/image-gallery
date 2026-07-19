@@ -1979,7 +1979,7 @@ async function loadGallery(): Promise<void> {
   showStatusModal(loadingMessage(), "busy");
   try {
     const imagesUrl = new URL("api/images", document.baseURI);
-    const response = await fetch(imagesUrl, { cache: "no-store" });
+    const response = await fetch(imagesUrl);
     const payload = (await response.json()) as GalleryResponse | ErrorResponse;
     if (!response.ok || !("images" in payload)) {
       showGalleryLoadError("error" in payload ? payload.error : uiCopy.en.loadFailed);
@@ -2002,7 +2002,7 @@ async function loadGalleryDetails(): Promise<void> {
   try {
     const imagesUrl = new URL("api/images", document.baseURI);
     imagesUrl.searchParams.set("details", "1");
-    const response = await fetch(imagesUrl, { cache: "no-store" });
+    const response = await fetch(imagesUrl);
     const payload = await response.json() as GalleryResponse | ErrorResponse;
     if (!response.ok || !("images" in payload)) return;
     const detailsByPath = new Map(payload.images.map((image) => [image.path, image]));
