@@ -150,6 +150,9 @@
             <span id="lightbox-watermark" class="lightbox-watermark" aria-hidden="true"></span>
           </div>
           <div class="lightbox-actions">
+            <button id="lightbox-info" class="lightbox-action" type="button">
+              <span>Info</span>
+            </button>
             <button id="lightbox-favorite" class="lightbox-action lightbox-favorite" type="button">
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="m12 2.75 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35-5.7-3-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.75Z" />
@@ -170,6 +173,19 @@
           </svg>
         </button>
       </div>
+    </dialog>
+    <dialog id="metadata-dialog" class="metadata-dialog" aria-labelledby="metadata-title">
+      <article class="metadata-panel">
+        <header class="metadata-header">
+          <div>
+            <p class="metadata-kicker">Image information</p>
+            <h2 id="metadata-title">Image metadata</h2>
+          </div>
+          <button id="metadata-close" class="secondary-button" type="button" aria-label="Close image information">Close</button>
+        </header>
+        <p id="metadata-status" class="metadata-status" role="status" aria-live="polite"></p>
+        <dl id="metadata-content" class="metadata-content"></dl>
+      </article>
     </dialog>
     <dialog id="slideshow-dialog" class="slideshow" aria-label="Slideshow" data-i18n-aria-label="slideshow">
       <div id="slideshow-media" class="slideshow-media">

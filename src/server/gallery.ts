@@ -1,6 +1,6 @@
 import { lstat, readdir } from "node:fs/promises";
 import path from "node:path";
-import type { GalleryImage, ImageKind } from "../shared/types.js";
+import type { GalleryImage, ImageDetailsResponse, ImageKind } from "../shared/types.js";
 import { readImageMetadata, readImageNameMetadata } from "./metadata.js";
 import { imagePreviewIsCached } from "./previews.js";
 
@@ -169,4 +169,31 @@ export async function resolveSafeMediaPath(root: string, requestedPath: string):
 
   const stats = await lstat(currentPath);
   return stats.isFile() ? currentPath : undefined;
+}
+
+export async function readGalleryImageDetails(root: string, requestedPath: string): Promise<ImageDetailsResponse | undefined> {
+  const imagePath = await resolveSafeMediaPath(root, requestedPath);
+  if (!imagePath) return undefined;
+
+  const stem = imagePath.slice(0, -path.extname(imagePath).length);
+  let metadata;
+  let shortName;
+  try {
+    metadata = await readImageMetadata(`${stem}.json`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn(`Ignoring invalid metadata for ${requestedPath}:`, error);
+    }
+  }
+  try {
+    shortName = await readImageNameMetadata(`${stem}${nameMetadataSuffix}`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn(`Ignoring invalid generated-name metadata for ${requestedPath}:`, error);
+    }
+  }
+  return {
+    ...(metadata ? { metadata } : {}),
+    ...(shortName ? { shortName } : {}),
+  };
 }

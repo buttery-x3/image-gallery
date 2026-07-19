@@ -3,6 +3,7 @@ import type {
   ErrorResponse,
   GalleryImage,
   GalleryResponse,
+  ImageDetailsResponse,
 } from "../shared/types.js";
 
 function requiredElement<T extends Element>(selector: string): T {
@@ -58,6 +59,7 @@ const lightboxWatermark = requiredElement<HTMLElement>("#lightbox-watermark");
 const lightboxShortNameEn = requiredElement<HTMLElement>("#lightbox-short-name-en");
 const lightboxShortNameJa = requiredElement<HTMLElement>("#lightbox-short-name-ja");
 const lightboxFavorite = requiredElement<HTMLButtonElement>("#lightbox-favorite");
+const lightboxInfo = requiredElement<HTMLButtonElement>("#lightbox-info");
 const lightboxReport = requiredElement<HTMLButtonElement>("#lightbox-report");
 const lightboxToggleName = requiredElement<HTMLButtonElement>("#lightbox-toggle-name");
 const lightboxTextPosition = requiredElement<HTMLButtonElement>("#lightbox-text-position");
@@ -76,6 +78,11 @@ const slideshowShortNameJa = requiredElement<HTMLElement>("#slideshow-short-name
 const reportDialog = requiredElement<HTMLDialogElement>("#report-dialog");
 const reportNo = requiredElement<HTMLButtonElement>("#report-no");
 const reportYes = requiredElement<HTMLAnchorElement>("#report-yes");
+const metadataDialog = requiredElement<HTMLDialogElement>("#metadata-dialog");
+const metadataTitle = requiredElement<HTMLElement>("#metadata-title");
+const metadataClose = requiredElement<HTMLButtonElement>("#metadata-close");
+const metadataStatus = requiredElement<HTMLElement>("#metadata-status");
+const metadataContent = requiredElement<HTMLDListElement>("#metadata-content");
 const toast = requiredElement<HTMLElement>("#toast");
 
 lightboxReport.hidden = !galleryConfig.enableReporting;
@@ -90,6 +97,8 @@ let toastTimer: number | undefined;
 let activeOpener: HTMLButtonElement | undefined;
 let activeImageIndex = -1;
 let reportOpener: HTMLButtonElement | undefined;
+let metadataOpener: HTMLButtonElement | undefined;
+let metadataRequestToken = 0;
 let lightboxTouchStart: { identifier: number; x: number; y: number; startedAt: number } | undefined;
 let activeImageLoads = 0;
 let allImages: GalleryImage[] = [];
@@ -106,6 +115,7 @@ const activeFilters = new Map<string, string>();
 const imageSearchIndexes = new WeakMap<GalleryImage, string>();
 const tilesByImage = new Map<GalleryImage, HTMLElement>();
 const favoriteButtonsByImage = new Map<GalleryImage, HTMLButtonElement>();
+const imageDetailsByPath = new Map<string, Promise<ImageDetailsResponse>>();
 const favoritesStorageKey = "image-gallery:favorites:v1";
 const nameLanguageStorageKey = "image-gallery:name-language:v1";
 const overlayPreferencesStorageKey = "image-gallery:overlay-preferences:v1";
@@ -1451,6 +1461,10 @@ lightbox.addEventListener("close", () => {
   activeOpener?.focus({ preventScroll: true });
   activeOpener = undefined;
 });
+lightboxInfo.addEventListener("click", () => {
+  const image = galleryImages[activeImageIndex];
+  if (image) void openMetadataDialog(image, lightboxInfo);
+});
 
 function randomOverlayNamePosition(): OverlayNamePosition {
   return overlayNamePositions[Math.floor(Math.random() * overlayNamePositions.length)]!;
@@ -1561,6 +1575,85 @@ reportDialog.addEventListener("close", () => {
   reportOpener = undefined;
 });
 
+function metadataLabel(value: string): string {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function appendMetadataRow(label: string, value: string): void {
+  const term = document.createElement("dt");
+  term.textContent = label;
+  const description = document.createElement("dd");
+  description.textContent = value || "—";
+  metadataContent.append(term, description);
+}
+
+function renderImageMetadata(image: GalleryImage): void {
+  metadataTitle.textContent = displayNameFor(image);
+  metadataContent.replaceChildren();
+  appendMetadataRow("Filename", image.name);
+  appendMetadataRow("Path", image.path);
+  appendMetadataRow("File type", image.type);
+  appendMetadataRow("Batch", image.batch ?? "—");
+  appendMetadataRow("Last modified", new Date(image.modifiedAt).toLocaleString());
+  if (image.shortName) {
+    appendMetadataRow("English name", image.shortName.en);
+    appendMetadataRow("Japanese name", image.shortName.ja);
+  }
+
+  const metadata = image.metadata;
+  if (!metadata) {
+    metadataStatus.textContent = "No metadata sidecar is available for this image.";
+    return;
+  }
+  metadataStatus.textContent = "";
+  appendMetadataRow("Schema", metadata.schema);
+  appendMetadataRow("Resolved prompt", metadata.resolvedPrompt);
+  for (const [key, value] of Object.entries(metadata.tags)) appendMetadataRow(metadataLabel(key), value);
+  for (const [key, values] of Object.entries(metadata.searchTokens)) {
+    appendMetadataRow(`${metadataLabel(key)} search tokens`, values.join(", "));
+  }
+}
+
+async function loadImageDetails(image: GalleryImage): Promise<ImageDetailsResponse> {
+  let request = imageDetailsByPath.get(image.path);
+  if (!request) {
+    const url = new URL("api/image-details", document.baseURI);
+    url.searchParams.set("path", image.path);
+    request = fetch(url).then(async (response) => {
+      const payload = await response.json() as ImageDetailsResponse | ErrorResponse;
+      if (!response.ok || "error" in payload) throw new Error("error" in payload ? payload.error : "Image metadata could not be loaded.");
+      return payload;
+    });
+    imageDetailsByPath.set(image.path, request);
+  }
+  return request;
+}
+
+async function openMetadataDialog(image: GalleryImage, opener: HTMLButtonElement): Promise<void> {
+  metadataOpener = opener;
+  const token = ++metadataRequestToken;
+  metadataTitle.textContent = displayNameFor(image);
+  metadataStatus.textContent = "Loading image metadata…";
+  metadataContent.replaceChildren();
+  if (!metadataDialog.open) metadataDialog.showModal();
+  try {
+    Object.assign(image, await loadImageDetails(image));
+    if (token === metadataRequestToken) renderImageMetadata(image);
+  } catch (error) {
+    if (token === metadataRequestToken) metadataStatus.textContent = error instanceof Error ? error.message : "Image metadata could not be loaded.";
+  }
+}
+
+metadataClose.addEventListener("click", () => metadataDialog.close());
+metadataDialog.addEventListener("click", (event) => {
+  if (event.target === metadataDialog) metadataDialog.close();
+});
+metadataDialog.addEventListener("close", () => {
+  metadataRequestToken += 1;
+  metadataOpener?.focus({ preventScroll: true });
+  metadataOpener = undefined;
+});
+
 function createTile(image: GalleryImage): HTMLElement {
   const tile = document.createElement("article");
   tile.className = "gallery-item is-loading";
@@ -1623,8 +1716,15 @@ function createTile(image: GalleryImage): HTMLElement {
 
   actions.append(favoriteButton, imageCopyButton, linkCopyButton);
 
+  const infoButton = document.createElement("button");
+  infoButton.type = "button";
+  infoButton.className = "tile-action-button tile-info-button";
+  infoButton.title = "Image information";
+  infoButton.setAttribute("aria-label", `Show information for ${displayNameFor(image)}`);
+  infoButton.textContent = "i";
+
   openButton.append(element, shortName);
-  tile.append(openButton, actions);
+  tile.append(openButton, actions, infoButton);
   openButton.addEventListener("click", () => openLightbox(galleryImages.indexOf(image), openButton));
   if (galleryConfig.enableReporting) {
     const reportButton = document.createElement("button");
@@ -1640,6 +1740,7 @@ function createTile(image: GalleryImage): HTMLElement {
     reportButton.addEventListener("click", () => openReportDialog(image, reportButton));
   }
   favoriteButton.addEventListener("click", () => toggleFavorite(image));
+  infoButton.addEventListener("click", () => void openMetadataDialog(image, infoButton));
   imageCopyButton.addEventListener("click", async () => {
     const absoluteUrl = new URL(image.url, document.baseURI).href;
     imageCopyButton.disabled = true;

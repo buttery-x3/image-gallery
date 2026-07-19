@@ -32,6 +32,11 @@ export interface GalleryResponse {
   images: GalleryImage[];
 }
 
+export interface ImageDetailsResponse {
+  metadata?: GalleryMetadata;
+  shortName?: GalleryShortName;
+}
+
 export interface ImageReportRequest {
   imagePath: string;
   imageUrl: string;

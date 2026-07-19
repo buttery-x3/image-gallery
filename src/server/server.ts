@@ -4,7 +4,7 @@ import path from "node:path";
 import express from "express";
 import nodemailer from "nodemailer";
 import { config } from "./config.js";
-import { GalleryDirectoryError, imageKindFor, readGalleryImages, resolveSafeMediaPath } from "./gallery.js";
+import { GalleryDirectoryError, imageKindFor, readGalleryImageDetails, readGalleryImages, resolveSafeMediaPath } from "./gallery.js";
 import { imagePreviewPath } from "./previews.js";
 import type {
   ErrorResponse,
@@ -149,6 +149,14 @@ app.get("/api/images", async (request, response) => {
     };
     response.status(503).json(payload);
   }
+});
+
+app.get("/api/image-details", async (request, response) => {
+  response.setHeader("Cache-Control", "private, max-age=60");
+  const requestedPath = typeof request.query.path === "string" ? request.query.path : "";
+  const details = await readGalleryImageDetails(config.galleryDir, requestedPath);
+  if (!details) return void response.status(404).json({ error: "Image details were not found." } satisfies ErrorResponse);
+  response.json(details);
 });
 
 app.get(/^\/media\/(.+)$/, async (request, response, next) => {
