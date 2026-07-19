@@ -1006,7 +1006,11 @@ main { flex: 1 0 auto; }
   font-weight: 600;
   line-height: 1;
   opacity: 0.5;
-  pointer-events: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
   text-shadow: none;
 }
 
@@ -1215,7 +1219,11 @@ main { flex: 1 0 auto; }
   line-height: 1;
   mix-blend-mode: normal;
   opacity: 0.5;
-  pointer-events: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
   text-shadow: none;
 }
 

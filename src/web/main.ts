@@ -121,6 +121,7 @@ let slideshowIndex = -1;
 let slideshowActiveLayer = 0;
 let slideshowTimer: number | undefined;
 let slideshowLoadToken = 0;
+let slideshowRoutePending = window.location.pathname.split("/").filter(Boolean).pop() === "slideshow";
 const activeFilters = new Map<string, string>();
 const imageSearchIndexes = new WeakMap<GalleryImage, string>();
 const tilesByImage = new Map<GalleryImage, HTMLElement>();
@@ -687,6 +688,20 @@ function saveContentConsent(): void {
   } catch {
     // Consent still applies for the current page when storage is unavailable.
   }
+}
+
+function mainPageUrl(): URL {
+  const url = new URL(window.location.href);
+  const pathSegments = url.pathname.split("/").filter(Boolean);
+  if (pathSegments.at(-1) === "slideshow") pathSegments.pop();
+  url.pathname = pathSegments.length === 0 ? "/" : `/${pathSegments.join("/")}/`;
+  url.search = "";
+  url.hash = "";
+  return url;
+}
+
+function returnToMainPage(): void {
+  window.location.assign(mainPageUrl());
 }
 
 function openReportDialog(image: GalleryImage, opener: HTMLButtonElement): void {
@@ -1667,6 +1682,8 @@ function closeSlideshow(): void {
 }
 
 slideshowButton.addEventListener("click", openSlideshow);
+lightboxWatermark.addEventListener("click", returnToMainPage);
+slideshowWatermark.addEventListener("click", returnToMainPage);
 slideshowDialog.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   event.preventDefault();
@@ -2048,6 +2065,10 @@ function updateVisibleImages(images: GalleryImage[]): void {
       : `${images.length} of ${maximumImages} images`;
   }
   updateShuffleButtonState();
+  if (slideshowRoutePending && galleryImages.length >= 2) {
+    slideshowRoutePending = false;
+    openSlideshow();
+  }
   if (images.length === 0) {
     showStatusModal(t(allImages.length === 0 ? "noImages" : "noMatches"), "empty");
   } else if (status.dataset.state !== "busy") {
