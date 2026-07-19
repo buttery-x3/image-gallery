@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fs from "node:fs";
 import path from "node:path";
 import express from "express";
 import nodemailer from "nodemailer";
@@ -15,6 +16,42 @@ import type {
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", "loopback");
+
+const galleryCacheTtlMs = 10_000;
+const galleryCache = new Map<string, { images: GalleryResponse["images"]; expiresAt: number }>();
+const galleryReadsInFlight = new Map<string, Promise<GalleryResponse["images"]>>();
+
+try {
+  fs.watch(config.galleryDir, { recursive: true }, () => galleryCache.clear());
+} catch (error) {
+  console.warn("Gallery changes will be picked up after the index cache expires:", error);
+}
+
+function galleryCacheKey(includeDetails: boolean, includePreviewStatus: boolean): string {
+  return `${includeDetails ? "details" : "compact"}:${includePreviewStatus ? "preview-status" : "no-preview-status"}`;
+}
+
+async function readCachedGalleryImages(includeDetails: boolean, includePreviewStatus: boolean): Promise<GalleryResponse["images"]> {
+  const key = galleryCacheKey(includeDetails, includePreviewStatus);
+  const cached = galleryCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.images;
+
+  const existingRead = galleryReadsInFlight.get(key);
+  if (existingRead) return existingRead;
+
+  const read = readGalleryImages(config.galleryDir, {
+    includeDetails,
+    includePreviewStatus,
+    previewCacheDir: config.previewCacheDir,
+  }).then((images) => {
+    galleryCache.set(key, { images, expiresAt: Date.now() + galleryCacheTtlMs });
+    return images;
+  }).finally(() => {
+    galleryReadsInFlight.delete(key);
+  });
+  galleryReadsInFlight.set(key, read);
+  return read;
+}
 
 const reportTransport = config.reportSmtp ? nodemailer.createTransport(config.reportSmtp) : undefined;
 
@@ -97,11 +134,9 @@ app.get("/api/images", async (request, response) => {
   response.setHeader("Cache-Control", "no-store");
   try {
     const includePreviewStatus = request.query.includePreviewStatus === "1";
+    const includeDetails = request.query.details === "1";
     const payload: GalleryResponse = {
-      images: await readGalleryImages(config.galleryDir, {
-        includePreviewStatus,
-        previewCacheDir: config.previewCacheDir,
-      }),
+      images: await readCachedGalleryImages(includeDetails, includePreviewStatus),
     };
     response.json(payload);
   } catch (error) {
@@ -175,4 +210,7 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
 app.listen(config.port, config.host, () => {
   console.log(`Image Gallery listening at http://${config.host}:${config.port}`);
   console.log(`Serving media from ${config.galleryDir}`);
+  void readCachedGalleryImages(false, false).catch((error) => {
+    console.error("Could not warm the gallery index:", error);
+  });
 });

@@ -29,9 +29,11 @@ function toUrlPath(relativePath: string): string {
 interface GalleryReadOptions {
   includePreviewStatus?: boolean;
   previewCacheDir?: string;
+  includeDetails?: boolean;
 }
 
 export async function readGalleryImages(root: string, options: GalleryReadOptions = {}): Promise<GalleryImage[]> {
+  const includeDetails = options.includeDetails !== false;
   let rootStats;
   try {
     rootStats = await lstat(root);
@@ -83,22 +85,25 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
         ? `previews/${toUrlPath(relativePath)}?v=${Math.trunc(stats.mtimeMs)}-${stats.size}`
         : undefined;
       let metadata;
-      const metadataPath = metadataFiles.get(path.basename(entry.name, path.extname(entry.name)));
-      if (metadataPath) {
-        try {
-          metadata = await readImageMetadata(metadataPath);
-        } catch (error) {
-          console.warn(`Ignoring invalid metadata for ${relativePath}:`, error);
-        }
-      }
       let shortName;
-      const nameMetadataPath = nameMetadataFiles.get(path.basename(entry.name, path.extname(entry.name)));
-      if (nameMetadataPath) {
-        try {
-          shortName = await readImageNameMetadata(nameMetadataPath);
-          if (!shortName) console.warn(`Ignoring unsupported generated-name metadata for ${relativePath}.`);
-        } catch (error) {
-          console.warn(`Ignoring invalid generated-name metadata for ${relativePath}:`, error);
+      if (includeDetails) {
+        const metadataPath = metadataFiles.get(path.basename(entry.name, path.extname(entry.name)));
+        if (metadataPath) {
+          try {
+            metadata = await readImageMetadata(metadataPath);
+          } catch (error) {
+            console.warn(`Ignoring invalid metadata for ${relativePath}:`, error);
+          }
+        }
+
+        const nameMetadataPath = nameMetadataFiles.get(path.basename(entry.name, path.extname(entry.name)));
+        if (nameMetadataPath) {
+          try {
+            shortName = await readImageNameMetadata(nameMetadataPath);
+            if (!shortName) console.warn(`Ignoring unsupported generated-name metadata for ${relativePath}.`);
+          } catch (error) {
+            console.warn(`Ignoring invalid generated-name metadata for ${relativePath}:`, error);
+          }
         }
       }
 

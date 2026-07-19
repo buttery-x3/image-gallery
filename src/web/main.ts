@@ -216,6 +216,8 @@ const pendingTiles: HTMLElement[] = [];
 let queueRefreshFrame: number | undefined;
 let headerLayoutFrame: number | undefined;
 let oneRowControlsTrackWidth = 0;
+let tileBuildFrame: number | undefined;
+let tileBuildToken = 0;
 
 function pixelValue(value: string): number {
   return Number.parseFloat(value) || 0;
@@ -1725,6 +1727,12 @@ function reorderTiles(): void {
 }
 
 function initializeTiles(): void {
+  tileBuildToken += 1;
+  const buildToken = tileBuildToken;
+  if (tileBuildFrame !== undefined) {
+    window.cancelAnimationFrame(tileBuildFrame);
+    tileBuildFrame = undefined;
+  }
   cancelQueueRefresh();
   tilesByImage.clear();
   favoriteButtonsByImage.clear();
@@ -1732,11 +1740,37 @@ function initializeTiles(): void {
   lazyImageObserver.disconnect();
   pendingTiles.length = 0;
   activeImageLoads = 0;
-  for (const image of allImages) {
-    const tile = createTile(image);
-    tilesByImage.set(image, tile);
-  }
-  reorderTiles();
+  let nextIndex = 0;
+  const buildBatch = (): void => {
+    tileBuildFrame = undefined;
+    if (buildToken !== tileBuildToken) return;
+
+    const batchSize = nextIndex === 0
+      ? Math.max(24, Math.ceil((window.innerWidth / 300) * (window.innerHeight / 240)) * 2)
+      : 96;
+    const fragment = document.createDocumentFragment();
+    const endIndex = Math.min(allImages.length, nextIndex + batchSize);
+    for (; nextIndex < endIndex; nextIndex += 1) {
+      const image = allImages[nextIndex]!;
+      const tile = createTile(image);
+      tilesByImage.set(image, tile);
+      fragment.append(tile);
+    }
+    gallery.append(fragment);
+
+    if (nextIndex === endIndex && nextIndex < allImages.length) {
+      if (nextIndex === batchSize) {
+        reorderTiles();
+        applyFilters();
+      }
+      tileBuildFrame = window.requestAnimationFrame(buildBatch);
+      return;
+    }
+
+    reorderTiles();
+    applyFilters();
+  };
+  buildBatch();
 }
 
 function updateVisibleImages(images: GalleryImage[]): void {
@@ -1771,7 +1805,9 @@ async function loadGallery(): Promise<void> {
   status.hidden = false;
   status.textContent = t("loadingGallery");
   try {
-    const response = await fetch(new URL("api/images", document.baseURI), { cache: "no-store" });
+    const imagesUrl = new URL("api/images", document.baseURI);
+    if (galleryConfig.searchMetadata || galleryConfig.showNames) imagesUrl.searchParams.set("details", "1");
+    const response = await fetch(imagesUrl, { cache: "no-store" });
     const payload = (await response.json()) as GalleryResponse | ErrorResponse;
     if (!response.ok || !("images" in payload)) {
       showGalleryLoadError("error" in payload ? payload.error : uiCopy.en.loadFailed);
@@ -1782,7 +1818,6 @@ async function loadGallery(): Promise<void> {
     activeFilters.clear();
     renderFilterControls();
     initializeTiles();
-    applyFilters();
   } catch (error) {
     showGalleryLoadError(error instanceof Error ? error.message : uiCopy.en.loadFailed);
   }
