@@ -78,6 +78,7 @@ const slideshowImages = [
 const slideshowNameOverlay = requiredElement<HTMLElement>("#slideshow-name-overlay");
 const slideshowShortNameEn = requiredElement<HTMLElement>("#slideshow-short-name-en");
 const slideshowShortNameJa = requiredElement<HTMLElement>("#slideshow-short-name-ja");
+const slideshowWatermark = requiredElement<HTMLElement>("#slideshow-watermark");
 const reportDialog = requiredElement<HTMLDialogElement>("#report-dialog");
 const reportNo = requiredElement<HTMLButtonElement>("#report-no");
 const reportYes = requiredElement<HTMLAnchorElement>("#report-yes");
@@ -95,6 +96,9 @@ lightboxTextPosition.hidden = !galleryConfig.showNames;
 lightboxWatermark.hidden = !galleryConfig.showWatermark;
 lightboxWatermark.textContent = galleryConfig.watermarkText;
 lightboxMedia.dataset.watermarkPosition = galleryConfig.watermarkPosition;
+slideshowWatermark.hidden = !galleryConfig.showWatermark;
+slideshowWatermark.textContent = galleryConfig.watermarkText;
+slideshowMedia.dataset.watermarkPosition = galleryConfig.watermarkPosition;
 
 let toastTimer: number | undefined;
 let activeOpener: HTMLButtonElement | undefined;
@@ -1551,7 +1555,11 @@ function advanceSlideshow(): void {
     nextElement.classList.add("is-active");
     slideshowActiveLayer = nextLayer;
     slideshowCurrentImage = nextImage;
-    slideshowMedia.dataset.namePosition = randomOverlayNamePosition();
+    const namePosition = randomOverlayNamePosition();
+    slideshowMedia.dataset.namePosition = namePosition;
+    slideshowMedia.dataset.watermarkPosition = galleryConfig.showNames
+      ? oppositeOverlayPosition(namePosition)
+      : galleryConfig.watermarkPosition;
     syncSlideshowName(nextImage);
     scheduleSlideshowAdvance();
   };
