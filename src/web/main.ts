@@ -1636,7 +1636,8 @@ async function loadGallery(): Promise<void> {
     const response = await fetch(new URL("api/images", document.baseURI), { cache: "no-store" });
     const payload = (await response.json()) as GalleryResponse | ErrorResponse;
     if (!response.ok || !("images" in payload)) {
-      throw new Error("error" in payload ? payload.error : "The gallery could not be loaded.");
+      showGalleryLoadError("error" in payload ? payload.error : uiCopy.en.loadFailed);
+      return;
     }
     allImages = shuffledImages(payload.images);
     galleryLoadState = "ready";
@@ -1645,18 +1646,22 @@ async function loadGallery(): Promise<void> {
     initializeTiles();
     applyFilters();
   } catch (error) {
-    galleryLoadState = "error";
-    galleryErrorMessage = error instanceof Error ? error.message : uiCopy.en.loadFailed;
-    allImages = [];
-    galleryImages = [];
-    gallery.replaceChildren();
-    syncSupportButtonPlacement();
-    shuffleButton.disabled = true;
-    advancedButton.disabled = true;
-    imageCount.textContent = "";
-    status.hidden = false;
-    status.textContent = nameLanguage === "ja" ? t("loadFailed") : galleryErrorMessage;
+    showGalleryLoadError(error instanceof Error ? error.message : uiCopy.en.loadFailed);
   }
+}
+
+function showGalleryLoadError(message: string): void {
+  galleryLoadState = "error";
+  galleryErrorMessage = message;
+  allImages = [];
+  galleryImages = [];
+  gallery.replaceChildren();
+  syncSupportButtonPlacement();
+  shuffleButton.disabled = true;
+  advancedButton.disabled = true;
+  imageCount.textContent = "";
+  status.hidden = false;
+  status.textContent = nameLanguage === "ja" ? t("loadFailed") : galleryErrorMessage;
 }
 
 shuffleButton.addEventListener("click", shuffleGallery);

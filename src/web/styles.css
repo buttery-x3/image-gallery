@@ -28,7 +28,7 @@
   --lightbox-control-hover: rgba(40, 43, 35, 0.98);
   --lightbox-line: rgba(255, 255, 255, 0.24);
   --lightbox-text: #fff;
-  font-family: var(--font-ui);
+  font-family: var(--font-ui), sans-serif;
   background: var(--page);
   color: var(--text);
   font-synthesis: none;
@@ -1207,7 +1207,7 @@ body.lightbox-open { overflow: hidden; }
 
 .site-header h1 {
   color: var(--text);
-  font-family: var(--font-display);
+  font-family: var(--font-display), sans-serif;
   text-transform: none;
 }
 
