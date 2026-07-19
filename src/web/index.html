@@ -127,7 +127,7 @@
         </div>
       </form>
     </dialog>
-    <dialog id="lightbox" class="lightbox" aria-labelledby="lightbox-name">
+    <dialog id="lightbox" class="lightbox" aria-label="Image preview">
       <button id="lightbox-close" class="lightbox-close" type="button" aria-label="Close preview" data-i18n-aria-label="closePreview">
         <span aria-hidden="true">×</span>
       </button>
@@ -139,17 +139,17 @@
         </button>
         <div class="lightbox-content">
           <div class="lightbox-heading">
-            <p id="lightbox-name" class="lightbox-name"></p>
+            <button id="lightbox-name" class="lightbox-name" type="button" aria-label="Return to image in gallery"></button>
             <button id="lightbox-report" class="report-button lightbox-report" type="button" aria-label="Report image" title="Report image">
               <span aria-hidden="true">!</span>
             </button>
           </div>
           <div id="lightbox-media" class="lightbox-media">
             <img id="lightbox-image" class="lightbox-image" alt="" />
-            <div id="lightbox-name-overlay" class="lightbox-name-overlay" aria-hidden="true" hidden>
+            <button id="lightbox-name-overlay" class="lightbox-name-overlay" type="button" aria-label="Return to image in gallery" hidden>
               <span id="lightbox-short-name-en" class="lightbox-short-name-en"></span>
               <span id="lightbox-short-name-ja" class="lightbox-short-name-ja" lang="ja"></span>
-            </div>
+            </button>
             <button id="lightbox-watermark" class="lightbox-watermark" type="button" aria-label="Back to gallery"></button>
           </div>
           <div class="lightbox-actions">
@@ -194,10 +194,10 @@
       <div id="slideshow-media" class="slideshow-media">
         <img id="slideshow-image-a" class="slideshow-image" alt="" />
         <img id="slideshow-image-b" class="slideshow-image" alt="" />
-        <div id="slideshow-name-overlay" class="slideshow-name-overlay" aria-hidden="true" hidden>
+        <button id="slideshow-name-overlay" class="slideshow-name-overlay" type="button" aria-label="Return to image in gallery" hidden>
           <span id="slideshow-short-name-en" class="slideshow-short-name-en"></span>
           <span id="slideshow-short-name-ja" class="slideshow-short-name-ja" lang="ja"></span>
-        </div>
+        </button>
         <button id="slideshow-watermark" class="slideshow-watermark" type="button" aria-label="Back to gallery"></button>
       </div>
     </dialog>

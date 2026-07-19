@@ -704,6 +704,12 @@ function returnToMainPage(): void {
   window.location.assign(mainPageUrl());
 }
 
+function scrollImageToFirstRow(image?: GalleryImage): void {
+  const tile = image ? tilesByImage.get(image) : undefined;
+  if (!tile) return;
+  window.requestAnimationFrame(() => tile.scrollIntoView({ block: "start" }));
+}
+
 function openReportDialog(image: GalleryImage, opener: HTMLButtonElement): void {
   if (!galleryConfig.enableReporting) return;
   reportOpener = opener;
@@ -1466,6 +1472,7 @@ function showLightboxImage(index: number): void {
 
   activeImageIndex = index;
   const displayName = displayNameFor(image);
+  lightbox.setAttribute("aria-label", displayName);
   lightboxName.hidden = !galleryConfig.showNames;
   lightboxName.textContent = displayName;
   lightboxImage.src = new URL(image.url, document.baseURI).href;
@@ -1505,6 +1512,8 @@ function closeLightbox(): void {
 }
 
 lightboxClose.addEventListener("click", closeLightbox);
+lightboxName.addEventListener("click", closeLightbox);
+lightboxNameOverlay.addEventListener("click", closeLightbox);
 lightboxReport.addEventListener("click", () => {
   if (!galleryConfig.enableReporting) return;
   const image = galleryImages[activeImageIndex];
@@ -1583,6 +1592,7 @@ lightbox.addEventListener("click", (event) => {
   if (event.target === lightbox || event.target === lightboxStage) closeLightbox();
 });
 lightbox.addEventListener("close", () => {
+  const closedImage = galleryImages[activeImageIndex];
   document.body.classList.remove("lightbox-open");
   lightboxName.textContent = "";
   lightboxNameOverlay.hidden = true;
@@ -1593,6 +1603,7 @@ lightbox.addEventListener("close", () => {
   activeImageIndex = -1;
   activeOpener?.focus({ preventScroll: true });
   activeOpener = undefined;
+  scrollImageToFirstRow(closedImage);
 });
 lightboxInfo.addEventListener("click", () => {
   const image = galleryImages[activeImageIndex];
@@ -1684,6 +1695,15 @@ function closeSlideshow(): void {
 slideshowButton.addEventListener("click", openSlideshow);
 lightboxWatermark.addEventListener("click", returnToMainPage);
 slideshowWatermark.addEventListener("click", returnToMainPage);
+slideshowNameOverlay.addEventListener("click", () => {
+  const image = slideshowCurrentImage;
+  if (!image) return;
+  if (window.location.pathname.split("/").filter(Boolean).pop() === "slideshow") {
+    window.history.replaceState(null, "", mainPageUrl());
+  }
+  closeSlideshow();
+  scrollImageToFirstRow(image);
+});
 slideshowDialog.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   event.preventDefault();
