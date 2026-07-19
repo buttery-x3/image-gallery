@@ -16,6 +16,10 @@ const galleryConfig = {
   searchMetadata: document.documentElement.dataset.gallerySearchMetadata === "true",
   showLanguageToggle: document.documentElement.dataset.galleryLanguageToggle === "true",
   showNames: document.documentElement.dataset.galleryShowNames === "true",
+  enableReporting: document.documentElement.dataset.galleryEnableReporting === "true",
+  showWatermark: document.documentElement.dataset.galleryShowWatermark === "true",
+  watermarkText: document.documentElement.dataset.galleryWatermarkText ?? "",
+  watermarkPosition: document.documentElement.dataset.galleryWatermarkPosition ?? "bottom-right",
 };
 const siteHeader = requiredElement<HTMLElement>(".site-header");
 const headerTitle = requiredElement<HTMLElement>(".header-title");
@@ -50,6 +54,7 @@ const lightboxName = requiredElement<HTMLElement>("#lightbox-name");
 const lightboxMedia = requiredElement<HTMLElement>("#lightbox-media");
 const lightboxImage = requiredElement<HTMLImageElement>("#lightbox-image");
 const lightboxNameOverlay = requiredElement<HTMLElement>("#lightbox-name-overlay");
+const lightboxWatermark = requiredElement<HTMLElement>("#lightbox-watermark");
 const lightboxShortNameEn = requiredElement<HTMLElement>("#lightbox-short-name-en");
 const lightboxShortNameJa = requiredElement<HTMLElement>("#lightbox-short-name-ja");
 const lightboxFavorite = requiredElement<HTMLButtonElement>("#lightbox-favorite");
@@ -72,6 +77,14 @@ const reportDialog = requiredElement<HTMLDialogElement>("#report-dialog");
 const reportNo = requiredElement<HTMLButtonElement>("#report-no");
 const reportYes = requiredElement<HTMLAnchorElement>("#report-yes");
 const toast = requiredElement<HTMLElement>("#toast");
+
+lightboxReport.hidden = !galleryConfig.enableReporting;
+reportDialog.hidden = !galleryConfig.enableReporting;
+lightboxToggleName.hidden = !galleryConfig.showNames;
+lightboxTextPosition.hidden = !galleryConfig.showNames;
+lightboxWatermark.hidden = !galleryConfig.showWatermark;
+lightboxWatermark.textContent = galleryConfig.watermarkText;
+lightboxMedia.dataset.watermarkPosition = galleryConfig.watermarkPosition;
 
 let toastTimer: number | undefined;
 let activeOpener: HTMLButtonElement | undefined;
@@ -626,6 +639,7 @@ function saveContentConsent(): void {
 }
 
 function openReportDialog(image: GalleryImage, opener: HTMLButtonElement): void {
+  if (!galleryConfig.enableReporting) return;
   reportOpener = opener;
   const imageUrl = new URL(image.url, document.baseURI).href;
   const query = new URLSearchParams({
@@ -774,9 +788,22 @@ function nextOverlayNamePosition(): OverlayNamePosition {
   return overlayNamePositions[(currentIndex + 1) % overlayNamePositions.length]!;
 }
 
+function oppositeOverlayPosition(position: OverlayNamePosition): OverlayNamePosition {
+  const opposites: Record<OverlayNamePosition, OverlayNamePosition> = {
+    "top-left": "bottom-right",
+    "top-right": "bottom-left",
+    "bottom-left": "top-right",
+    "bottom-right": "top-left",
+  };
+  return opposites[position];
+}
+
 function syncLightboxOverlayState(image?: GalleryImage): void {
   const hasShortName = Boolean(image?.shortName);
   lightboxMedia.dataset.namePosition = overlayNamePosition;
+  lightboxMedia.dataset.watermarkPosition = galleryConfig.showNames
+    ? oppositeOverlayPosition(overlayNamePosition)
+    : galleryConfig.watermarkPosition;
   lightboxNameOverlay.hidden = !galleryConfig.showNames || !hasShortName || !overlayNameVisible;
   lightboxToggleName.disabled = !galleryConfig.showNames || !hasShortName;
   lightboxToggleName.setAttribute("aria-pressed", String(overlayNameVisible));
@@ -1336,6 +1363,7 @@ function closeLightbox(): void {
 
 lightboxClose.addEventListener("click", closeLightbox);
 lightboxReport.addEventListener("click", () => {
+  if (!galleryConfig.enableReporting) return;
   const image = galleryImages[activeImageIndex];
   if (image) openReportDialog(image, lightboxReport);
 });
@@ -1595,20 +1623,22 @@ function createTile(image: GalleryImage): HTMLElement {
 
   actions.append(favoriteButton, imageCopyButton, linkCopyButton);
 
-  const reportButton = document.createElement("button");
-  reportButton.type = "button";
-  reportButton.className = "report-button tile-report-button";
-  reportButton.title = t("reportImage");
-  reportButton.setAttribute("aria-label", reportImageLabel(displayNameFor(image)));
-  const reportSymbol = document.createElement("span");
-  reportSymbol.setAttribute("aria-hidden", "true");
-  reportSymbol.textContent = "!";
-  reportButton.append(reportSymbol);
-
   openButton.append(element, shortName);
-  tile.append(openButton, actions, reportButton);
+  tile.append(openButton, actions);
   openButton.addEventListener("click", () => openLightbox(galleryImages.indexOf(image), openButton));
-  reportButton.addEventListener("click", () => openReportDialog(image, reportButton));
+  if (galleryConfig.enableReporting) {
+    const reportButton = document.createElement("button");
+    reportButton.type = "button";
+    reportButton.className = "report-button tile-report-button";
+    reportButton.title = t("reportImage");
+    reportButton.setAttribute("aria-label", reportImageLabel(displayNameFor(image)));
+    const reportSymbol = document.createElement("span");
+    reportSymbol.setAttribute("aria-hidden", "true");
+    reportSymbol.textContent = "!";
+    reportButton.append(reportSymbol);
+    tile.append(reportButton);
+    reportButton.addEventListener("click", () => openReportDialog(image, reportButton));
+  }
   favoriteButton.addEventListener("click", () => toggleFavorite(image));
   imageCopyButton.addEventListener("click", async () => {
     const absoluteUrl = new URL(image.url, document.baseURI).href;

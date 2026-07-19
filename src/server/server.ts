@@ -69,6 +69,10 @@ app.get("/healthz", (_request, response) => response.type("text/plain").send("ok
 app.post("/api/reports", express.json({ limit: "4kb", type: "application/json" }), async (request, response) => {
   response.setHeader("Cache-Control", "no-store");
 
+  if (!config.reportingEnabled) {
+    return void response.status(404).json({ error: "Image reporting is disabled." } satisfies ErrorResponse);
+  }
+
   const requestHost = request.get("host");
   const requestOrigin = requestHost ? `${request.protocol}://${requestHost}` : undefined;
   if (!requestOrigin || request.get("origin") !== requestOrigin) {

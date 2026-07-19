@@ -678,6 +678,7 @@ main { flex: 1 0 auto; }
 .primary-button:focus-visible,
 .danger-button:focus-visible,
 .report-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.report-button[hidden], .lightbox-action[hidden], .report-dialog[hidden] { display: none; }
 
 .filter-actions {
   display: flex;
@@ -1179,27 +1180,30 @@ main { flex: 1 0 auto; }
   opacity: 0.5;
   pointer-events: none;
   text-shadow: none;
-  text-transform: lowercase;
 }
 
-.lightbox-media[data-name-position="top-left"] .lightbox-watermark {
-  right: clamp(10px, 2vw, 24px);
-  bottom: clamp(10px, 2vw, 24px);
+.lightbox-watermark[hidden] {
+  display: none;
 }
 
-.lightbox-media[data-name-position="bottom-left"] .lightbox-watermark {
-  top: clamp(10px, 2vw, 24px);
-  right: clamp(10px, 2vw, 24px);
-}
-
-.lightbox-media[data-name-position="bottom-right"] .lightbox-watermark {
+.lightbox-media[data-watermark-position="top-left"] .lightbox-watermark {
   top: clamp(10px, 2vw, 24px);
   left: clamp(10px, 2vw, 24px);
 }
 
-.lightbox-media[data-name-position="top-right"] .lightbox-watermark {
+.lightbox-media[data-watermark-position="top-right"] .lightbox-watermark {
+  top: clamp(10px, 2vw, 24px);
+  right: clamp(10px, 2vw, 24px);
+}
+
+.lightbox-media[data-watermark-position="bottom-left"] .lightbox-watermark {
   bottom: clamp(10px, 2vw, 24px);
   left: clamp(10px, 2vw, 24px);
+}
+
+.lightbox-media[data-watermark-position="bottom-right"] .lightbox-watermark {
+  bottom: clamp(10px, 2vw, 24px);
+  right: clamp(10px, 2vw, 24px);
 }
 
 .lightbox-actions {

@@ -10,6 +10,10 @@ type GalleryConfig = {
   searchMetadata: boolean;
   showLanguageToggle: boolean;
   showNames: boolean;
+  enableReporting: boolean;
+  showWatermark: boolean;
+  watermarkText: string;
+  watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
 };
 
 function readGalleryConfig(): GalleryConfig {
@@ -26,14 +30,24 @@ function readGalleryConfig(): GalleryConfig {
   const record = parsed as Record<string, unknown>;
   const siteName = typeof record.siteName === "string" ? record.siteName.trim() : "";
   if (!siteName) throw new Error("gallery.config.json siteName must be a non-empty string.");
-  for (const key of ["searchMetadata", "showLanguageToggle", "showNames"] as const) {
+  for (const key of ["searchMetadata", "showLanguageToggle", "showNames", "enableReporting", "showWatermark"] as const) {
     if (typeof record[key] !== "boolean") throw new Error(`gallery.config.json ${key} must be true or false.`);
+  }
+  const watermarkText = typeof record.watermarkText === "string" ? record.watermarkText.trim() : "";
+  if (!watermarkText) throw new Error("gallery.config.json watermarkText must be a non-empty string.");
+  const watermarkPosition = record.watermarkPosition;
+  if (!(["top-left", "top-right", "bottom-left", "bottom-right"] as const).includes(watermarkPosition as never)) {
+    throw new Error("gallery.config.json watermarkPosition must be a corner name.");
   }
   return {
     siteName,
     searchMetadata: record.searchMetadata as boolean,
     showLanguageToggle: record.showLanguageToggle as boolean,
     showNames: record.showNames as boolean,
+    enableReporting: record.enableReporting as boolean,
+    showWatermark: record.showWatermark as boolean,
+    watermarkText,
+    watermarkPosition: watermarkPosition as GalleryConfig["watermarkPosition"],
   };
 }
 
@@ -95,6 +109,10 @@ function galleryHtml(title: string, description: string, siteUrl: URL | undefine
         .replace("__GALLERY_SEARCH_METADATA__", String(config.searchMetadata))
         .replace("__GALLERY_LANGUAGE_TOGGLE__", String(config.showLanguageToggle))
         .replace("__GALLERY_SHOW_NAMES__", String(config.showNames))
+        .replace("__GALLERY_ENABLE_REPORTING__", String(config.enableReporting))
+        .replace("__GALLERY_SHOW_WATERMARK__", String(config.showWatermark))
+        .replace("__GALLERY_WATERMARK_TEXT__", escapeHtml(config.watermarkText))
+        .replace("__GALLERY_WATERMARK_POSITION__", config.watermarkPosition)
         .replace("<!-- gallery-metadata -->", metadata.join("\n    "));
     },
   };

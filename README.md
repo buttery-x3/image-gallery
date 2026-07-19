@@ -32,6 +32,10 @@ Edit [`gallery.config.json`](gallery.config.json) before building or starting th
 | `searchMetadata` | `false` | When enabled, search also indexes cached JSON metadata and generated names; otherwise it searches filenames only |
 | `showLanguageToggle` | `false` | Show the EN / JP interface-language control |
 | `showNames` | `false` | Show image names in tiles and the lightbox |
+| `enableReporting` | `false` | Show controls for reporting an image as explicit content |
+| `showWatermark` | `true` | Show the watermark in the lightbox |
+| `watermarkText` | `waiaifu.lol` | Text shown in the lightbox watermark |
+| `watermarkPosition` | `bottom-right` | Watermark corner: `top-left`, `top-right`, `bottom-left`, or `bottom-right` |
 
 The file is intentionally conservative for a fresh clone: metadata search, the language toggle, and image names are disabled. These settings are build-time configuration, so rebuild after changing them. Runtime and deployment settings such as `GALLERY_DIR`, `PORT`, and SMTP credentials remain in `.env` or the service environment.
 

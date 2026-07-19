@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { createHash } from "node:crypto";
-import { constants as fileSystemConstants, createReadStream } from "node:fs";
+import { constants as fileSystemConstants, createReadStream, readFileSync } from "node:fs";
 import { access, copyFile, lstat, mkdir, readdir, readFile, rename, rm, rmdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { generateJapaneseFantasyName, generateShortNameForStem } from "./gallery-name-generator.mjs";
@@ -13,6 +13,17 @@ if (namingStyle && namingStyle !== "japanese-fantasy") {
   throw new Error(`Unsupported BATCH_NAME_STYLE: ${namingStyle}`);
 }
 const namingEnabled = namingStyle === "japanese-fantasy";
+function readShowNames() {
+  const configPath = path.resolve("gallery.config.json");
+  try {
+    const parsed = JSON.parse(readFileSync(configPath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+    return parsed.showNames === true;
+  } catch {
+    return false;
+  }
+}
+const nameMetadataEnabled = readShowNames();
 
 const argumentsToParse = process.argv.slice(2);
 const knownFlags = new Set(["--backfill-name-metadata", "--dry-run", "--rename-existing"]);
@@ -571,14 +582,16 @@ async function renameExistingBatches() {
         targetPath: path.join(record.directory, nameMetadataTargetName),
       });
     }
-    fileWrites.push({
-      targetPath: path.join(record.directory, nameMetadataTargetName),
-      contents: nameMetadataContents(generated.shortName),
-      replaceExisting: Boolean(record.nameMetadataName),
-    });
+    if (nameMetadataEnabled) {
+      fileWrites.push({
+        targetPath: path.join(record.directory, nameMetadataTargetName),
+        contents: nameMetadataContents(generated.shortName),
+        replaceExisting: Boolean(record.nameMetadataName),
+      });
+    }
     mappings.push(
-      `- ${sourceRelativePath} -> ${targetRelativePath}${metadataMapping} + ${nameMetadataTargetName} ` +
-      `(${generated.shortName.en} / ${generated.shortName.ja})`,
+      `- ${sourceRelativePath} -> ${targetRelativePath}${metadataMapping}` +
+      (nameMetadataEnabled ? ` + ${nameMetadataTargetName} (${generated.shortName.en} / ${generated.shortName.ja})` : ""),
     );
   }
 
@@ -602,6 +615,10 @@ async function renameExistingBatches() {
 }
 
 async function backfillGeneratedNameMetadata() {
+  if (!nameMetadataEnabled) {
+    console.log("Name metadata is disabled in gallery.config.json; no files were generated.");
+    return;
+  }
   const records = await collectBatchedImageRecords({ allowInvalidNameMetadata: true });
   const usedShortNames = new Set(records.flatMap((record) => record.shortName
     ? [record.shortName.en.toLocaleLowerCase("en-US")]
@@ -751,7 +768,7 @@ async function processIncomingBatch() {
         : ` + ${record.metadataName}`;
     }
     let nameMetadataMapping = "";
-    if (generated) {
+    if (generated && nameMetadataEnabled) {
       const nameMetadataTargetName = `${targetStem}${nameMetadataSuffix}`;
       fileWrites.push({
         targetPath: path.join(batchTarget.batchDirectory, nameMetadataTargetName),

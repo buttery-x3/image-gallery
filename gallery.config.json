@@ -2,5 +2,9 @@
   "siteName": "Image Gallery",
   "searchMetadata": false,
   "showLanguageToggle": false,
-  "showNames": false
+  "showNames": false,
+  "enableReporting": false,
+  "showWatermark": true,
+  "watermarkText": "waiaifu.lol",
+  "watermarkPosition": "bottom-right"
 }
