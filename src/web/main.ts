@@ -27,7 +27,9 @@ const headerTitle = requiredElement<HTMLElement>(".header-title");
 const headerControls = requiredElement<HTMLElement>(".header-controls");
 const consentDialog = requiredElement<HTMLDialogElement>("#consent-dialog");
 const consentAgree = requiredElement<HTMLButtonElement>("#consent-agree");
-const status = requiredElement<HTMLElement>("#status");
+const status = requiredElement<HTMLDialogElement>("#status");
+const statusMessage = requiredElement<HTMLElement>("#status-message");
+const statusClose = requiredElement<HTMLButtonElement>("#status-close");
 const imageCount = requiredElement<HTMLElement>("#image-count");
 const themeSelect = requiredElement<HTMLSelectElement>("#theme");
 const supportHeader = requiredElement<HTMLElement>(".header-meta");
@@ -49,6 +51,7 @@ const filterForm = requiredElement<HTMLFormElement>("#filter-form");
 const filterGrid = requiredElement<HTMLElement>("#filter-grid");
 const filterClose = requiredElement<HTMLButtonElement>("#filter-close");
 const filterReset = requiredElement<HTMLButtonElement>("#filter-reset");
+const filterSubmit = requiredElement<HTMLButtonElement>('#filter-form button[type="submit"]');
 const lightbox = requiredElement<HTMLDialogElement>("#lightbox");
 const lightboxStage = requiredElement<HTMLElement>(".lightbox-stage");
 const lightboxName = requiredElement<HTMLElement>("#lightbox-name");
@@ -1172,12 +1175,7 @@ function updateFilterCount(): void {
     : (nameLanguage === "ja" ? `${count}件のフィルターが有効` : `Advanced filters, ${count} active`));
 }
 
-function applyFilters(showBusy = false): void {
-  if (showBusy) {
-    status.hidden = false;
-    status.dataset.state = "busy";
-    status.textContent = nameLanguage === "ja" ? "検索中…" : "Searching…";
-  }
+function applyFilters(): void {
   const terms = normalized(searchInput.value).split(/\s+/).filter(Boolean);
   const images = allImages.filter((image) => {
     if (favoritesOnly.checked && !isFavorite(image)) return false;
@@ -1190,6 +1188,39 @@ function applyFilters(showBusy = false): void {
   updateVisibleImages(images);
   updateFilterCount();
 }
+
+function loadingMessage(): string {
+  return nameLanguage === "ja"
+    ? "画像を読み込んでいます。もう少しだけ待ってね :3"
+    : "Loading images, please wait—not long :3";
+}
+
+function showStatusModal(message: string, state: "busy" | "empty" | "error"): void {
+  status.dataset.state = state;
+  statusMessage.textContent = message;
+  statusClose.hidden = state === "busy";
+  if (!status.open) status.showModal();
+}
+
+function closeStatusModal(): void {
+  if (status.open) status.close();
+}
+
+function waitForStatusPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+async function applyFiltersWithBusy(dialog?: HTMLDialogElement): Promise<void> {
+  showStatusModal(loadingMessage(), "busy");
+  await waitForStatusPaint();
+  applyFilters();
+  if (galleryImages.length > 0) closeStatusModal();
+  if (dialog?.open) dialog.close();
+}
+
+statusClose.addEventListener("click", closeStatusModal);
 
 advancedButton.addEventListener("click", () => {
   syncFilterControls();
@@ -1208,17 +1239,19 @@ filterForm.addEventListener("submit", (event) => {
     const key = select.dataset.filterKey;
     if (key && select.value) activeFilters.set(key, select.value);
   }
-  filterDialog.close();
-  applyFilters(true);
+  filterSubmit.disabled = true;
+  void applyFiltersWithBusy(filterDialog).finally(() => {
+    filterSubmit.disabled = false;
+  });
 });
 filterDialog.addEventListener("click", (event) => {
   if (event.target === filterDialog) filterDialog.close();
 });
 searchInput.addEventListener("input", () => {
   window.clearTimeout(searchTimer);
-  searchTimer = window.setTimeout(() => applyFilters(true), 120);
+  searchTimer = window.setTimeout(() => void applyFiltersWithBusy(), 120);
 });
-favoritesOnly.addEventListener("change", () => applyFilters(true));
+favoritesOnly.addEventListener("change", () => void applyFiltersWithBusy());
 
 function resizeTile(tile: HTMLElement): void {
   const styles = window.getComputedStyle(gallery);
@@ -1590,11 +1623,6 @@ function appendMetadataRow(label: string, value: string): void {
 function renderImageMetadata(image: GalleryImage): void {
   metadataTitle.textContent = displayNameFor(image);
   metadataContent.replaceChildren();
-  appendMetadataRow("Filename", image.name);
-  appendMetadataRow("Path", image.path);
-  appendMetadataRow("File type", image.type);
-  appendMetadataRow("Batch", image.batch ?? "—");
-  appendMetadataRow("Last modified", new Date(image.modifiedAt).toLocaleString());
   if (image.shortName) {
     appendMetadataRow("English name", image.shortName.en);
     appendMetadataRow("Japanese name", image.shortName.ja);
@@ -1606,12 +1634,11 @@ function renderImageMetadata(image: GalleryImage): void {
     return;
   }
   metadataStatus.textContent = "";
-  appendMetadataRow("Schema", metadata.schema);
-  appendMetadataRow("Resolved prompt", metadata.resolvedPrompt);
   for (const [key, value] of Object.entries(metadata.tags)) appendMetadataRow(metadataLabel(key), value);
   for (const [key, values] of Object.entries(metadata.searchTokens)) {
     appendMetadataRow(`${metadataLabel(key)} search tokens`, values.join(", "));
   }
+  appendMetadataRow("Resolved prompt", metadata.resolvedPrompt);
 }
 
 async function loadImageDetails(image: GalleryImage): Promise<ImageDetailsResponse> {
@@ -1833,8 +1860,7 @@ function syncNameLanguageDisplay(): void {
     syncFilterControls();
     applyFilters();
   } else if (galleryLoadState === "error") {
-    status.hidden = false;
-    status.textContent = nameLanguage === "ja" ? t("loadFailed") : galleryErrorMessage;
+    showStatusModal(nameLanguage === "ja" ? t("loadFailed") : galleryErrorMessage, "error");
   }
 }
 
@@ -1898,13 +1924,15 @@ function initializeTiles(): void {
       if (nextIndex === batchSize) {
         reorderTiles();
         applyFilters();
+        showStatusModal(loadingMessage(), "busy");
       }
       tileBuildFrame = window.requestAnimationFrame(buildBatch);
       return;
     }
 
-    reorderTiles();
-    applyFilters();
+  reorderTiles();
+  applyFilters();
+  closeStatusModal();
   };
   buildBatch();
 }
@@ -1929,19 +1957,17 @@ function updateVisibleImages(images: GalleryImage[]): void {
       : `${images.length} of ${maximumImages} images`;
   }
   updateShuffleButtonState();
-  status.hidden = images.length > 0;
-  status.dataset.state = images.length > 0 ? "" : "empty";
-  status.textContent = images.length === 0
-    ? t(allImages.length === 0 ? "noImages" : "noMatches")
-    : "";
+  if (images.length === 0) {
+    showStatusModal(t(allImages.length === 0 ? "noImages" : "noMatches"), "empty");
+  } else if (status.dataset.state !== "busy") {
+    closeStatusModal();
+  }
   scheduleQueueRefresh();
 }
 
 async function loadGallery(): Promise<void> {
   galleryLoadState = "loading";
-  status.hidden = false;
-  status.dataset.state = "busy";
-  status.textContent = t("loadingGallery");
+  closeStatusModal();
   try {
     const imagesUrl = new URL("api/images", document.baseURI);
     if (galleryConfig.searchMetadata || galleryConfig.showNames) imagesUrl.searchParams.set("details", "1");
@@ -1972,9 +1998,7 @@ function showGalleryLoadError(message: string): void {
   slideshowButton.disabled = true;
   advancedButton.disabled = true;
   imageCount.textContent = "";
-  status.hidden = false;
-  status.dataset.state = "error";
-  status.textContent = nameLanguage === "ja" ? t("loadFailed") : galleryErrorMessage;
+  showStatusModal(nameLanguage === "ja" ? t("loadFailed") : galleryErrorMessage, "error");
 }
 
 shuffleButton.addEventListener("click", shuffleGallery);

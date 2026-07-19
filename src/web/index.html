@@ -102,7 +102,10 @@
       </div>
     </header>
     <main>
-      <p id="status" class="status" role="status" aria-live="polite" data-i18n="loadingGallery">Loading gallery…</p>
+      <dialog id="status" class="status" aria-labelledby="status-message">
+        <p id="status-message" role="status" aria-live="polite" data-i18n="loadingGallery">Loading gallery…</p>
+        <button id="status-close" class="secondary-button" type="button">Close</button>
+      </dialog>
       <section id="gallery" class="gallery" aria-label="Image gallery" data-i18n-aria-label="imageGallery"></section>
       <aside id="support-card" class="support-card" aria-label="Support this site" data-i18n-aria-label="supportSite" hidden>
         <p data-i18n="enjoyingGallery">Enjoying the gallery?</p>

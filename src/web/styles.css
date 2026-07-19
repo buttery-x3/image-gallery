@@ -715,23 +715,26 @@ main { flex: 1 0 auto; }
 
 .status {
   position: fixed;
-  top: max(5.5rem, calc(env(safe-area-inset-top) + 3.5rem));
-  left: 50%;
-  z-index: 100;
+  inset: 0;
   width: min(34rem, calc(100% - 32px));
-  margin: 0;
-  padding: 12px 18px;
+  max-width: none;
+  margin: auto;
+  padding: 18px 20px;
   border: 1px solid var(--line-strong);
   border-radius: var(--control-radius);
   background: var(--surface-raised);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
   color: var(--text);
   text-align: center;
-  pointer-events: none;
-  transform: translateX(-50%);
+  place-items: center;
+  gap: 14px;
 }
 
-.status[hidden] { display: none; }
+.status:not([open]) { display: none; }
+.status[open] { display: grid; }
+.status::backdrop { background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px); }
+.status p { margin: 0; }
+.status button[hidden] { display: none; }
 
 .gallery {
   display: grid;
