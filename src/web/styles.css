@@ -1208,11 +1208,11 @@ body.lightbox-open { overflow: hidden; }
 .site-header h1 {
   color: var(--text);
   font-family: var(--font-display);
+  text-transform: none;
 }
 
 html:not([data-theme="classic"]):not([data-theme="glass"]) .site-header h1 {
   letter-spacing: 0.055em;
-  text-transform: uppercase;
 }
 
 .theme-picker {
@@ -1398,7 +1398,7 @@ html[data-theme="glass"] .filter-dialog {
 
 html[data-theme="studio"] body { background-size: 100% 24px; }
 html[data-theme="studio"] .site-header { border-bottom-width: 2px; }
-html[data-theme="studio"] .site-header h1 { font-style: italic; text-transform: none; }
+html[data-theme="studio"] .site-header h1 { font-style: italic; }
 
 html[data-theme="neon"] body { background-size: 32px 32px, 32px 32px, 100% 100%; }
 html[data-theme="neon"] .site-header { box-shadow: 0 1px 18px rgba(0, 234, 255, 0.14); }
@@ -1407,7 +1407,7 @@ html[data-theme="neon"] .gallery-image:hover { box-shadow: 0 0 0 1px var(--accen
 
 html[data-theme="accessible"] body { font-size: 1.06rem; }
 html[data-theme="accessible"] .site-header { border-bottom-width: 3px; }
-html[data-theme="accessible"] .site-header h1 { letter-spacing: 0; text-transform: none; }
+html[data-theme="accessible"] .site-header h1 { letter-spacing: 0; }
 html[data-theme="accessible"] :focus-visible { outline-width: 3px; outline-offset: 3px; }
 html[data-theme="accessible"] .image-count { color: #fff; font-weight: 700; }
 html[data-theme="accessible"] .theme-picker select { font-size: 0.8rem; }
