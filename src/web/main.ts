@@ -12,6 +12,11 @@ function requiredElement<T extends Element>(selector: string): T {
 }
 
 const gallery = requiredElement<HTMLElement>("#gallery");
+const galleryConfig = {
+  searchMetadata: document.documentElement.dataset.gallerySearchMetadata === "true",
+  showLanguageToggle: document.documentElement.dataset.galleryLanguageToggle === "true",
+  showNames: document.documentElement.dataset.galleryShowNames === "true",
+};
 const siteHeader = requiredElement<HTMLElement>(".site-header");
 const headerTitle = requiredElement<HTMLElement>(".header-title");
 const headerControls = requiredElement<HTMLElement>(".header-controls");
@@ -25,10 +30,11 @@ const supportButton = requiredElement<HTMLElement>("#support-button");
 const supportCard = requiredElement<HTMLElement>("#support-card");
 const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const searchInput = requiredElement<HTMLInputElement>("#search");
-const searchableOnly = requiredElement<HTMLInputElement>("#searchable-only");
 const favoritesOnly = requiredElement<HTMLInputElement>("#favorites-only");
+const nameLanguageFieldset = requiredElement<HTMLElement>(".name-language");
 const nameLanguageInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="name-language"]')];
 if (nameLanguageInputs.length !== 2) throw new Error("Missing name language controls");
+nameLanguageFieldset.hidden = !galleryConfig.showLanguageToggle;
 const advancedButton = requiredElement<HTMLButtonElement>("#advanced-filters");
 const advancedFilterCount = requiredElement<HTMLElement>("#advanced-filter-count");
 const filterDialog = requiredElement<HTMLDialogElement>("#filter-dialog");
@@ -489,6 +495,7 @@ function saveFavoriteImagePaths(): void {
 }
 
 function loadNameLanguage(): NameLanguage {
+  if (!galleryConfig.showLanguageToggle) return "en";
   try {
     return window.localStorage.getItem(nameLanguageStorageKey) === "ja" ? "ja" : "en";
   } catch {
@@ -749,8 +756,8 @@ function nextOverlayNamePosition(): OverlayNamePosition {
 function syncLightboxOverlayState(image?: GalleryImage): void {
   const hasShortName = Boolean(image?.shortName);
   lightboxMedia.dataset.namePosition = overlayNamePosition;
-  lightboxNameOverlay.hidden = !hasShortName || !overlayNameVisible;
-  lightboxToggleName.disabled = !hasShortName;
+  lightboxNameOverlay.hidden = !galleryConfig.showNames || !hasShortName || !overlayNameVisible;
+  lightboxToggleName.disabled = !galleryConfig.showNames || !hasShortName;
   lightboxToggleName.setAttribute("aria-pressed", String(overlayNameVisible));
   lightboxToggleName.querySelector("span")!.textContent = t(overlayNameVisible ? "hideName" : "showName");
 
@@ -815,19 +822,23 @@ function searchIndex(image: GalleryImage): string {
   const existing = imageSearchIndexes.get(image);
   if (existing) return existing;
 
-  const metadata = image.metadata;
   const values = [
     image.displayName,
-    image.shortName?.en ?? "",
-    image.shortName?.ja ?? "",
     image.name,
     image.path,
-    image.batch ?? "",
-    metadata?.schema ?? "",
-    metadata?.resolvedPrompt ?? "",
-    ...Object.values(metadata?.tags ?? {}),
-    ...Object.values(metadata?.searchTokens ?? {}).flat(),
   ];
+  if (galleryConfig.searchMetadata) {
+    const metadata = image.metadata;
+    values.push(
+      image.shortName?.en ?? "",
+      image.shortName?.ja ?? "",
+      image.batch ?? "",
+      metadata?.schema ?? "",
+      metadata?.resolvedPrompt ?? "",
+      ...Object.values(metadata?.tags ?? {}),
+      ...Object.values(metadata?.searchTokens ?? {}).flat(),
+    );
+  }
   const index = normalized(values.join("\n"));
   imageSearchIndexes.set(image, index);
   return index;
@@ -1029,6 +1040,11 @@ function fieldLabel(key: string): string {
 }
 
 function renderFilterControls(): void {
+  if (!galleryConfig.searchMetadata) {
+    filterGrid.replaceChildren();
+    advancedButton.disabled = true;
+    return;
+  }
   const facets = new Map<string, Map<string, number>>();
   for (const image of allImages) {
     const values = new Map<string, string>(Object.entries(image.metadata?.tags ?? {}));
@@ -1102,7 +1118,6 @@ function applyFilters(): void {
   const terms = normalized(searchInput.value).split(/\s+/).filter(Boolean);
   const images = allImages.filter((image) => {
     if (favoritesOnly.checked && !isFavorite(image)) return false;
-    if (searchableOnly.checked && !image.metadata) return false;
     if (terms.some((term) => !searchIndex(image).includes(term))) return false;
     for (const [key, value] of activeFilters) {
       if (tagValue(image, key) !== value) return false;
@@ -1140,7 +1155,6 @@ searchInput.addEventListener("input", () => {
   window.clearTimeout(searchTimer);
   searchTimer = window.setTimeout(applyFilters, 120);
 });
-searchableOnly.addEventListener("change", applyFilters);
 favoritesOnly.addEventListener("change", applyFilters);
 
 function resizeTile(tile: HTMLElement): void {
@@ -1256,6 +1270,7 @@ function showLightboxImage(index: number): void {
 
   activeImageIndex = index;
   const displayName = displayNameFor(image);
+  lightboxName.hidden = !galleryConfig.showNames;
   lightboxName.textContent = displayName;
   lightboxImage.src = new URL(image.url, document.baseURI).href;
   lightboxImage.alt = displayName;
@@ -1410,6 +1425,7 @@ function createTile(image: GalleryImage): HTMLElement {
 
   const shortName = document.createElement("span");
   shortName.className = "gallery-short-name";
+  shortName.hidden = !galleryConfig.showNames;
   shortName.textContent = image.shortName?.[nameLanguage] ?? "";
   shortName.lang = nameLanguage === "ja" ? "ja" : "en";
   shortName.setAttribute("aria-hidden", "true");
@@ -1527,6 +1543,7 @@ function syncNameLanguageDisplay(): void {
     if (shortName) {
       shortName.textContent = image.shortName?.[nameLanguage] ?? "";
       shortName.lang = nameLanguage === "ja" ? "ja" : "en";
+      shortName.hidden = !galleryConfig.showNames;
     }
     const copyImageButton = tile.querySelector<HTMLButtonElement>('[data-action="copy-image"]');
     copyImageButton?.setAttribute("aria-label", copyImageLabel(displayName));
@@ -1608,9 +1625,7 @@ function updateVisibleImages(images: GalleryImage[]): void {
   }
   syncSupportButtonPlacement();
 
-  const maximumImages = searchableOnly.checked
-    ? allImages.filter((image) => image.metadata).length
-    : allImages.length;
+  const maximumImages = allImages.length;
   if (images.length === maximumImages) {
     imageCount.textContent = nameLanguage === "ja"
       ? `${images.length}枚`

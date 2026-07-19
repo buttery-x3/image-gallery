@@ -1,6 +1,6 @@
 # Image Gallery
 
-A small, private, self-hosted image gallery. Copy images and GIFs into a folder, refresh the page, and they are displayed in a full-width masonry gallery. Search is available in the header, with advanced metadata filters when matching JSON sidecars are present.
+A small, private, self-hosted image gallery. Copy images and GIFs into a folder, refresh the page, and they are displayed in a full-width masonry gallery. Search defaults to filenames; metadata search and filters can be enabled in `gallery.config.json`.
 
 Gallery media is shown at exactly 300px wide with its natural height. Clicking an image opens it against a dark lightbox. On desktop, hover actions can copy either the image itself or its direct public URL; mobile relies on native image controls.
 
@@ -22,6 +22,19 @@ On Linux or macOS, use `cp .env.example .env` instead of `copy`.
 
 The default media directory is `gallery/`. Put JPEG, PNG, GIF, WebP, or AVIF files there, then open `http://localhost:5173`.
 
+## Gallery configuration
+
+Edit [`gallery.config.json`](gallery.config.json) before building or starting the development server:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `siteName` | `Image Gallery` | Page heading, browser title, and social-preview title |
+| `searchMetadata` | `false` | When enabled, search also indexes cached JSON metadata and generated names; otherwise it searches filenames only |
+| `showLanguageToggle` | `false` | Show the EN / JP interface-language control |
+| `showNames` | `false` | Show image names in tiles and the lightbox |
+
+The file is intentionally conservative for a fresh clone: metadata search, the language toggle, and image names are disabled. These settings are build-time configuration, so rebuild after changing them. Runtime and deployment settings such as `GALLERY_DIR`, `PORT`, and SMTP credentials remain in `.env` or the service environment.
+
 ## Production build
 
 ```sh
@@ -39,7 +52,6 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 | --- | --- | --- |
 | `GALLERY_DIR` | `./gallery` | Directory scanned recursively for media |
 | `PREVIEW_CACHE_DIR` | `./.cache/previews` | Directory outside the gallery for generated GIF and PNG WebP previews |
-| `GALLERY_TITLE` | `Image Gallery` | Page heading, document title, and social-preview title (applied at build time) |
 | `GALLERY_DESCRIPTION` | `A simple private image gallery.` | Description used in browser and social metadata (applied at build time) |
 | `SITE_URL` | unset | Full public gallery URL used for canonical and absolute social-preview URLs (applied at build time) |
 | `BATCH_NAME_STYLE` | unset | Set to `japanese-fantasy` to generate long fantasy names while batching |
@@ -55,11 +67,9 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 
 Hidden entries, symbolic links, and unsupported files are ignored. New files appear after a page refresh; no rebuild is required. Images near the viewport are loaded first, then loading continues through the full gallery in the background with no more than four media files loading concurrently.
 
-Images may have a same-name JSON sidecar in the same directory. The `anime_waifu_lite/v1` format is used for prompt search and advanced tag filters; invalid, unsupported, or missing metadata does not prevent the image from appearing. Every image also exposes its filename stem as a searchable display name. The containing subdirectory is available as a Batch filter.
+Images may have a same-name JSON sidecar in the same directory. The `anime_waifu_lite/v1` format is used when metadata search and advanced tag filters are enabled; invalid, unsupported, or missing metadata does not prevent the image from appearing. Every image exposes its filename stem to the default filename search. The containing subdirectory is available as a Batch filter.
 
-Generated fantasy names also receive a `<long-name>.gallery-name.json` sidecar using the `image-gallery/name/v1` schema. It stores a short English display name and its katakana equivalent. The lightbox keeps the full filename stem above the image and overlays both short names, with the English text colored from the first two usable metadata colors and a white/black fallback. Lightbox controls can hide the bilingual name or cycle it through all four corners; those choices persist in the browser. A lowercase black `waiaifu.lol` mark remains at 50% opacity in the diagonally opposite corner. Both name versions remain searchable, while the persistent **EN / JP** control is retained for interface-language selection.
-
-Enable **Searchable only** in the header to temporarily hide images that do not yet have supported metadata.
+Generated fantasy names also receive a `<long-name>.gallery-name.json` sidecar using the `image-gallery/name/v1` schema. It stores a short English display name and its katakana equivalent. When `showNames` is enabled, the lightbox can show the full filename stem and bilingual short names, with the English text colored from the first two usable metadata colors and a white/black fallback. Lightbox controls can hide the bilingual name or cycle it through all four corners; those choices persist in the browser. A lowercase black `waiaifu.lol` mark remains at 50% opacity in the diagonally opposite corner. Both name versions become searchable when `searchMetadata` is enabled, and the EN / JP control is available when `showLanguageToggle` is enabled.
 
 GIF and PNG tiles use automatically generated 300px-wide lossy WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. Previews are created on first view and cached outside the gallery; the original file is still used in the lightbox and by the desktop Copy image/Copy link controls.
 

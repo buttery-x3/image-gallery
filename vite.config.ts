@@ -1,7 +1,41 @@
+import fs from "node:fs";
+import path from "node:path";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 
 const fallbackTitle = "Image Gallery";
 const fallbackDescription = "A simple private image gallery.";
+
+type GalleryConfig = {
+  siteName: string;
+  searchMetadata: boolean;
+  showLanguageToggle: boolean;
+  showNames: boolean;
+};
+
+function readGalleryConfig(): GalleryConfig {
+  const configPath = path.resolve(process.cwd(), "gallery.config.json");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  } catch (error) {
+    throw new Error(`Could not read ${configPath}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("gallery.config.json must contain a JSON object.");
+  }
+  const record = parsed as Record<string, unknown>;
+  const siteName = typeof record.siteName === "string" ? record.siteName.trim() : "";
+  if (!siteName) throw new Error("gallery.config.json siteName must be a non-empty string.");
+  for (const key of ["searchMetadata", "showLanguageToggle", "showNames"] as const) {
+    if (typeof record[key] !== "boolean") throw new Error(`gallery.config.json ${key} must be true or false.`);
+  }
+  return {
+    siteName,
+    searchMetadata: record.searchMetadata as boolean,
+    showLanguageToggle: record.showLanguageToggle as boolean,
+    showNames: record.showNames as boolean,
+  };
+}
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -26,7 +60,7 @@ function publicSiteUrl(value: string | undefined): URL | undefined {
   return siteUrl;
 }
 
-function galleryHtml(title: string, description: string, siteUrl: URL | undefined): Plugin {
+function galleryHtml(title: string, description: string, siteUrl: URL | undefined, config: GalleryConfig): Plugin {
   return {
     name: "gallery-html-metadata",
     transformIndexHtml(html) {
@@ -58,6 +92,9 @@ function galleryHtml(title: string, description: string, siteUrl: URL | undefine
 
       return html
         .replaceAll("__GALLERY_TITLE__", escapeHtml(title))
+        .replace("__GALLERY_SEARCH_METADATA__", String(config.searchMetadata))
+        .replace("__GALLERY_LANGUAGE_TOGGLE__", String(config.showLanguageToggle))
+        .replace("__GALLERY_SHOW_NAMES__", String(config.showNames))
         .replace("<!-- gallery-metadata -->", metadata.join("\n    "));
     },
   };
@@ -65,14 +102,15 @@ function galleryHtml(title: string, description: string, siteUrl: URL | undefine
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const title = env.GALLERY_TITLE?.trim() || fallbackTitle;
+  const config = readGalleryConfig();
+  const title = config.siteName || fallbackTitle;
   const description = env.GALLERY_DESCRIPTION?.trim() || fallbackDescription;
   const siteUrl = publicSiteUrl(env.SITE_URL);
 
   return {
     root: "src/web",
     base: "./",
-    plugins: [galleryHtml(title, description, siteUrl)],
+    plugins: [galleryHtml(title, description, siteUrl, config)],
     build: {
       outDir: "../../dist/public",
       emptyOutDir: false,
