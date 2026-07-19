@@ -39,7 +39,6 @@ export interface ImageDetailsResponse {
 
 export interface ImageReportRequest {
   imagePath: string;
-  imageUrl: string;
 }
 
 export interface ImageReportResponse {

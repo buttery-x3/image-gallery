@@ -4,6 +4,7 @@ dist/
 .env.*
 !.env.example
 .cache/
+reported-image-paths.txt
 npm-debug.log*
 
 gallery/*

@@ -3,7 +3,6 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import express from "express";
-import nodemailer from "nodemailer";
 import { config } from "./config.js";
 import { GalleryDirectoryError, imageKindFor, readGalleryImageDetails, readGalleryImages, resolveSafeMediaPath } from "./gallery.js";
 import { imagePreviewPath } from "./previews.js";
@@ -67,8 +66,6 @@ async function readCachedGalleryImages(includeDetails: boolean, includePreviewSt
   return read;
 }
 
-const reportTransport = config.reportSmtp ? nodemailer.createTransport(config.reportSmtp) : undefined;
-
 app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("X-Frame-Options", "SAMEORIGIN");
@@ -93,14 +90,9 @@ app.post("/api/reports", express.json({ limit: "4kb", type: "application/json" }
     return void response.status(403).json({ error: "Report requests must come from this gallery." } satisfies ErrorResponse);
   }
 
-  if (!reportTransport) {
-    return void response.status(503).json({ error: "Image reporting is not configured." } satisfies ErrorResponse);
-  }
-
   const body = request.body as Partial<ImageReportRequest> | undefined;
   if (
-    !body || typeof body.imagePath !== "string" || typeof body.imageUrl !== "string" ||
-    body.imagePath.length > 2_048 || body.imageUrl.length > 4_096
+    !body || typeof body.imagePath !== "string" || body.imagePath.length > 2_048
   ) {
     return void response.status(400).json({ error: "Invalid image report." } satisfies ErrorResponse);
   }
@@ -110,41 +102,15 @@ app.post("/api/reports", express.json({ limit: "4kb", type: "application/json" }
     return void response.status(404).json({ error: "The reported image could not be found." } satisfies ErrorResponse);
   }
 
-  let imageUrl: URL;
   try {
-    imageUrl = new URL(body.imageUrl);
-  } catch {
-    return void response.status(400).json({ error: "Invalid image URL." } satisfies ErrorResponse);
-  }
-
-  const encodedImagePath = body.imagePath.split("/").map(encodeURIComponent).join("/");
-  const expectedMediaSuffix = `/media/${encodedImagePath}`;
-  if (
-    imageUrl.origin !== requestOrigin || imageUrl.search || imageUrl.hash ||
-    (imageUrl.pathname !== expectedMediaSuffix && !imageUrl.pathname.endsWith(expectedMediaSuffix))
-  ) {
-    return void response.status(400).json({ error: "Invalid image URL." } satisfies ErrorResponse);
-  }
-
-  try {
-    await reportTransport.sendMail({
-      from: config.reportEmailFrom,
-      to: config.reportEmailTo,
-      subject: "Explicit sexual content report",
-      text: [
-        "An image was reported as explicit sexual content.",
-        "",
-        imageUrl.href,
-        "",
-        `Gallery path: ${body.imagePath}`,
-      ].join("\n"),
-    });
+    await fs.promises.mkdir(path.dirname(config.reportListPath), { recursive: true });
+    await fs.promises.appendFile(config.reportListPath, `${mediaPath}\n`, "utf8");
   } catch (error) {
-    console.error("Could not send image report email:", error);
-    return void response.status(502).json({ error: "The report could not be sent." } satisfies ErrorResponse);
+    console.error("Could not record image report:", error);
+    return void response.status(502).json({ error: "The report could not be recorded." } satisfies ErrorResponse);
   }
 
-  const payload: ImageReportResponse = { message: "Report sent." };
+  const payload: ImageReportResponse = { message: "Report recorded." };
   response.status(202).json(payload);
 });
 

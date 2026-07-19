@@ -81,7 +81,9 @@ const slideshowShortNameJa = requiredElement<HTMLElement>("#slideshow-short-name
 const slideshowWatermark = requiredElement<HTMLElement>("#slideshow-watermark");
 const reportDialog = requiredElement<HTMLDialogElement>("#report-dialog");
 const reportNo = requiredElement<HTMLButtonElement>("#report-no");
-const reportYes = requiredElement<HTMLAnchorElement>("#report-yes");
+const reportYes = requiredElement<HTMLButtonElement>("#report-yes");
+const reportConfirmationDialog = requiredElement<HTMLDialogElement>("#report-confirmation-dialog");
+const reportConfirmationClose = requiredElement<HTMLButtonElement>("#report-confirmation-close");
 const metadataDialog = requiredElement<HTMLDialogElement>("#metadata-dialog");
 const metadataTitle = requiredElement<HTMLElement>("#metadata-title");
 const metadataClose = requiredElement<HTMLButtonElement>("#metadata-close");
@@ -104,6 +106,7 @@ let toastTimer: number | undefined;
 let activeOpener: HTMLButtonElement | undefined;
 let activeImageIndex = -1;
 let reportOpener: HTMLButtonElement | undefined;
+let reportImage: GalleryImage | undefined;
 let metadataOpener: HTMLButtonElement | undefined;
 let metadataRequestToken = 0;
 let lightboxTouchStart: { identifier: number; x: number; y: number; startedAt: number } | undefined;
@@ -124,11 +127,13 @@ const tilesByImage = new Map<GalleryImage, HTMLElement>();
 const favoriteButtonsByImage = new Map<GalleryImage, HTMLButtonElement>();
 const imageDetailsByPath = new Map<string, Promise<ImageDetailsResponse>>();
 const favoritesStorageKey = "image-gallery:favorites:v1";
+const reportedImagePathsStorageKey = "image-gallery:reported-images:v1";
 const nameLanguageStorageKey = "image-gallery:name-language:v1";
 const overlayPreferencesStorageKey = "image-gallery:overlay-preferences:v1";
 const contentConsentStorageKey = "image-gallery:content-consent:v1";
 const themeStorageKey = "image-gallery:theme:v1";
 const favoriteImagePaths = loadFavoriteImagePaths();
+const reportedImagePaths = loadReportedImagePaths();
 type NameLanguage = "en" | "ja";
 type GalleryTheme = "editorial" | "glass" | "studio" | "classic" | "daylight" | "neon" | "accessible";
 type OverlayNamePosition = "top-left" | "bottom-left" | "bottom-right" | "top-right";
@@ -606,6 +611,33 @@ function saveOverlayPreferences(): void {
   }
 }
 
+function parseReportedImagePaths(value: string | null): Set<string> {
+  if (!value) return new Set();
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((path): path is string => typeof path === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function loadReportedImagePaths(): Set<string> {
+  try {
+    return parseReportedImagePaths(window.localStorage.getItem(reportedImagePathsStorageKey));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveReportedImagePaths(): void {
+  try {
+    window.localStorage.setItem(reportedImagePathsStorageKey, JSON.stringify([...reportedImagePaths]));
+  } catch {
+    // Reported images remain hidden until the page is refreshed when storage is unavailable.
+  }
+}
+
 function parseTheme(value: string | null | undefined): GalleryTheme {
   return galleryThemes.has(value as GalleryTheme) ? value as GalleryTheme : "editorial";
 }
@@ -660,13 +692,53 @@ function saveContentConsent(): void {
 function openReportDialog(image: GalleryImage, opener: HTMLButtonElement): void {
   if (!galleryConfig.enableReporting) return;
   reportOpener = opener;
-  const imageUrl = new URL(image.url, document.baseURI).href;
-  const query = new URLSearchParams({
-    subject: "waiaifu report",
-    body: imageUrl,
-  });
-  reportYes.href = `mailto:admin@flamehorn.com?${query}`;
+  reportImage = image;
   reportDialog.showModal();
+}
+
+function hideReportedImage(path: string, persist: boolean): void {
+  reportedImagePaths.add(path);
+  if (persist) saveReportedImagePaths();
+
+  const hiddenImage = allImages.find((image) => image.path === path);
+  allImages = allImages.filter((image) => image.path !== path);
+  if (hiddenImage) {
+    const tile = tilesByImage.get(hiddenImage);
+    tile?.remove();
+    tilesByImage.delete(hiddenImage);
+    favoriteButtonsByImage.delete(hiddenImage);
+  }
+
+  slideshowSequence = slideshowSequence.filter((image) => image.path !== path);
+  if (slideshowCurrentImage?.path === path) closeSlideshow();
+  if (lightbox.open && galleryImages[activeImageIndex]?.path === path) closeLightbox();
+  if (galleryLoadState === "ready") applyFilters();
+}
+
+async function submitReport(): Promise<void> {
+  const image = reportImage;
+  if (!image) return;
+
+  reportYes.disabled = true;
+  reportNo.disabled = true;
+  try {
+    const response = await fetch(new URL("api/reports", document.baseURI), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imagePath: image.path }),
+    });
+    const payload = await response.json() as { error?: string };
+    if (!response.ok) throw new Error(payload.error ?? "The report could not be recorded.");
+
+    reportDialog.close();
+    hideReportedImage(image.path, true);
+    reportConfirmationDialog.showModal();
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "The report could not be recorded.");
+  } finally {
+    reportYes.disabled = false;
+    reportNo.disabled = false;
+  }
 }
 
 function displayNameFor(image: GalleryImage): string {
@@ -1619,11 +1691,13 @@ slideshowDialog.addEventListener("close", () => {
 });
 
 reportNo.addEventListener("click", () => reportDialog.close());
-reportYes.addEventListener("click", () => reportDialog.close());
+reportYes.addEventListener("click", () => void submitReport());
 reportDialog.addEventListener("close", () => {
   reportOpener?.focus({ preventScroll: true });
   reportOpener = undefined;
+  reportImage = undefined;
 });
+reportConfirmationClose.addEventListener("click", () => reportConfirmationDialog.close());
 
 function metadataLabel(value: string): string {
   return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
@@ -1993,7 +2067,7 @@ async function loadGallery(): Promise<void> {
       showGalleryLoadError("error" in payload ? payload.error : uiCopy.en.loadFailed);
       return;
     }
-    allImages = shuffledImages(payload.images);
+    allImages = shuffledImages(payload.images.filter((image) => !reportedImagePaths.has(image.path)));
     galleryLoadState = "ready";
     activeFilters.clear();
     renderFilterControls();
@@ -2068,6 +2142,13 @@ window.addEventListener("storage", (event) => {
     if (lightbox.open && activeImage) syncLightboxFavoriteButton(activeImage);
     if (lightbox.open && favoritesOnly.checked && activeImage && !isFavorite(activeImage)) closeLightbox();
     applyFilters();
+  } else if (event.key === reportedImagePathsStorageKey) {
+    const updatedPaths = parseReportedImagePaths(event.newValue);
+    for (const path of updatedPaths) {
+      if (!reportedImagePaths.has(path)) hideReportedImage(path, false);
+    }
+    reportedImagePaths.clear();
+    for (const path of updatedPaths) reportedImagePaths.add(path);
   }
 });
 
