@@ -587,6 +587,7 @@ main { flex: 1 0 auto; }
 
 .advanced-button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: #fff; }
 .advanced-button:disabled { cursor: default; opacity: 0.4; }
+.advanced-button[hidden] { display: none; }
 .advanced-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 .filter-count {
@@ -703,6 +704,8 @@ main { flex: 1 0 auto; }
   text-decoration: none;
   cursor: pointer;
 }
+
+.name-language[hidden] { display: none; }
 
 .secondary-button { border: 1px solid rgba(255, 255, 255, 0.16); background: transparent; color: #d7d8da; }
 .primary-button { border: 1px solid #f3f3f1; background: #f3f3f1; color: #111214; }
@@ -836,6 +839,8 @@ main { flex: 1 0 auto; }
   transform: translateY(0);
 }
 
+.gallery-short-name[hidden] { display: none; }
+
 .report-button {
   display: grid;
   place-items: center;
@@ -897,6 +902,107 @@ main { flex: 1 0 auto; }
 .lightbox[open] { display: flex; }
 .lightbox::backdrop { background: transparent; }
 
+.slideshow {
+  position: fixed;
+  inset: 0;
+  display: none;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  background: #000;
+  overflow: hidden;
+}
+
+.slideshow[open] { display: grid; place-items: center; }
+.slideshow::backdrop { background: #000; }
+
+.slideshow-media {
+  --slideshow-name-en-size: clamp(24px, 9vw, 72px);
+  --slideshow-name-ja-size: clamp(12px, 4.5vw, 36px);
+  --slideshow-name-fill: #fff;
+  --slideshow-name-outline: #000;
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  overflow: hidden;
+}
+
+.slideshow-image {
+  display: block;
+  grid-area: 1 / 1;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  opacity: 0;
+  object-fit: contain;
+  transition: opacity 600ms ease;
+}
+
+.slideshow-image.is-active { opacity: 1; }
+
+.slideshow-name-overlay {
+  position: absolute;
+  z-index: 1;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: calc(100% - clamp(20px, 4vw, 48px));
+  pointer-events: none;
+}
+
+.slideshow-name-overlay[hidden] { display: none; }
+.slideshow-media[data-name-position="top-left"] .slideshow-name-overlay { top: clamp(10px, 2vw, 24px); left: clamp(10px, 2vw, 24px); }
+.slideshow-media[data-name-position="bottom-left"] .slideshow-name-overlay { bottom: clamp(10px, 2vw, 24px); left: clamp(10px, 2vw, 24px); }
+.slideshow-media[data-name-position="bottom-right"] .slideshow-name-overlay { right: clamp(10px, 2vw, 24px); bottom: clamp(10px, 2vw, 24px); align-items: flex-end; }
+.slideshow-media[data-name-position="top-right"] .slideshow-name-overlay { top: clamp(10px, 2vw, 24px); right: clamp(10px, 2vw, 24px); align-items: flex-end; }
+
+.slideshow-media[data-name-position="bottom-right"] .slideshow-short-name-en,
+.slideshow-media[data-name-position="bottom-right"] .slideshow-short-name-ja,
+.slideshow-media[data-name-position="top-right"] .slideshow-short-name-en,
+.slideshow-media[data-name-position="top-right"] .slideshow-short-name-ja { text-align: right; }
+
+.slideshow-short-name-en,
+.slideshow-short-name-ja {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  paint-order: stroke fill;
+}
+
+.slideshow-short-name-en {
+  color: var(--slideshow-name-fill);
+  font-size: var(--slideshow-name-en-size);
+  font-style: italic;
+  font-weight: 850;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  -webkit-text-stroke: 0.09em var(--slideshow-name-outline);
+  text-shadow: 0.06em 0 var(--slideshow-name-outline), -0.06em 0 var(--slideshow-name-outline), 0 0.06em var(--slideshow-name-outline), 0 -0.06em var(--slideshow-name-outline);
+}
+
+.slideshow-short-name-ja {
+  margin-top: 0.38em;
+  color: #000;
+  font-family: "Noto Sans JP", "Yu Gothic", "Hiragino Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--slideshow-name-ja-size);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  -webkit-text-stroke: 0.09em #fff;
+  text-shadow: 0.06em 0 #fff, -0.06em 0 #fff, 0 0.06em #fff, 0 -0.06em #fff;
+}
+
 .lightbox-stage {
   display: grid;
   grid-template-columns: 42px minmax(0, auto) 42px;
@@ -935,6 +1041,8 @@ main { flex: 1 0 auto; }
   text-align: left;
   font-family: Inter, "Noto Sans JP", "Yu Gothic", "Hiragino Sans", ui-sans-serif, system-ui, sans-serif;
 }
+
+.lightbox-name[hidden] { display: none; }
 
 .lightbox-report { flex: 0 0 auto; }
 
@@ -1174,7 +1282,7 @@ main { flex: 1 0 auto; }
   cursor: pointer;
 }
 
-body.lightbox-open { overflow: hidden; }
+body.lightbox-open, body.slideshow-open { overflow: hidden; }
 
 .toast {
   position: fixed;

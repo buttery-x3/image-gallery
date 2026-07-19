@@ -29,6 +29,7 @@ const supportHeader = requiredElement<HTMLElement>(".header-meta");
 const supportButton = requiredElement<HTMLElement>("#support-button");
 const supportCard = requiredElement<HTMLElement>("#support-card");
 const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
+const slideshowButton = requiredElement<HTMLButtonElement>("#slideshow");
 const searchInput = requiredElement<HTMLInputElement>("#search");
 const favoritesOnly = requiredElement<HTMLInputElement>("#favorites-only");
 const nameLanguageFieldset = requiredElement<HTMLElement>(".name-language");
@@ -37,6 +38,7 @@ if (nameLanguageInputs.length !== 2) throw new Error("Missing name language cont
 nameLanguageFieldset.hidden = !galleryConfig.showLanguageToggle;
 const advancedButton = requiredElement<HTMLButtonElement>("#advanced-filters");
 const advancedFilterCount = requiredElement<HTMLElement>("#advanced-filter-count");
+advancedButton.hidden = !galleryConfig.searchMetadata;
 const filterDialog = requiredElement<HTMLDialogElement>("#filter-dialog");
 const filterForm = requiredElement<HTMLFormElement>("#filter-form");
 const filterGrid = requiredElement<HTMLElement>("#filter-grid");
@@ -57,6 +59,15 @@ const lightboxTextPosition = requiredElement<HTMLButtonElement>("#lightbox-text-
 const lightboxClose = requiredElement<HTMLButtonElement>("#lightbox-close");
 const lightboxPrevious = requiredElement<HTMLButtonElement>("#lightbox-previous");
 const lightboxNext = requiredElement<HTMLButtonElement>("#lightbox-next");
+const slideshowDialog = requiredElement<HTMLDialogElement>("#slideshow-dialog");
+const slideshowMedia = requiredElement<HTMLElement>("#slideshow-media");
+const slideshowImages = [
+  requiredElement<HTMLImageElement>("#slideshow-image-a"),
+  requiredElement<HTMLImageElement>("#slideshow-image-b"),
+] as const;
+const slideshowNameOverlay = requiredElement<HTMLElement>("#slideshow-name-overlay");
+const slideshowShortNameEn = requiredElement<HTMLElement>("#slideshow-short-name-en");
+const slideshowShortNameJa = requiredElement<HTMLElement>("#slideshow-short-name-ja");
 const reportDialog = requiredElement<HTMLDialogElement>("#report-dialog");
 const reportNo = requiredElement<HTMLButtonElement>("#report-no");
 const reportYes = requiredElement<HTMLAnchorElement>("#report-yes");
@@ -72,6 +83,12 @@ let allImages: GalleryImage[] = [];
 let galleryImages: GalleryImage[] = [];
 let searchTimer: number | undefined;
 let shufflePending = false;
+let slideshowSequence: GalleryImage[] = [];
+let slideshowCurrentImage: GalleryImage | undefined;
+let slideshowIndex = -1;
+let slideshowActiveLayer = 0;
+let slideshowTimer: number | undefined;
+let slideshowLoadToken = 0;
 const activeFilters = new Map<string, string>();
 const imageSearchIndexes = new WeakMap<GalleryImage, string>();
 const tilesByImage = new Map<GalleryImage, HTMLElement>();
@@ -89,6 +106,7 @@ const galleryThemes = new Set<GalleryTheme>(["editorial", "glass", "studio", "cl
 const uiCopy = {
   en: {
     shuffle: "Shuffle",
+    slideshow: "Slideshow",
     searchImages: "Search images",
     onlyFavorites: "Only favorites",
     displayLanguage: "Display name language",
@@ -128,6 +146,7 @@ const uiCopy = {
   },
   ja: {
     shuffle: "シャッフル",
+    slideshow: "スライドショー",
     searchImages: "画像を検索",
     onlyFavorites: "お気に入りのみ",
     displayLanguage: "表示言語",
@@ -1398,6 +1417,108 @@ lightbox.addEventListener("close", () => {
   activeOpener = undefined;
 });
 
+function randomOverlayNamePosition(): OverlayNamePosition {
+  return overlayNamePositions[Math.floor(Math.random() * overlayNamePositions.length)]!;
+}
+
+function clearSlideshowTimer(): void {
+  if (slideshowTimer !== undefined) window.clearTimeout(slideshowTimer);
+  slideshowTimer = undefined;
+}
+
+function syncSlideshowName(image?: GalleryImage): void {
+  const shortName = image?.shortName;
+  slideshowNameOverlay.hidden = !galleryConfig.showNames || !shortName;
+  slideshowShortNameEn.textContent = shortName?.en ?? "";
+  slideshowShortNameJa.textContent = shortName?.ja ?? "";
+  if (!image) return;
+
+  const colors = overlayColors(image);
+  slideshowMedia.style.setProperty("--slideshow-name-fill", colors.fill);
+  slideshowMedia.style.setProperty("--slideshow-name-outline", colors.outline);
+}
+
+function scheduleSlideshowAdvance(): void {
+  clearSlideshowTimer();
+  if (!slideshowDialog.open) return;
+  slideshowTimer = window.setTimeout(advanceSlideshow, 5000);
+}
+
+function advanceSlideshow(): void {
+  if (!slideshowDialog.open || slideshowSequence.length === 0) return;
+
+  slideshowIndex = (slideshowIndex + 1) % slideshowSequence.length;
+  const nextImage = slideshowSequence[slideshowIndex]!;
+  const nextLayer = slideshowActiveLayer === 0 ? 1 : 0;
+  const nextElement = slideshowImages[nextLayer]!;
+  const loadToken = ++slideshowLoadToken;
+  const displayName = displayNameFor(nextImage);
+
+  const complete = (): void => {
+    if (loadToken !== slideshowLoadToken || !slideshowDialog.open) return;
+    slideshowImages[slideshowActiveLayer]!.classList.remove("is-active");
+    nextElement.classList.add("is-active");
+    slideshowActiveLayer = nextLayer;
+    slideshowCurrentImage = nextImage;
+    slideshowMedia.dataset.namePosition = randomOverlayNamePosition();
+    syncSlideshowName(nextImage);
+    scheduleSlideshowAdvance();
+  };
+  nextElement.addEventListener("load", complete, { once: true });
+  nextElement.addEventListener("error", () => {
+    if (loadToken === slideshowLoadToken && slideshowDialog.open) scheduleSlideshowAdvance();
+  }, { once: true });
+  nextElement.alt = displayName;
+  nextElement.src = new URL(nextImage.url, document.baseURI).href;
+}
+
+function openSlideshow(): void {
+  if (galleryImages.length < 2) return;
+  if (lightbox.open) closeLightbox();
+  slideshowSequence = shuffledImages(galleryImages);
+  slideshowIndex = -1;
+  slideshowCurrentImage = undefined;
+  slideshowActiveLayer = 0;
+  slideshowLoadToken += 1;
+  clearSlideshowTimer();
+  for (const image of slideshowImages) {
+    image.classList.remove("is-active");
+    image.removeAttribute("src");
+  }
+  syncSlideshowName();
+  slideshowDialog.showModal();
+  document.body.classList.add("slideshow-open");
+  advanceSlideshow();
+}
+
+function closeSlideshow(): void {
+  if (slideshowDialog.open) slideshowDialog.close();
+}
+
+slideshowButton.addEventListener("click", openSlideshow);
+slideshowDialog.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  event.preventDefault();
+  closeSlideshow();
+});
+slideshowDialog.addEventListener("click", (event) => {
+  if (event.target === slideshowDialog) closeSlideshow();
+});
+slideshowDialog.addEventListener("close", () => {
+  clearSlideshowTimer();
+  slideshowLoadToken += 1;
+  slideshowSequence = [];
+  slideshowCurrentImage = undefined;
+  slideshowIndex = -1;
+  for (const image of slideshowImages) {
+    image.classList.remove("is-active");
+    image.removeAttribute("src");
+  }
+  syncSlideshowName();
+  document.body.classList.remove("slideshow-open");
+  slideshowButton.focus({ preventScroll: true });
+});
+
 reportNo.addEventListener("click", () => reportDialog.close());
 reportYes.addEventListener("click", () => reportDialog.close());
 reportDialog.addEventListener("close", () => {
@@ -1568,6 +1689,7 @@ function syncNameLanguageDisplay(): void {
     syncLightboxFavoriteButton(activeImage);
   }
   syncLightboxOverlayState(activeImage);
+  syncSlideshowName(slideshowCurrentImage);
   if (galleryLoadState === "ready") {
     renderFilterControls();
     syncFilterControls();
@@ -1586,6 +1708,7 @@ function setNameLanguage(value: NameLanguage, persist: boolean): void {
 
 function updateShuffleButtonState(): void {
   shuffleButton.disabled = shufflePending || allImages.length < 2;
+  slideshowButton.disabled = galleryImages.length < 2;
 }
 
 function reorderTiles(): void {
@@ -1673,6 +1796,7 @@ function showGalleryLoadError(message: string): void {
   gallery.replaceChildren();
   syncSupportButtonPlacement();
   shuffleButton.disabled = true;
+  slideshowButton.disabled = true;
   advancedButton.disabled = true;
   imageCount.textContent = "";
   status.hidden = false;

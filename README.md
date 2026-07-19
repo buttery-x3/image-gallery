@@ -2,7 +2,7 @@
 
 A small, private, self-hosted image gallery. Copy images and GIFs into a folder, refresh the page, and they are displayed in a full-width masonry gallery. Search defaults to filenames; metadata search and filters can be enabled in `gallery.config.json`.
 
-Gallery media is shown at exactly 300px wide with its natural height. Clicking an image opens it against a dark lightbox. On desktop, hover actions can copy either the image itself or its direct public URL; mobile relies on native image controls.
+Gallery media is shown at exactly 300px wide with its natural height. Clicking an image opens it against a dark lightbox. The Slideshow button plays the currently filtered images in a randomized loop, changing every five seconds with a fade; press Escape or click the black margin to close it. On desktop, hover actions can copy either the image itself or its direct public URL; mobile relies on native image controls.
 
 ## Requirements
 

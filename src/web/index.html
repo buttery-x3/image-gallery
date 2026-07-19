@@ -48,6 +48,10 @@
           </svg>
           <span data-i18n="shuffle">Shuffle</span>
         </button>
+        <button id="slideshow" class="shuffle-button slideshow-button" type="button" disabled>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 5 10 7-10 7V5Z" /></svg>
+          <span data-i18n="slideshow">Slideshow</span>
+        </button>
       </div>
       <div class="header-controls">
         <label class="search-field">
@@ -165,6 +169,16 @@
             <path d="m9 6 6 6-6 6" />
           </svg>
         </button>
+      </div>
+    </dialog>
+    <dialog id="slideshow-dialog" class="slideshow" aria-label="Slideshow" data-i18n-aria-label="slideshow">
+      <div id="slideshow-media" class="slideshow-media">
+        <img id="slideshow-image-a" class="slideshow-image" alt="" />
+        <img id="slideshow-image-b" class="slideshow-image" alt="" />
+        <div id="slideshow-name-overlay" class="slideshow-name-overlay" aria-hidden="true" hidden>
+          <span id="slideshow-short-name-en" class="slideshow-short-name-en"></span>
+          <span id="slideshow-short-name-ja" class="slideshow-short-name-ja" lang="ja"></span>
+        </div>
       </div>
     </dialog>
     <dialog id="report-dialog" class="report-dialog" aria-labelledby="report-dialog-title">
