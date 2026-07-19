@@ -12,6 +12,9 @@ function requiredElement<T extends Element>(selector: string): T {
 }
 
 const gallery = requiredElement<HTMLElement>("#gallery");
+const siteHeader = requiredElement<HTMLElement>(".site-header");
+const headerTitle = requiredElement<HTMLElement>(".header-title");
+const headerControls = requiredElement<HTMLElement>(".header-controls");
 const consentDialog = requiredElement<HTMLDialogElement>("#consent-dialog");
 const consentAgree = requiredElement<HTMLButtonElement>("#consent-agree");
 const status = requiredElement<HTMLElement>("#status");
@@ -184,12 +187,80 @@ let galleryErrorMessage: string = uiCopy.en.loadFailed;
 const maximumConcurrentImageLoads = 4;
 const lazyLoadMargin = 150;
 const mobileSupportCardImageIndex = 24;
-const mobileHeaderQuery = window.matchMedia("(max-width: 800px)");
 const pendingTiles: HTMLElement[] = [];
 let queueRefreshFrame: number | undefined;
+let headerLayoutFrame: number | undefined;
+let oneRowControlsTrackWidth = 0;
+
+function pixelValue(value: string): number {
+  return Number.parseFloat(value) || 0;
+}
+
+function outerWidth(element: HTMLElement, minimumWidth = 0): number {
+  const style = window.getComputedStyle(element);
+  if (style.display === "none" && minimumWidth === 0) return 0;
+  return Math.max(element.getBoundingClientRect().width, element.scrollWidth, minimumWidth)
+    + pixelValue(style.marginLeft)
+    + pixelValue(style.marginRight);
+}
+
+function flexRowWidth(container: HTMLElement, widthFor?: (element: HTMLElement) => number): number {
+  const style = window.getComputedStyle(container);
+  const widths = [...container.children]
+    .filter((element): element is HTMLElement => element instanceof HTMLElement)
+    .map((element) => widthFor?.(element) ?? outerWidth(element))
+    .filter((width) => width > 0);
+  return widths.reduce((total, width) => total + width, 0)
+    + Math.max(0, widths.length - 1) * pixelValue(style.columnGap);
+}
+
+function syncHeaderLayout(): void {
+  headerLayoutFrame = undefined;
+  const headerStyle = window.getComputedStyle(siteHeader);
+  if (!siteHeader.classList.contains("is-stacked")) {
+    oneRowControlsTrackWidth = Math.max(
+      oneRowControlsTrackWidth,
+      headerControls.getBoundingClientRect().width,
+    );
+  }
+  const controlsWidth = flexRowWidth(headerControls, (element) => {
+    const style = window.getComputedStyle(element);
+    const flexBasis = style.flexBasis.endsWith("px") ? pixelValue(style.flexBasis) : 0;
+    if (flexBasis > 0) {
+      return flexBasis + pixelValue(style.marginLeft) + pixelValue(style.marginRight);
+    }
+    return outerWidth(element);
+  });
+  const metaStyle = window.getComputedStyle(supportHeader);
+  const metaWidths = [...supportHeader.children]
+    .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== supportButton)
+    .map((element) => outerWidth(element))
+    .filter((width) => width > 0);
+  const supportStyle = window.getComputedStyle(supportButton);
+  metaWidths.push(outerWidth(supportButton, pixelValue(supportStyle.width)));
+  const metaWidth = metaWidths.reduce((total, width) => total + width, 0)
+    + Math.max(0, metaWidths.length - 1) * pixelValue(metaStyle.columnGap);
+  const edgeColumnWidth = Math.max(flexRowWidth(headerTitle), metaWidth);
+  const requiredWidth = 2 * edgeColumnWidth
+    + Math.max(controlsWidth, oneRowControlsTrackWidth)
+    + 2 * pixelValue(headerStyle.columnGap);
+  const availableWidth = siteHeader.clientWidth
+    - pixelValue(headerStyle.paddingLeft)
+    - pixelValue(headerStyle.paddingRight);
+  const shouldStack = requiredWidth > availableWidth;
+
+  const layoutChanged = siteHeader.classList.contains("is-stacked") !== shouldStack;
+  siteHeader.classList.toggle("is-stacked", shouldStack);
+  if (layoutChanged) syncSupportButtonPlacement();
+}
+
+function scheduleHeaderLayout(): void {
+  if (headerLayoutFrame !== undefined) return;
+  headerLayoutFrame = window.requestAnimationFrame(syncHeaderLayout);
+}
 
 function syncSupportButtonPlacement(): void {
-  const mobile = mobileHeaderQuery.matches;
+  const mobile = siteHeader.classList.contains("is-stacked");
   const anchorImage = galleryImages[mobileSupportCardImageIndex - 1];
   const anchorTile = anchorImage ? tilesByImage.get(anchorImage) : undefined;
   const buttonReady = Boolean(supportButton.querySelector(".bmc-btn"));
@@ -242,8 +313,13 @@ if (!supportButton.querySelector(".bmc-btn")) {
   supportButtonObserver.observe(supportButton, { childList: true, subtree: true });
 }
 
-syncSupportButtonPlacement();
-mobileHeaderQuery.addEventListener("change", syncSupportButtonPlacement);
+syncHeaderLayout();
+const headerLayoutObserver = new ResizeObserver(scheduleHeaderLayout);
+headerLayoutObserver.observe(siteHeader);
+for (const element of [headerTitle, headerControls, supportHeader, imageCount]) {
+  headerLayoutObserver.observe(element);
+}
+void document.fonts.ready.then(scheduleHeaderLayout);
 
 function cancelQueueRefresh(): void {
   if (queueRefreshFrame === undefined) return;
