@@ -47,14 +47,6 @@ const requestedBaseUrl = positionalArguments[0];
 const galleryRoot = path.resolve(process.env.GALLERY_DIR ?? "gallery");
 const previewCacheRoot = path.resolve(process.env.PREVIEW_CACHE_DIR ?? ".cache/previews");
 
-function supportedMetadataRecord(parsed) {
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
-  if (parsed.schema === "anime_waifu_lite/v1") return parsed;
-  return Object.values(parsed).find(
-    (value) => value && typeof value === "object" && !Array.isArray(value) && value.schema === "anime_waifu_lite/v1",
-  );
-}
-
 function supportedNameMetadataRecord(parsed) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
   const shortName = parsed.shortName;
@@ -155,9 +147,6 @@ async function readImageRecords(directory, options = {}) {
     const displayPath = relativeGalleryPath(path.join(directory, jsonFile.name));
     if (matches.length === 0 && options.allowOrphanedMetadata) {
       options.orphanedMetadataFiles?.push(displayPath);
-      if (options.deleteOrphanedMetadata) {
-        await rm(path.join(directory, jsonFile.name));
-      }
       continue;
     }
     if (matches.length === 0) throw new Error(`${displayPath} does not have a same-name image.`);
@@ -169,13 +158,9 @@ async function readImageRecords(directory, options = {}) {
     } catch (error) {
       throw new Error(`${displayPath} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
     }
-    const metadata = supportedMetadataRecord(parsed);
-    if (!metadata) {
-      throw new Error(`${displayPath} does not contain supported anime_waifu_lite/v1 metadata.`);
-    }
     metadataByImage.set(matches[0].name, {
       metadataName: jsonFile.name,
-      metadataFingerprint: metadataFingerprint(metadata),
+      metadataFingerprint: metadataFingerprint(parsed),
     });
   }
 
@@ -667,9 +652,14 @@ async function processIncomingBatch() {
   const orphanedMetadataFiles = [];
   const records = await readImageRecords(galleryRoot, {
     allowOrphanedMetadata: true,
-    deleteOrphanedMetadata: !dryRun,
     orphanedMetadataFiles,
   });
+  if (orphanedMetadataFiles.length > 0) {
+    throw new Error(
+      `Orphan JSON sidecar${orphanedMetadataFiles.length === 1 ? "" : "s"} must be paired or moved before batching:\n` +
+      orphanedMetadataFiles.map((filePath) => `- ${filePath}`).join("\n"),
+    );
+  }
   const incomingMissingMetadata = records.filter((record) => !record.metadataName).length;
   const printReport = ({
     added = 0,
@@ -680,7 +670,6 @@ async function processIncomingBatch() {
     metadataCollisionsRetained = 0,
   } = {}) => {
     const planned = dryRun ? " (dry run)" : "";
-    const orphanAction = dryRun ? "would be deleted" : "deleted";
     console.log(`\nBatch report${planned}:`);
     console.log(`- Incoming images found: ${records.length}`);
     console.log(`- Images ${dryRun ? "that would be added" : "added"}: ${added}`);
@@ -690,7 +679,7 @@ async function processIncomingBatch() {
     console.log(`- Generated name metadata files ${dryRun ? "that would be added" : "added"}: ${generatedMetadataAdded}`);
     console.log(`- Duplicate images ${dryRun ? "that would be quarantined" : "quarantined"}: ${duplicatesQuarantined}`);
     console.log(`- Metadata collisions retained: ${metadataCollisionsRetained}`);
-    console.log(`- Orphan source JSON files ${orphanAction}: ${orphanedMetadataFiles.length}`);
+    console.log(`- Orphan source JSON files: ${orphanedMetadataFiles.length}`);
   };
 
   if (records.length === 0) {

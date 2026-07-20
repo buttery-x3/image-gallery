@@ -3,6 +3,12 @@
   "searchMetadata": false,
   "showLanguageToggle": false,
   "showNames": false,
+  "metadata": {
+    "enabledSchemas": [
+      "anime_waifu_lite/v1",
+      "anime_creature_lite_v4/v1"
+    ]
+  },
   "enableReporting": false,
   "showWatermark": true,
   "watermarkText": "waiaifu.lol",

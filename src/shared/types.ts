@@ -2,8 +2,13 @@ export const imageKinds = ["jpeg", "png", "gif", "webp", "avif"] as const;
 
 export type ImageKind = (typeof imageKinds)[number];
 
+export const galleryCategories = ["women", "creatures", "men"] as const;
+
+export type GalleryCategory = (typeof galleryCategories)[number];
+
 export interface GalleryMetadata {
   schema: string;
+  category: GalleryCategory;
   resolvedPrompt: string;
   tags: Record<string, string>;
   searchTokens: Record<string, string[]>;
@@ -24,6 +29,12 @@ export interface GalleryImage {
   modifiedAt: string;
   type: ImageKind;
   batch?: string;
+  category?: GalleryCategory;
+  metadataPresent?: boolean;
+  metadataInvalid?: boolean;
+  metadataSchema?: string;
+  metadataSupported?: boolean;
+  metadataEnabled?: boolean;
   metadata?: GalleryMetadata;
   shortName?: GalleryShortName;
 }
@@ -33,6 +44,12 @@ export interface GalleryResponse {
 }
 
 export interface ImageDetailsResponse {
+  category?: GalleryCategory;
+  metadataPresent?: boolean;
+  metadataInvalid?: boolean;
+  metadataSchema?: string;
+  metadataSupported?: boolean;
+  metadataEnabled?: boolean;
   metadata?: GalleryMetadata;
   shortName?: GalleryShortName;
 }

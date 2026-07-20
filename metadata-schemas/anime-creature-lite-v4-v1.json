@@ -1,0 +1,48 @@
+{
+  "definitionVersion": 1,
+  "schema": "anime_creature_lite_v4/v1",
+  "recordPath": "anime_creature_lite_v4",
+  "category": "creatures",
+  "resolvedPrompt": { "path": "resolved_prompt" },
+  "tags": {
+    "gender": { "path": "gender" },
+    "species": { "path": "species" },
+    "creature_family": { "path": "creature_family" },
+    "hair_style": { "path": "global_selections.hair_style" },
+    "hair_color_primary": { "path": "global_selections.hair_color_primary" },
+    "hair_color_secondary": { "path": "global_selections.hair_color_secondary" },
+    "hair_accent": { "path": "global_selections.hair_accent" },
+    "eye_shape": { "path": "global_selections.eye_shape" },
+    "eye_color_primary": { "path": "global_selections.eye_color_primary" },
+    "eye_color_secondary": { "path": "global_selections.eye_color_secondary" },
+    "eye_accent": { "path": "global_selections.eye_accent" },
+    "outfit": {
+      "select": {
+        "path": "gender",
+        "cases": {
+          "woman": "global_selections.outfit_woman",
+          "man": "global_selections.outfit_man"
+        }
+      }
+    },
+    "outfit_color": { "path": "global_selections.outfit_color" },
+    "trim": { "path": "global_selections.trim" },
+    "trim_color": { "path": "global_selections.trim_color" },
+    "accessory": { "path": "global_selections.accessory" },
+    "accessory_color": { "path": "global_selections.accessory_color" },
+    "pose": { "path": "global_selections.pose" },
+    "facing_direction": { "path": "global_selections.facing_direction" },
+    "scene": { "path": "global_selections.scene_a" },
+    "scene_detail": { "path": "global_selections.scene_b" },
+    "lighting": { "path": "global_selections.lighting_tone" },
+    "secondary_lighting": { "path": "global_selections.secondary_lighting" },
+    "finish_style": { "path": "global_selections.finish_style" },
+    "creature_color_primary": { "path": "global_selections.creature_color_primary" },
+    "creature_color_secondary": { "path": "global_selections.creature_color_secondary" }
+  },
+  "valueRules": {
+    "trim": true,
+    "omitEmpty": true,
+    "omitContaining": ["@@"]
+  }
+}

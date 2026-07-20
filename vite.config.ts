@@ -14,6 +14,7 @@ type GalleryConfig = {
   showWatermark: boolean;
   watermarkText: string;
   watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  metadata?: { enabledSchemas?: string[] };
 };
 
 function readGalleryConfig(): GalleryConfig {
@@ -39,6 +40,21 @@ function readGalleryConfig(): GalleryConfig {
   if (!(["top-left", "top-right", "bottom-left", "bottom-right"] as const).includes(watermarkPosition as never)) {
     throw new Error("gallery.config.json watermarkPosition must be a corner name.");
   }
+  let metadata: GalleryConfig["metadata"];
+  if (record.metadata !== undefined) {
+    if (!record.metadata || typeof record.metadata !== "object" || Array.isArray(record.metadata)) {
+      throw new Error("gallery.config.json metadata must be an object.");
+    }
+    const enabledSchemas = (record.metadata as Record<string, unknown>).enabledSchemas;
+    if (enabledSchemas !== undefined && (
+      !Array.isArray(enabledSchemas) || enabledSchemas.some((schema) => typeof schema !== "string" || !schema.trim())
+    )) {
+      throw new Error("gallery.config.json metadata.enabledSchemas must be an array of non-empty strings.");
+    }
+    metadata = enabledSchemas === undefined
+      ? {}
+      : { enabledSchemas: enabledSchemas.map((schema) => (schema as string).trim()) };
+  }
   return {
     siteName,
     searchMetadata: record.searchMetadata as boolean,
@@ -48,6 +64,7 @@ function readGalleryConfig(): GalleryConfig {
     showWatermark: record.showWatermark as boolean,
     watermarkText,
     watermarkPosition: watermarkPosition as GalleryConfig["watermarkPosition"],
+    ...(metadata ? { metadata } : {}),
   };
 }
 

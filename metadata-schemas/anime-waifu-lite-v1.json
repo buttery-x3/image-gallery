@@ -1,0 +1,36 @@
+{
+  "definitionVersion": 1,
+  "schema": "anime_waifu_lite/v1",
+  "category": "women",
+  "resolvedPrompt": { "path": "resolved_prompt" },
+  "searchTokensPath": "search_tokens",
+  "tags": {
+    "body_type": { "path": "body_type" },
+    "breast_type": { "path": "breast_type" },
+    "hair_style": { "path": "hair_style" },
+    "hair_color_primary": { "path": "hair_color_primary" },
+    "hair_color_secondary": { "path": "hair_color_secondary" },
+    "hair_accent": { "path": "hair_accent", "excludeWhen": { "path": "active_flags.hair_accent_active", "equals": false } },
+    "eye_shape": { "path": "eye_shape" },
+    "eye_color_primary": { "path": "eye_color_primary" },
+    "eye_color_secondary": { "path": "eye_color_secondary" },
+    "eye_accent": { "path": "eye_accent", "excludeWhen": { "path": "active_flags.eye_accent_active", "equals": false } },
+    "outfit": { "path": "outfit" },
+    "outfit_color": { "path": "outfit_color" },
+    "trim": { "path": "trim", "excludeWhen": { "path": "active_flags.trim_active", "equals": false } },
+    "trim_color": { "path": "trim_color", "excludeWhen": { "path": "active_flags.trim_active", "equals": false } },
+    "jewellery": { "path": "jewellery", "excludeWhen": { "path": "active_flags.jewellery_active", "equals": false } },
+    "jewellery_color": { "path": "jewellery_color", "excludeWhen": { "path": "active_flags.jewellery_active", "equals": false } },
+    "pose": { "path": "pose" },
+    "facing_direction": { "path": "facing_direction" },
+    "scene": { "path": "scene" },
+    "scene_detail": { "path": "scene_detail", "excludeWhen": { "path": "active_flags.scene_detail_active", "equals": false } },
+    "lighting": { "path": "lighting" },
+    "secondary_lighting": { "path": "secondary_lighting", "excludeWhen": { "path": "active_flags.secondary_lighting_active", "equals": false } },
+    "finish_style": { "path": "finish_style" }
+  },
+  "valueRules": {
+    "trim": true,
+    "omitEmpty": true
+  }
+}

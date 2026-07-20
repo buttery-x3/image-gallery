@@ -1,7 +1,7 @@
 import { lstat, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { GalleryImage, ImageDetailsResponse, ImageKind } from "../shared/types.js";
-import { readImageMetadata, readImageNameMetadata } from "./metadata.js";
+import { readImageMetadataResult, readImageNameMetadata } from "./metadata.js";
 import { imagePreviewIsCached } from "./previews.js";
 
 const supportedExtensions = new Map<string, ImageKind>([
@@ -85,17 +85,30 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
         ? `previews/${toUrlPath(relativePath)}?v=${Math.trunc(stats.mtimeMs)}-${stats.size}`
         : undefined;
       let metadata;
+      let category;
+      let metadataPresent;
+      let metadataInvalid;
+      let metadataSchema;
+      let metadataSupported;
+      let metadataEnabled;
       let shortName;
-      if (includeDetails) {
-        const metadataPath = metadataFiles.get(path.basename(entry.name, path.extname(entry.name)));
-        if (metadataPath) {
-          try {
-            metadata = await readImageMetadata(metadataPath);
-          } catch (error) {
-            console.warn(`Ignoring invalid metadata for ${relativePath}:`, error);
-          }
+      const metadataPath = metadataFiles.get(path.basename(entry.name, path.extname(entry.name)));
+      if (metadataPath) {
+        metadataPresent = true;
+        try {
+          const result = await readImageMetadataResult(metadataPath);
+          category = result.category;
+          metadataSchema = result.schema;
+          metadataSupported = result.supported;
+          metadataEnabled = result.enabled;
+          if (includeDetails) metadata = result.metadata;
+        } catch (error) {
+          metadataInvalid = true;
+          console.warn(`Ignoring invalid metadata for ${relativePath}:`, error);
         }
+      }
 
+      if (includeDetails) {
         const nameMetadataPath = nameMetadataFiles.get(path.basename(entry.name, path.extname(entry.name)));
         if (nameMetadataPath) {
           try {
@@ -127,6 +140,12 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
         modifiedAt: stats.mtime.toISOString(),
         type,
         ...(relativeDirectory === "." ? {} : { batch: relativeDirectory }),
+        ...(category ? { category } : {}),
+        ...(metadataPresent ? { metadataPresent } : {}),
+        ...(metadataInvalid ? { metadataInvalid } : {}),
+        ...(metadataSchema ? { metadataSchema } : {}),
+        ...(metadataSupported === undefined ? {} : { metadataSupported }),
+        ...(metadataEnabled === undefined ? {} : { metadataEnabled }),
         ...(metadata ? { metadata } : {}),
         ...(shortName ? { shortName } : {}),
       });
@@ -177,11 +196,26 @@ export async function readGalleryImageDetails(root: string, requestedPath: strin
 
   const stem = imagePath.slice(0, -path.extname(imagePath).length);
   let metadata;
+  let category;
+  let metadataPresent;
+  let metadataInvalid;
+  let metadataSchema;
+  let metadataSupported;
+  let metadataEnabled;
   let shortName;
   try {
-    metadata = await readImageMetadata(`${stem}.json`);
+    metadataPresent = true;
+    const result = await readImageMetadataResult(`${stem}.json`);
+    metadata = result.metadata;
+    category = result.category;
+    metadataSchema = result.schema;
+    metadataSupported = result.supported;
+    metadataEnabled = result.enabled;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      metadataPresent = undefined;
+    } else {
+      metadataInvalid = true;
       console.warn(`Ignoring invalid metadata for ${requestedPath}:`, error);
     }
   }
@@ -193,6 +227,12 @@ export async function readGalleryImageDetails(root: string, requestedPath: strin
     }
   }
   return {
+    ...(category ? { category } : {}),
+    ...(metadataPresent ? { metadataPresent } : {}),
+    ...(metadataInvalid ? { metadataInvalid } : {}),
+    ...(metadataSchema ? { metadataSchema } : {}),
+    ...(metadataSupported === undefined ? {} : { metadataSupported }),
+    ...(metadataEnabled === undefined ? {} : { metadataEnabled }),
     ...(metadata ? { metadata } : {}),
     ...(shortName ? { shortName } : {}),
   };
