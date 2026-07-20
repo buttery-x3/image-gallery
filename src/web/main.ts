@@ -1,6 +1,7 @@
 import "./styles.css";
 import type {
   ErrorResponse,
+  GalleryCategory,
   GalleryImage,
   GalleryResponse,
   ImageDetailsResponse,
@@ -39,6 +40,8 @@ const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const slideshowButton = requiredElement<HTMLButtonElement>("#slideshow");
 const searchInput = requiredElement<HTMLInputElement>("#search");
 const favoritesOnly = requiredElement<HTMLInputElement>("#favorites-only");
+const categoryInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="gallery-category"]')];
+if (categoryInputs.length !== 4) throw new Error("Missing gallery category controls");
 const nameLanguageFieldset = requiredElement<HTMLElement>(".name-language");
 const nameLanguageInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="name-language"]')];
 if (nameLanguageInputs.length !== 2) throw new Error("Missing name language controls");
@@ -113,6 +116,8 @@ let lightboxTouchStart: { identifier: number; x: number; y: number; startedAt: n
 let activeImageLoads = 0;
 let allImages: GalleryImage[] = [];
 let galleryImages: GalleryImage[] = [];
+let activeCategory: "all" | GalleryCategory = "all";
+const categoryBuckets = new Map<GalleryCategory, GalleryImage[]>();
 let searchTimer: number | undefined;
 let shufflePending = false;
 let slideshowSequence: GalleryImage[] = [];
@@ -145,6 +150,11 @@ const uiCopy = {
     slideshow: "Slideshow",
     searchImages: "Search images",
     onlyFavorites: "Only favorites",
+    categoryFilter: "Gallery category",
+    all: "All",
+    women: "Women",
+    creatures: "Creatures",
+    men: "Men",
     displayLanguage: "Display name language",
     advanced: "Advanced",
     buyCoffee: "Buy me a coffee",
@@ -181,6 +191,11 @@ const uiCopy = {
     loadFailed: "The gallery could not be loaded.",
   },
   ja: {
+    categoryFilter: "\u30ae\u30e3\u30e9\u30ea\u30fc\u306e\u30ab\u30c6\u30b4\u30ea\u30fc",
+    all: "\u3059\u3079\u3066",
+    women: "\u5973\u6027",
+    creatures: "\u30af\u30ea\u30fc\u30c1\u30e3\u30fc",
+    men: "\u7537\u6027",
     shuffle: "シャッフル",
     slideshow: "スライドショー",
     searchImages: "画像を検索",
@@ -421,6 +436,7 @@ function shuffleGallery(): void {
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
       allImages = shuffledImages(allImages);
+      rebuildCategoryBuckets();
       reorderTiles();
       applyFilters();
       window.requestAnimationFrame(() => {
@@ -723,6 +739,7 @@ function hideReportedImage(path: string, persist: boolean): void {
 
   const hiddenImage = allImages.find((image) => image.path === path);
   allImages = allImages.filter((image) => image.path !== path);
+  rebuildCategoryBuckets();
   if (hiddenImage) {
     const tile = tilesByImage.get(hiddenImage);
     tile?.remove();
@@ -1274,9 +1291,22 @@ function updateFilterCount(): void {
     : (nameLanguage === "ja" ? `${count}件のフィルターが有効` : `Advanced filters, ${count} active`));
 }
 
+function rebuildCategoryBuckets(): void {
+  categoryBuckets.clear();
+  for (const category of ["women", "creatures", "men"] as const) categoryBuckets.set(category, []);
+  for (const image of allImages) {
+    if (image.category) categoryBuckets.get(image.category)!.push(image);
+  }
+  for (const element of document.querySelectorAll<HTMLElement>("[data-category-count]")) {
+    const category = element.dataset.categoryCount;
+    element.textContent = String(category === "all" ? allImages.length : categoryBuckets.get(category as GalleryCategory)?.length ?? 0);
+  }
+}
+
 function applyFilters(): void {
   const terms = normalized(searchInput.value).split(/\s+/).filter(Boolean);
-  const images = allImages.filter((image) => {
+  const candidates = activeCategory === "all" ? allImages : categoryBuckets.get(activeCategory) ?? [];
+  const images = candidates.filter((image) => {
     if (favoritesOnly.checked && !isFavorite(image)) return false;
     if (terms.some((term) => !searchIndex(image).includes(term))) return false;
     for (const [key, value] of activeFilters) {
@@ -1358,6 +1388,13 @@ searchInput.addEventListener("input", () => {
   searchTimer = window.setTimeout(() => void applyFiltersWithBusy(), 120);
 });
 favoritesOnly.addEventListener("change", () => void applyFiltersWithBusy());
+for (const input of categoryInputs) {
+  input.addEventListener("change", () => {
+    if (!input.checked) return;
+    activeCategory = input.value as "all" | GalleryCategory;
+    void applyFiltersWithBusy();
+  });
+}
 
 function resizeTile(tile: HTMLElement): void {
   const styles = window.getComputedStyle(gallery);
@@ -1758,7 +1795,12 @@ function renderImageMetadata(image: GalleryImage): void {
 
   const metadata = image.metadata;
   if (!metadata) {
-    metadataStatus.textContent = "No metadata sidecar is available for this image.";
+    if (!image.metadataPresent) metadataStatus.textContent = "No metadata sidecar is available for this image.";
+    else if (image.metadataInvalid) metadataStatus.textContent = "The metadata sidecar is not valid JSON.";
+    else if (!image.metadataSchema) metadataStatus.textContent = "The metadata sidecar does not contain a recognized schema marker.";
+    else if (image.metadataSupported === false) metadataStatus.textContent = `Metadata schema ${image.metadataSchema} is preserved but not supported.`;
+    else if (image.metadataEnabled === false) metadataStatus.textContent = `Metadata schema ${image.metadataSchema} is preserved but not enabled.`;
+    else metadataStatus.textContent = `Metadata schema ${image.metadataSchema} could not be normalized.`;
     return;
   }
   metadataStatus.textContent = "";
@@ -2109,6 +2151,9 @@ async function loadGallery(): Promise<void> {
       return;
     }
     allImages = shuffledImages(payload.images.filter((image) => !reportedImagePaths.has(image.path)));
+    activeCategory = "all";
+    for (const input of categoryInputs) input.checked = input.value === "all";
+    rebuildCategoryBuckets();
     galleryLoadState = "ready";
     activeFilters.clear();
     renderFilterControls();

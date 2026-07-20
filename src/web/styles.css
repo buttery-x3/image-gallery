@@ -381,6 +381,34 @@ main { flex: 1 0 auto; }
   flex-wrap: wrap;
 }
 
+.category-filter {
+  display: inline-flex;
+  height: 36px;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.category-filter label { position: relative; cursor: pointer; }
+.category-filter input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.category-filter label > span {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  gap: 4px;
+  padding: 0 9px;
+  border-radius: 6px;
+  color: #999ca2;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.category-filter small { color: inherit; font-size: 0.62rem; opacity: 0.72; }
+.category-filter input:checked + span { background: #f3f3f1; color: #111214; }
+.category-filter input:focus-visible + span { outline: 2px solid #fff; outline-offset: 2px; }
+
 .search-field {
   position: relative;
   flex: 1 1 220px;
@@ -1495,6 +1523,7 @@ html:not([data-theme="classic"]):not([data-theme="glass"]) .site-header h1 {
 .search-field svg { stroke: var(--faint); }
 
 .search-field input,
+.category-filter,
 .name-language,
 .shuffle-button,
 .advanced-button {
@@ -1513,8 +1542,10 @@ html:not([data-theme="classic"]):not([data-theme="glass"]) .site-header h1 {
   color: var(--text);
 }
 
-.name-language span { border-radius: max(0px, calc(var(--control-radius) - 2px)); color: var(--faint); }
+.name-language span,
+.category-filter label > span { border-radius: max(0px, calc(var(--control-radius) - 2px)); color: var(--faint); }
 .name-language input:checked + span,
+.category-filter input:checked + span,
 .filter-count,
 .searchable-toggle input:checked + .toggle-track {
   border-color: var(--accent);
@@ -1694,6 +1725,9 @@ html[data-theme="accessible"] .theme-picker select { font-size: 0.8rem; }
   .header-title { gap: 8px; }
   .header-controls { gap: 6px; }
   .header-meta { gap: 8px; }
+  .category-filter { width: 100%; order: -1; overflow-x: auto; }
+  .category-filter label { flex: 1 0 auto; }
+  .category-filter label > span { justify-content: center; }
   .search-field { flex-basis: 180px; }
   .search-field input,
   .advanced-button { min-height: 32px; height: 32px; }

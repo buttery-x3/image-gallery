@@ -54,6 +54,13 @@
         </button>
       </div>
       <div class="header-controls">
+        <fieldset class="category-filter" aria-label="Gallery category" data-i18n-aria-label="categoryFilter">
+          <legend class="visually-hidden" data-i18n="categoryFilter">Gallery category</legend>
+          <label><input type="radio" name="gallery-category" value="all" checked /><span><span data-i18n="all">All</span> <small data-category-count="all">0</small></span></label>
+          <label><input type="radio" name="gallery-category" value="women" /><span><span data-i18n="women">Women</span> <small data-category-count="women">0</small></span></label>
+          <label><input type="radio" name="gallery-category" value="creatures" /><span><span data-i18n="creatures">Creatures</span> <small data-category-count="creatures">0</small></span></label>
+          <label><input type="radio" name="gallery-category" value="men" /><span><span data-i18n="men">Men</span> <small data-category-count="men">0</small></span></label>
+        </fieldset>
         <label class="search-field">
           <span class="visually-hidden" data-i18n="searchImages">Search images</span>
           <svg aria-hidden="true" viewBox="0 0 24 24">
