@@ -26,6 +26,8 @@ Copy or clone the repository into `/opt/image-gallery`, then give the service ac
 sudo chown -R image-gallery:image-gallery /opt/image-gallery
 ```
 
+Keep the committed `metadata-schemas/` directory at the repository root. The service working directory is `/opt/image-gallery`, and the server loads enabled metadata definitions from that directory when it starts. After adding or enabling a definition, rebuild if application code also changed and restart the service.
+
 ## 3. Build the application
 
 ```sh

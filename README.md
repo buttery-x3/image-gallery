@@ -32,6 +32,7 @@ Edit [`gallery.config.json`](gallery.config.json) before building or starting th
 | `searchMetadata` | `false` | When enabled, search also indexes cached JSON metadata and generated names; otherwise it searches filenames only |
 | `showLanguageToggle` | `false` | Show the EN / JP interface-language control |
 | `showNames` | `false` | Show image names in tiles and the lightbox |
+| `metadata.enabledSchemas` | all installed definitions | Metadata schemas normalized for categories, search, and filters |
 | `enableReporting` | `false` | Show controls for reporting an image as explicit content |
 | `showWatermark` | `true` | Show the watermark in the lightbox |
 | `watermarkText` | `waiaifu.lol` | Text shown in the lightbox watermark |
@@ -66,7 +67,9 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 
 Hidden entries, symbolic links, and unsupported files are ignored. New files appear after a page refresh; no rebuild is required. Images near the viewport are loaded first, then loading continues through the full gallery in the background with no more than four media files loading concurrently.
 
-Images may have a same-name JSON sidecar in the same directory. The `anime_waifu_lite/v1` format is used when metadata search and advanced tag filters are enabled; invalid, unsupported, or missing metadata does not prevent the image from appearing. Every image exposes its filename stem to the default filename search. The containing subdirectory is available as a Batch filter.
+Images may have a same-name JSON sidecar in the same directory. Batching preserves any valid JSON sidecar regardless of its schema. Definitions under `metadata-schemas/` normalize enabled schemas into common gallery categories and tags; unsupported, disabled, or missing metadata does not prevent the image from appearing. The top-level All / Women / Creatures / Men selector uses each definition's category, while advanced filters combine canonical tags across every enabled schema. Every image exposes its filename stem to the default filename search. The containing subdirectory is available as a Batch filter.
+
+The included definitions support `anime_waifu_lite/v1` as Women and `anime_creature_lite_v4/v1` as Creatures. Future formats, including a men-only generator, can be added without changing the gallery UI or batcher. See [Metadata schemas](docs/METADATA_SCHEMAS.md) for the definition format and `process-new-schema` workflow.
 
 Generated fantasy names also receive a `<long-name>.gallery-name.json` sidecar using the `image-gallery/name/v1` schema. It stores a short English display name and its katakana equivalent. When `showNames` is enabled, the lightbox can show the full filename stem and bilingual short names, with the English text colored from the first two usable metadata colors and a white/black fallback. Lightbox controls can hide the bilingual name or cycle it through all four corners; those choices persist in the browser. A lowercase black `waiaifu.lol` mark remains at 50% opacity in the diagonally opposite corner. Both name versions become searchable when `searchMetadata` is enabled, and the EN / JP control is available when `showLanguageToggle` is enabled.
 
@@ -78,7 +81,7 @@ To organize every root-level image into a timestamped batch and cache only that 
 bash ./process-batch.sh
 ```
 
-Images without JSON metadata are included. When a same-name JSON sidecar is present, it is validated and moved alongside its image. Orphaned or invalid JSON stops the batch before anything moves. Before moving anything, the batcher indexes existing metadata and file sizes, then SHA-256 hashes only plausible same-size duplicate candidates. Exact duplicate image/JSON pairs are moved recoverably into `GALLERY_DIR/.duplicates/<timestamp>/`, which remains hidden from the site; metadata matches with different image content stay in the normal batch and are reported. Duplicate images are also detected when metadata is missing or has changed.
+Images without JSON metadata are included. When a same-name JSON sidecar is present, its JSON syntax is validated and it is moved alongside its image without requiring a recognized schema. Orphaned or invalid JSON stops the batch before anything moves and is never deleted automatically. Before moving anything, the batcher indexes existing metadata and file sizes, then SHA-256 hashes only plausible same-size duplicate candidates. Exact duplicate image/JSON pairs are moved recoverably into `GALLERY_DIR/.duplicates/<timestamp>/`, which remains hidden from the site; metadata matches with different image content stay in the normal batch and are reported. Duplicate images are also detected when metadata is missing or has changed.
 
 When `BATCH_NAME_STYLE=japanese-fantasy` is set, each unique image and prompt sidecar receives the same long generated name during the move. The batcher also creates generated-name metadata containing a 1–5-mora given-name prefix, a 2–4-mora family-name prefix, and the matching katakana display name. Existing previews remain valid across moves and renames, and only missing previews are requested, with up to four concurrent requests.
 
@@ -123,6 +126,7 @@ The command does not prompt. It validates the URL and gallery path, then removes
 | `bash ./process-batch.sh` | Organize root-level uploads and generate only missing previews |
 | `bash ./rename-existing.sh` | Force generated names onto images already inside batch directories |
 | `npm run backfill-name-metadata` | Add missing EN/JP display-name sidecars without renaming images |
+| `npm run process-new-schema` | Scaffold, validate, and optionally enable a declarative metadata schema |
 | `bash ./remove-image.sh '<url>'` | Permanently remove an image, its sidecars, and generated preview |
 | `npm run scan-for-duplicates` / `bash ./scan-for-duplicates.sh` | SHA-256 scan all batched images and report exact duplicates |
 
@@ -134,6 +138,8 @@ On the Linux server described in the installation guide, deploy an update with `
 src/server/    Express server, directory scanning, and media delivery
 src/shared/    Types shared by the browser and server
 src/web/       Single-page gallery interface
+src/tools/     Local schema onboarding tools
+metadata-schemas/ Declarative metadata-to-gallery mappings
 docs/          Installation documentation plus Caddy and systemd examples
 gallery/       Default local media directory (contents are ignored by Git)
 ```
