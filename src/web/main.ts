@@ -318,12 +318,14 @@ function syncHeaderLayout(): void {
     .map((element) => outerWidth(element))
     .filter((width) => width > 0);
   const supportStyle = window.getComputedStyle(supportButton);
-  metaWidths.push(outerWidth(supportButton, pixelValue(supportStyle.width)));
+  if (supportStyle.display !== "none") {
+    metaWidths.push(outerWidth(supportButton, pixelValue(supportStyle.width)));
+  }
   const metaWidth = metaWidths.reduce((total, width) => total + width, 0)
     + Math.max(0, metaWidths.length - 1) * pixelValue(metaStyle.columnGap);
-  const edgeColumnWidth = Math.max(flexRowWidth(headerTitle), metaWidth);
-  const requiredWidth = 2 * edgeColumnWidth
+  const requiredWidth = flexRowWidth(headerTitle)
     + Math.max(controlsWidth, oneRowControlsTrackWidth)
+    + metaWidth
     + 2 * pixelValue(headerStyle.columnGap);
   const availableWidth = siteHeader.clientWidth
     - pixelValue(headerStyle.paddingLeft)
