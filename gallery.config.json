@@ -1,9 +1,9 @@
 {
-  "siteName": "Image Gallery",
-  "searchMetadata": false,
+  "siteName": "test",
+  "searchMetadata": true,
   "showTypeToggle": true,
-  "showLanguageToggle": false,
-  "showNames": false,
+  "showLanguageToggle": true,
+  "showNames": true,
   "metadata": {
     "schemas": {
       "anime_waifu_lite/v1": {
