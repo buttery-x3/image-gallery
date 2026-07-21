@@ -10,7 +10,8 @@ This repository is intentionally a small private image gallery. Keep the impleme
 - `src/web` contains the framework-free Vite/TypeScript SPA.
 - `src/shared` contains the API types shared by both sides.
 - `src/tools` contains small local maintenance and schema-onboarding commands.
-- `metadata-schemas` contains declarative mappings from source metadata schemas to gallery categories and tags.
+- `metadata-schemas` contains declarative mappings from source metadata schemas to gallery tags.
+- `name-generation-schemas` contains declarative filename and optional short-name generation rules.
 - `gallery` is local content and must never be committed, modified, or deleted by application code.
 - The production build is generated under `dist` and is not committed.
 
@@ -28,6 +29,7 @@ This repository is intentionally a small private image gallery. Keep the impleme
 - Hidden files and symbolic links must not be exposed.
 - Ordinary same-stem JSON sidecars must be preserved regardless of whether their schema is enabled or understood.
 - The batcher must remain schema-neutral; new metadata formats should normally be added through declarative definitions.
+- Product categories and name generation are assigned per source metadata schema in `gallery.config.json`, not embedded in reusable definitions.
 
 ## Scope discipline
 

@@ -1,0 +1,73 @@
+{
+  "definitionVersion": 1,
+  "schema": "image-gallery/name-generator/waifu-japanese-fantasy/v1",
+  "engine": "mora-pair/v1",
+  "fileName": {
+    "partSeparator": "-",
+    "givenMiddleCount": 7,
+    "familyMiddleCount": 8
+  },
+  "representations": {
+    "en": {
+      "partSeparator": " ",
+      "capitalizeParts": true,
+      "givenMoraRange": [1, 5],
+      "familyMoraRange": [2, 4]
+    },
+    "ja": {
+      "partSeparator": "・",
+      "script": "katakana"
+    }
+  },
+  "weights": {
+    "middleCommon": 6,
+    "initialCommon": 3
+  },
+  "mora": {
+    "middle": [
+      "a", "i", "u", "e", "o", "ka", "ki", "ku", "ke", "ko", "ga", "gi", "gu", "ge", "go",
+      "sa", "shi", "su", "se", "so", "za", "ji", "zu", "ze", "zo", "ta", "chi", "tsu", "te", "to",
+      "da", "di", "du", "de", "do", "na", "ni", "nu", "ne", "no", "ha", "hi", "fu", "he", "ho",
+      "ba", "bi", "bu", "be", "bo", "pa", "pi", "pu", "pe", "po", "ma", "mi", "mu", "me", "mo",
+      "ya", "yu", "yo", "ra", "ri", "ru", "re", "ro", "wa", "wo", "kya", "kyu", "kyo", "gya",
+      "gyu", "gyo", "sha", "shu", "sho", "ja", "ju", "jo", "cha", "chu", "cho", "nya", "nyu", "nyo",
+      "hya", "hyu", "hyo", "bya", "byu", "byo", "pya", "pyu", "pyo", "mya", "myu", "myo", "rya",
+      "ryu", "ryo", "fa", "fi", "fe", "fo"
+    ],
+    "common": [
+      "ka", "ki", "ku", "ke", "ko", "ga", "gi", "gu", "ge", "go", "sa", "shi", "su", "se", "so",
+      "za", "ji", "zu", "ze", "zo", "ta", "chi", "tsu", "te", "to", "da", "de", "do", "na", "ni",
+      "nu", "ne", "no", "ha", "hi", "fu", "he", "ho", "ba", "bi", "bu", "be", "bo", "pa", "pi",
+      "pu", "pe", "po", "ma", "mi", "mu", "me", "mo", "ya", "yu", "yo", "ra", "ri", "ru", "re",
+      "ro", "wa", "fa", "fi", "fe", "fo"
+    ],
+    "initialExcluded": ["a", "i", "u", "e", "o", "wo"],
+    "ending": [
+      "ra", "ri", "ru", "re", "ro", "na", "ni", "nu", "ne", "no", "ma", "mi", "mu", "me", "mo",
+      "ya", "yu", "yo", "ka", "ki", "ku", "ke", "ko", "sa", "shi", "su", "se", "so", "ta", "chi",
+      "tsu", "te", "to", "mori", "nagi", "hara", "kura", "hane", "yume", "zora"
+    ],
+    "katakana": {
+      "a": "ア", "i": "イ", "u": "ウ", "e": "エ", "o": "オ",
+      "ka": "カ", "ki": "キ", "ku": "ク", "ke": "ケ", "ko": "コ",
+      "ga": "ガ", "gi": "ギ", "gu": "グ", "ge": "ゲ", "go": "ゴ",
+      "sa": "サ", "shi": "シ", "su": "ス", "se": "セ", "so": "ソ",
+      "za": "ザ", "ji": "ジ", "zu": "ズ", "ze": "ゼ", "zo": "ゾ",
+      "ta": "タ", "chi": "チ", "tsu": "ツ", "te": "テ", "to": "ト",
+      "da": "ダ", "di": "ヂ", "du": "ヅ", "de": "デ", "do": "ド",
+      "na": "ナ", "ni": "ニ", "nu": "ヌ", "ne": "ネ", "no": "ノ",
+      "ha": "ハ", "hi": "ヒ", "fu": "フ", "he": "ヘ", "ho": "ホ",
+      "ba": "バ", "bi": "ビ", "bu": "ブ", "be": "ベ", "bo": "ボ",
+      "pa": "パ", "pi": "ピ", "pu": "プ", "pe": "ペ", "po": "ポ",
+      "ma": "マ", "mi": "ミ", "mu": "ム", "me": "メ", "mo": "モ",
+      "ya": "ヤ", "yu": "ユ", "yo": "ヨ", "ra": "ラ", "ri": "リ", "ru": "ル", "re": "レ", "ro": "ロ",
+      "wa": "ワ", "wo": "ヲ", "kya": "キャ", "kyu": "キュ", "kyo": "キョ",
+      "gya": "ギャ", "gyu": "ギュ", "gyo": "ギョ", "sha": "シャ", "shu": "シュ", "sho": "ショ",
+      "ja": "ジャ", "ju": "ジュ", "jo": "ジョ", "cha": "チャ", "chu": "チュ", "cho": "チョ",
+      "nya": "ニャ", "nyu": "ニュ", "nyo": "ニョ", "hya": "ヒャ", "hyu": "ヒュ", "hyo": "ヒョ",
+      "bya": "ビャ", "byu": "ビュ", "byo": "ビョ", "pya": "ピャ", "pyu": "ピュ", "pyo": "ピョ",
+      "mya": "ミャ", "myu": "ミュ", "myo": "ミョ", "rya": "リャ", "ryu": "リュ", "ryo": "リョ",
+      "fa": "ファ", "fi": "フィ", "fe": "フェ", "fo": "フォ"
+    }
+  }
+}

@@ -3,27 +3,61 @@ import { createHash } from "node:crypto";
 import { constants as fileSystemConstants, createReadStream, readFileSync } from "node:fs";
 import { access, copyFile, lstat, mkdir, readdir, readFile, rename, rm, rmdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { generateJapaneseFantasyName, generateShortNameForStem } from "./gallery-name-generator.mjs";
+import { generateName, generateShortNameForStem, loadNameGenerationDefinitions } from "./gallery-name-generator.mjs";
 
 const supportedExtensions = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"]);
 const nameMetadataSuffix = ".gallery-name.json";
-const nameMetadataSchema = "image-gallery/name/v1";
-const namingStyle = process.env.BATCH_NAME_STYLE?.trim() ?? "";
-if (namingStyle && namingStyle !== "japanese-fantasy") {
-  throw new Error(`Unsupported BATCH_NAME_STYLE: ${namingStyle}`);
+const legacyNameMetadataSchema = "image-gallery/name/v1";
+const nameMetadataSchema = "image-gallery/name/v2";
+if (process.env.BATCH_NAME_STYLE?.trim()) {
+  throw new Error(
+    "BATCH_NAME_STYLE is no longer supported. Configure metadata.schemas.<source-schema>.nameGeneration in gallery.config.json.",
+  );
 }
-const namingEnabled = namingStyle === "japanese-fantasy";
-function readShowNames() {
+
+function readMetadataSchemaPolicies() {
   const configPath = path.resolve("gallery.config.json");
   try {
     const parsed = JSON.parse(readFileSync(configPath, "utf8"));
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
-    return parsed.showNames === true;
-  } catch {
-    return false;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return new Map();
+    const metadata = parsed.metadata;
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return new Map();
+    if (metadata.enabledSchemas !== undefined) {
+      throw new Error("gallery.config.json metadata.enabledSchemas has been replaced by metadata.schemas.");
+    }
+    if (metadata.schemas === undefined) return new Map();
+    if (!metadata.schemas || typeof metadata.schemas !== "object" || Array.isArray(metadata.schemas)) {
+      throw new Error("gallery.config.json metadata.schemas must be an object.");
+    }
+    const policies = new Map();
+    for (const [sourceSchema, value] of Object.entries(metadata.schemas)) {
+      if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.enabled !== "boolean") {
+        throw new Error(`gallery.config.json metadata.schemas.${sourceSchema} must contain enabled: true or false.`);
+      }
+      let nameGeneration;
+      if (value.nameGeneration !== undefined) {
+        if (!value.enabled) throw new Error(`Name generation cannot be configured for disabled metadata schema ${sourceSchema}.`);
+        if (!value.nameGeneration || typeof value.nameGeneration !== "object" || Array.isArray(value.nameGeneration)) {
+          throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration must be an object.`);
+        }
+        const definition = value.nameGeneration.definition;
+        const shortNames = value.nameGeneration.shortNames ?? [];
+        if (typeof definition !== "string" || !definition.trim()) {
+          throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration.definition must be a non-empty string.`);
+        }
+        if (!Array.isArray(shortNames) || shortNames.some((language) => language !== "en" && language !== "ja") || new Set(shortNames).size !== shortNames.length) {
+          throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration.shortNames must contain unique en/ja values.`);
+        }
+        nameGeneration = { definition: definition.trim(), shortNames: [...shortNames] };
+      }
+      policies.set(sourceSchema, { enabled: value.enabled, ...(nameGeneration ? { nameGeneration } : {}) });
+    }
+    return policies;
+  } catch (error) {
+    throw new Error(`Could not read gallery metadata configuration: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
-const nameMetadataEnabled = readShowNames();
+const metadataSchemaPolicies = readMetadataSchemaPolicies();
 
 const argumentsToParse = process.argv.slice(2);
 const knownFlags = new Set(["--backfill-name-metadata", "--dry-run", "--rename-existing"]);
@@ -46,20 +80,43 @@ if (
 const requestedBaseUrl = positionalArguments[0];
 const galleryRoot = path.resolve(process.env.GALLERY_DIR ?? "gallery");
 const previewCacheRoot = path.resolve(process.env.PREVIEW_CACHE_DIR ?? ".cache/previews");
+const nameGenerationDefinitionsRoot = path.resolve("name-generation-schemas");
+
+function sourceMetadataSchema(parsed) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+  if (typeof parsed.schema === "string" && parsed.schema.trim()) return parsed.schema.trim();
+  const candidates = Object.values(parsed).filter(
+    (value) => value && typeof value === "object" && !Array.isArray(value) && typeof value.schema === "string" && value.schema.trim(),
+  );
+  return candidates.length === 1 ? candidates[0].schema.trim() : undefined;
+}
 
 function supportedNameMetadataRecord(parsed) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
   const shortName = parsed.shortName;
+  if (!shortName || typeof shortName !== "object" || Array.isArray(shortName)) return undefined;
+  const en = typeof shortName.en === "string" ? shortName.en.trim() : "";
+  const ja = typeof shortName.ja === "string" ? shortName.ja.trim() : "";
+  if (parsed.schema === legacyNameMetadataSchema) return en && ja ? { shortName: { en, ja } } : undefined;
   if (
-    parsed.schema !== nameMetadataSchema || !shortName || typeof shortName !== "object" ||
-    Array.isArray(shortName) || typeof shortName.en !== "string" || !shortName.en.trim() ||
-    typeof shortName.ja !== "string" || !shortName.ja.trim()
+    parsed.schema !== nameMetadataSchema || (!en && !ja) ||
+    typeof parsed.sourceMetadataSchema !== "string" || !parsed.sourceMetadataSchema.trim() ||
+    typeof parsed.generatorSchema !== "string" || !parsed.generatorSchema.trim()
   ) return undefined;
-  return { en: shortName.en.trim(), ja: shortName.ja.trim() };
+  return {
+    shortName: { ...(en ? { en } : {}), ...(ja ? { ja } : {}) },
+    sourceMetadataSchema: parsed.sourceMetadataSchema.trim(),
+    generatorSchema: parsed.generatorSchema.trim(),
+  };
 }
 
-function nameMetadataContents(shortName) {
-  return `${JSON.stringify({ schema: nameMetadataSchema, shortName }, null, 2)}\n`;
+function nameMetadataContents(sourceSchema, generatorSchema, shortName) {
+  return `${JSON.stringify({
+    schema: nameMetadataSchema,
+    sourceMetadataSchema: sourceSchema,
+    generatorSchema,
+    shortName,
+  }, null, 2)}\n`;
 }
 
 function nameMetadataStem(fileName) {
@@ -161,6 +218,7 @@ async function readImageRecords(directory, options = {}) {
     metadataByImage.set(matches[0].name, {
       metadataName: jsonFile.name,
       metadataFingerprint: metadataFingerprint(parsed),
+      sourceMetadataSchema: sourceMetadataSchema(parsed),
     });
   }
 
@@ -180,14 +238,16 @@ async function readImageRecords(directory, options = {}) {
     } catch (error) {
       throw new Error(`${displayPath} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
     }
-    const shortName = supportedNameMetadataRecord(parsed);
-    if (!shortName && !options.allowInvalidNameMetadata) {
-      throw new Error(`${displayPath} does not contain supported ${nameMetadataSchema} metadata.`);
+    const nameMetadata = supportedNameMetadataRecord(parsed);
+    if (!nameMetadata && !options.allowInvalidNameMetadata) {
+      throw new Error(`${displayPath} does not contain supported ${legacyNameMetadataSchema} or ${nameMetadataSchema} metadata.`);
     }
     nameMetadataByImage.set(matches[0].name, {
       nameMetadataName: nameMetadataFile.name,
-      shortName,
-      nameMetadataInvalid: !shortName,
+      shortName: nameMetadata?.shortName,
+      nameGeneratorSchema: nameMetadata?.generatorSchema,
+      nameSourceMetadataSchema: nameMetadata?.sourceMetadataSchema,
+      nameMetadataInvalid: !nameMetadata,
     });
   }
 
@@ -199,8 +259,11 @@ async function readImageRecords(directory, options = {}) {
       imageName: imageFile.name,
       metadataName: metadata?.metadataName,
       metadataFingerprint: metadata?.metadataFingerprint,
+      sourceMetadataSchema: metadata?.sourceMetadataSchema,
       nameMetadataName: nameMetadata?.nameMetadataName,
       shortName: nameMetadata?.shortName,
+      nameGeneratorSchema: nameMetadata?.nameGeneratorSchema,
+      nameSourceMetadataSchema: nameMetadata?.nameSourceMetadataSchema,
       nameMetadataInvalid: nameMetadata?.nameMetadataInvalid,
     };
   });
@@ -212,7 +275,7 @@ async function collectBatchedImageRecords(options = {}) {
   async function walk(directory, isRoot) {
     if (!isRoot) records.push(...await readImageRecords(directory, {
       allowNameMetadata: true,
-      allowInvalidNameMetadata: options.allowInvalidNameMetadata,
+      allowInvalidNameMetadata: options.allowInvalidNameMetadata !== false,
     }));
     const entries = await readdir(directory, { withFileTypes: true });
     for (const entry of entries) {
@@ -339,10 +402,43 @@ async function collectUsedImageStems() {
 }
 
 async function collectUsedShortNames() {
-  const records = await collectBatchedImageRecords();
-  return new Set(records.flatMap((record) => record.shortName
-    ? [record.shortName.en.toLocaleLowerCase("en-US")]
-    : []));
+  const records = await collectBatchedImageRecords({ allowInvalidNameMetadata: true });
+  return {
+    en: new Set(records.flatMap((record) => record.shortName?.en
+      ? [record.shortName.en.toLocaleLowerCase("en-US")]
+      : [])),
+    ja: new Set(records.flatMap((record) => record.shortName?.ja
+      ? [record.shortName.ja.toLocaleLowerCase("en-US")]
+      : [])),
+  };
+}
+
+function nameGenerationPolicy(record) {
+  if (!record.sourceMetadataSchema) return undefined;
+  return metadataSchemaPolicies.get(record.sourceMetadataSchema)?.nameGeneration;
+}
+
+async function nameDefinitionsFor(records) {
+  const requestedBySchema = new Map();
+  for (const record of records) {
+    const policy = nameGenerationPolicy(record);
+    if (!policy) continue;
+    const requested = requestedBySchema.get(policy.definition) ?? new Set();
+    for (const representation of policy.shortNames) requested.add(representation);
+    requestedBySchema.set(policy.definition, requested);
+  }
+  return loadNameGenerationDefinitions(
+    nameGenerationDefinitionsRoot,
+    new Map([...requestedBySchema].map(([schema, representations]) => [schema, [...representations]])),
+  );
+}
+
+function generateNameForRecord(record, definitions, usedNames, usedShortNames) {
+  const policy = nameGenerationPolicy(record);
+  if (!policy) return undefined;
+  const definition = definitions.get(policy.definition);
+  if (!definition) throw new Error(`Name generation definition ${policy.definition} was not loaded.`);
+  return generateName(definition, policy.shortNames, usedNames, usedShortNames);
 }
 
 function previewCacheKey(identifier, size, modifiedAt) {
@@ -525,24 +621,31 @@ async function cacheMissingPreviews(batchName) {
 }
 
 async function renameExistingBatches() {
-  if (!namingEnabled) {
-    throw new Error("Set BATCH_NAME_STYLE=japanese-fantasy before renaming existing batches.");
-  }
-
-  const records = await collectBatchedImageRecords();
+  const records = await collectBatchedImageRecords({ allowInvalidNameMetadata: true });
   if (records.length === 0) {
     console.log("No images were found in existing batch directories.");
     return;
   }
+  const recordsToRename = records.filter((record) => nameGenerationPolicy(record));
+  if (recordsToRename.length === 0) {
+    console.log("No existing images use a source metadata schema with configured name generation.");
+    return;
+  }
+  const invalidRecord = recordsToRename.find((record) => record.nameMetadataInvalid);
+  if (invalidRecord) {
+    throw new Error(`${relativeGalleryPath(path.join(invalidRecord.directory, invalidRecord.nameMetadataName))} is invalid and cannot be replaced automatically.`);
+  }
 
+  const definitions = await nameDefinitionsFor(recordsToRename);
   const usedNames = await collectUsedImageStems();
   const usedShortNames = await collectUsedShortNames();
   const imageMoves = [];
   const fileMoves = [];
   const fileWrites = [];
   const mappings = [];
-  for (const record of records) {
-    const generated = generateJapaneseFantasyName(usedNames, usedShortNames);
+  for (const record of recordsToRename) {
+    const policy = nameGenerationPolicy(record);
+    const generated = generateNameForRecord(record, definitions, usedNames, usedShortNames);
     const imageTargetName = `${generated.fileStem}${path.extname(record.imageName).toLowerCase()}`;
     const sourcePath = path.join(record.directory, record.imageName);
     const targetPath = path.join(record.directory, imageTargetName);
@@ -567,20 +670,20 @@ async function renameExistingBatches() {
         targetPath: path.join(record.directory, nameMetadataTargetName),
       });
     }
-    if (nameMetadataEnabled) {
+    if (policy.shortNames.length > 0) {
       fileWrites.push({
         targetPath: path.join(record.directory, nameMetadataTargetName),
-        contents: nameMetadataContents(generated.shortName),
+        contents: nameMetadataContents(record.sourceMetadataSchema, generated.generatorSchema, generated.shortName),
         replaceExisting: Boolean(record.nameMetadataName),
       });
     }
     mappings.push(
       `- ${sourceRelativePath} -> ${targetRelativePath}${metadataMapping}` +
-      (nameMetadataEnabled ? ` + ${nameMetadataTargetName} (${generated.shortName.en} / ${generated.shortName.ja})` : ""),
+      (generated.shortName ? ` + ${nameMetadataTargetName} (${Object.values(generated.shortName).join(" / ")})` : ""),
     );
   }
 
-  console.log(`${dryRun ? "Would rename" : "Renaming"} ${records.length} existing batched image${records.length === 1 ? "" : "s"}.`);
+  console.log(`${dryRun ? "Would rename" : "Renaming"} ${recordsToRename.length} existing batched image${recordsToRename.length === 1 ? "" : "s"}.`);
   if (dryRun) {
     for (const mapping of mappings) console.log(mapping);
     return;
@@ -600,29 +703,36 @@ async function renameExistingBatches() {
 }
 
 async function backfillGeneratedNameMetadata() {
-  if (!nameMetadataEnabled) {
-    console.log("Name metadata is disabled in gallery.config.json; no files were generated.");
+  const records = await collectBatchedImageRecords({ allowInvalidNameMetadata: true });
+  const recordsWithShortNames = records.filter((record) => (nameGenerationPolicy(record)?.shortNames.length ?? 0) > 0);
+  if (recordsWithShortNames.length === 0) {
+    console.log("No configured source metadata schema requests generated short names.");
     return;
   }
-  const records = await collectBatchedImageRecords({ allowInvalidNameMetadata: true });
-  const usedShortNames = new Set(records.flatMap((record) => record.shortName
-    ? [record.shortName.en.toLocaleLowerCase("en-US")]
-    : []));
+  const definitions = await nameDefinitionsFor(recordsWithShortNames);
+  const usedShortNames = await collectUsedShortNames();
   const fileWrites = [];
   const mappings = [];
   const skipped = [];
 
-  for (const record of records) {
+  for (const record of recordsWithShortNames) {
     const relativePath = relativeGalleryPath(path.join(record.directory, record.imageName));
-    if (record.nameMetadataName) {
-      skipped.push(`- ${relativePath}: ${record.nameMetadataInvalid ? "invalid name metadata requires manual repair" : "already has name metadata"}`);
+    if (record.nameMetadataInvalid) {
+      skipped.push(`- ${relativePath}: invalid name metadata requires manual repair`);
       continue;
     }
+    const policy = nameGenerationPolicy(record);
+    const missingRepresentations = policy.shortNames.filter((representation) => !record.shortName?.[representation]);
+    if (missingRepresentations.length === 0) {
+      skipped.push(`- ${relativePath}: already has every configured short-name representation`);
+      continue;
+    }
+    const definition = definitions.get(policy.definition);
 
     const fileStem = path.basename(record.imageName, path.extname(record.imageName));
-    let shortName;
+    let generatedShortName;
     try {
-      shortName = generateShortNameForStem(fileStem, usedShortNames);
+      generatedShortName = generateShortNameForStem(definition, fileStem, missingRepresentations, usedShortNames);
     } catch (error) {
       skipped.push(`- ${relativePath}: ${error instanceof Error ? error.message : String(error)}`);
       continue;
@@ -631,13 +741,16 @@ async function backfillGeneratedNameMetadata() {
     const targetName = `${fileStem}${nameMetadataSuffix}`;
     fileWrites.push({
       targetPath: path.join(record.directory, targetName),
-      contents: nameMetadataContents(shortName),
+      contents: nameMetadataContents(record.sourceMetadataSchema, policy.definition, {
+        ...record.shortName,
+        ...generatedShortName,
+      }),
+      replaceExisting: Boolean(record.nameMetadataName),
     });
-    mappings.push(`- ${relativePath} + ${targetName} (${shortName.en} / ${shortName.ja})`);
+    mappings.push(`- ${relativePath} + ${targetName} (${Object.values(generatedShortName).join(" / ")})`);
   }
 
   console.log(`${dryRun ? "Would add" : "Adding"} name metadata for ${fileWrites.length} image${fileWrites.length === 1 ? "" : "s"}.`);
-  for (const mapping of mappings) console.log(mapping);
   if (skipped.length > 0) {
     console.log(`Skipping ${skipped.length} image${skipped.length === 1 ? "" : "s"}:`);
     for (const message of skipped) console.log(message);
@@ -698,8 +811,10 @@ async function processIncomingBatch() {
   const { duplicates, metadataCollisions, uniqueRecords } = await classifyIncomingRecords(records);
   const quarantineTarget = duplicates.length > 0 ? await nextQuarantineTarget() : undefined;
   const batchTarget = uniqueRecords.length > 0 ? await nextBatchTarget() : undefined;
-  const usedNames = namingEnabled && uniqueRecords.length > 0 ? await collectUsedImageStems() : new Set();
-  const usedShortNames = namingEnabled && uniqueRecords.length > 0 ? await collectUsedShortNames() : new Set();
+  const definitions = await nameDefinitionsFor(uniqueRecords);
+  const generatedNameCount = uniqueRecords.filter((record) => nameGenerationPolicy(record)).length;
+  const usedNames = generatedNameCount > 0 ? await collectUsedImageStems() : new Set();
+  const usedShortNames = generatedNameCount > 0 ? await collectUsedShortNames() : { en: new Set(), ja: new Set() };
   const imageMoves = [];
   const fileMoves = [];
   const fileWrites = [];
@@ -723,6 +838,13 @@ async function processIncomingBatch() {
         });
         metadataMapping = ` + ${duplicate.record.metadataName}`;
       }
+      if (duplicate.record.nameMetadataName) {
+        fileMoves.push({
+          sourcePath: path.join(duplicate.record.directory, duplicate.record.nameMetadataName),
+          targetPath: path.join(quarantineTarget.quarantineDirectory, duplicate.record.nameMetadataName),
+        });
+        metadataMapping += ` + ${duplicate.record.nameMetadataName}`;
+      }
       quarantineMappings.push(
         `- ${duplicate.record.imageName}${metadataMapping} -> ${quarantineTarget.quarantineRelativeDirectory}/ ` +
         `(duplicate of ${duplicate.duplicateOf})`,
@@ -733,7 +855,8 @@ async function processIncomingBatch() {
   if (batchTarget) newDirectories.push(batchTarget.batchDirectory);
   for (const record of uniqueRecords) {
     const sourceStem = path.basename(record.imageName, path.extname(record.imageName));
-    const generated = namingEnabled ? generateJapaneseFantasyName(usedNames, usedShortNames) : undefined;
+    const policy = nameGenerationPolicy(record);
+    const generated = generateNameForRecord(record, definitions, usedNames, usedShortNames);
     const targetStem = generated?.fileStem ?? sourceStem;
     const imageTargetName = `${targetStem}${path.extname(record.imageName)}`;
     const sourcePath = path.join(galleryRoot, record.imageName);
@@ -747,25 +870,25 @@ async function processIncomingBatch() {
     let metadataMapping = "";
     if (record.metadataName) {
       metadataCount += 1;
-      const metadataTargetName = namingEnabled ? `${targetStem}.json` : record.metadataName;
+      const metadataTargetName = generated ? `${targetStem}.json` : record.metadataName;
       fileMoves.push({
         sourcePath: path.join(galleryRoot, record.metadataName),
         targetPath: path.join(batchTarget.batchDirectory, metadataTargetName),
       });
-      metadataMapping = namingEnabled
+      metadataMapping = generated
         ? ` + ${record.metadataName} -> ${metadataTargetName}`
         : ` + ${record.metadataName}`;
     }
     let nameMetadataMapping = "";
-    if (generated && nameMetadataEnabled) {
+    if (generated && policy.shortNames.length > 0) {
       const nameMetadataTargetName = `${targetStem}${nameMetadataSuffix}`;
       fileWrites.push({
         targetPath: path.join(batchTarget.batchDirectory, nameMetadataTargetName),
-        contents: nameMetadataContents(generated.shortName),
+        contents: nameMetadataContents(record.sourceMetadataSchema, generated.generatorSchema, generated.shortName),
       });
-      nameMetadataMapping = ` + ${nameMetadataTargetName} (${generated.shortName.en} / ${generated.shortName.ja})`;
+      nameMetadataMapping = ` + ${nameMetadataTargetName} (${Object.values(generated.shortName).join(" / ")})`;
     }
-    mappings.push(namingEnabled
+    mappings.push(generated
       ? `- ${record.imageName} -> ${imageTargetName}${metadataMapping}${nameMetadataMapping}`
       : `- ${record.imageName}${metadataMapping}`);
   }
@@ -790,7 +913,7 @@ async function processIncomingBatch() {
     console.log(
       `${dryRun ? "Would move" : "Moving"} ${uniqueRecords.length} unique ` +
       `image${uniqueRecords.length === 1 ? "" : "s"} (${metadataCount} with metadata) ` +
-      `to ${batchTarget.batchName}/${namingEnabled ? " using generated names" : ""}`,
+      `to ${batchTarget.batchName}/${generatedNameCount > 0 ? ` using generated names for ${generatedNameCount}` : ""}`,
     );
   } else {
     console.log("No unique images remain to batch.");

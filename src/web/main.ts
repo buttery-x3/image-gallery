@@ -779,8 +779,16 @@ async function submitReport(): Promise<void> {
   }
 }
 
+function shortDisplayNameFor(image: GalleryImage): { value: string; language: NameLanguage } | undefined {
+  const alternateLanguage = nameLanguage === "en" ? "ja" : "en";
+  const preferred = image.shortName?.[nameLanguage];
+  if (preferred) return { value: preferred, language: nameLanguage };
+  const alternate = image.shortName?.[alternateLanguage];
+  return alternate ? { value: alternate, language: alternateLanguage } : undefined;
+}
+
 function displayNameFor(image: GalleryImage): string {
-  return image.shortName?.[nameLanguage] ?? image.displayName;
+  return shortDisplayNameFor(image)?.value ?? image.displayName;
 }
 
 function openImageLabel(displayName: string): string {
@@ -1789,8 +1797,8 @@ function renderImageMetadata(image: GalleryImage): void {
   metadataTitle.textContent = displayNameFor(image);
   metadataContent.replaceChildren();
   if (image.shortName) {
-    appendMetadataRow("English name", image.shortName.en);
-    appendMetadataRow("Japanese name", image.shortName.ja);
+    if (image.shortName.en) appendMetadataRow("English name", image.shortName.en);
+    if (image.shortName.ja) appendMetadataRow("Japanese name", image.shortName.ja);
   }
 
   const metadata = image.metadata;
@@ -1872,8 +1880,9 @@ function createTile(image: GalleryImage): HTMLElement {
   const shortName = document.createElement("span");
   shortName.className = "gallery-short-name";
   shortName.hidden = !galleryConfig.showNames;
-  shortName.textContent = image.shortName?.[nameLanguage] ?? "";
-  shortName.lang = nameLanguage === "ja" ? "ja" : "en";
+  const shortDisplayName = shortDisplayNameFor(image);
+  shortName.textContent = shortDisplayName?.value ?? "";
+  shortName.lang = shortDisplayName?.language === "ja" ? "ja" : "en";
   shortName.setAttribute("aria-hidden", "true");
 
   const actions = document.createElement("div");
@@ -1997,8 +2006,9 @@ function syncNameLanguageDisplay(): void {
     tile.querySelector<HTMLButtonElement>(".image-open")?.setAttribute("aria-label", openImageLabel(displayName));
     const shortName = tile.querySelector<HTMLElement>(".gallery-short-name");
     if (shortName) {
-      shortName.textContent = image.shortName?.[nameLanguage] ?? "";
-      shortName.lang = nameLanguage === "ja" ? "ja" : "en";
+      const shortDisplayName = shortDisplayNameFor(image);
+      shortName.textContent = shortDisplayName?.value ?? "";
+      shortName.lang = shortDisplayName?.language === "ja" ? "ja" : "en";
       shortName.hidden = !galleryConfig.showNames;
     }
     const copyImageButton = tile.querySelector<HTMLButtonElement>('[data-action="copy-image"]');

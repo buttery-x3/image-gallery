@@ -8,15 +8,15 @@ export type GalleryCategory = (typeof galleryCategories)[number];
 
 export interface GalleryMetadata {
   schema: string;
-  category: GalleryCategory;
+  category?: GalleryCategory;
   resolvedPrompt: string;
   tags: Record<string, string>;
   searchTokens: Record<string, string[]>;
 }
 
 export interface GalleryShortName {
-  en: string;
-  ja: string;
+  en?: string;
+  ja?: string;
 }
 
 export interface GalleryImage {

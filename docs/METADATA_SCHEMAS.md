@@ -1,32 +1,33 @@
 # Metadata schemas
 
-The gallery keeps file organization separate from metadata interpretation. `process-gallery-batch.mjs` accepts any syntactically valid same-stem JSON sidecar and preserves it with the image. Definition files in `metadata-schemas/` decide which schemas provide gallery categories, search data, filters, and prompt details.
+The gallery keeps file organization separate from metadata interpretation. `process-gallery-batch.mjs` accepts any syntactically valid same-stem JSON sidecar and preserves it with the image. Definition files in `metadata-schemas/` decide how source schemas provide search data, filters, and prompt details. Product category and naming behavior are assigned separately in `gallery.config.json`.
 
 ## Enable schemas
 
-`gallery.config.json` may list the enabled source schemas:
+`gallery.config.json` configures each source schema:
 
 ```json
 {
   "metadata": {
-    "enabledSchemas": [
-      "anime_waifu_lite/v1",
-      "anime_creature_lite_v4/v1"
-    ]
+    "schemas": {
+      "anime_waifu_lite/v1": { "enabled": true, "category": "women" },
+      "anime_creature_lite_v4/v1": { "enabled": true, "category": "creatures" },
+      "future_men/v1": { "enabled": false, "category": "men" }
+    }
   }
 }
 ```
 
-When `enabledSchemas` is omitted, every non-draft definition is enabled. An unknown or disabled schema is preserved but is not normalized. Its image remains visible under **All**.
+When `metadata.schemas` is omitted, every non-draft definition is enabled without a product category. An unknown or explicitly disabled schema is preserved but is not normalized. Its image remains visible under **All**.
 
-The definition's `category` is independent of its tags. A male creature remains in `creatures`; a future men-only generator should use a definition whose category is `men`.
+Category is a product-level policy independent of reusable tag mappings. A male creature source can remain in `creatures`; a future men-only source can be assigned to `men`. Multiple enabled schemas may share a category and are filtered together without scanning their tags.
 
 ## Add a schema
 
 Scaffold a draft from one representative sample:
 
 ```sh
-npm run process-new-schema -- --sample /path/to/example.json --category men --scaffold --output metadata-schemas/example-v1.json
+npm run process-new-schema -- --sample /path/to/example.json --scaffold --output metadata-schemas/example-v1.json
 ```
 
 The draft lists discovered string leaf paths but deliberately does not guess their meanings. Map the useful paths into canonical tags, remove `"draft": true`, and validate it:
@@ -44,7 +45,7 @@ npm run process-new-schema -- --definition metadata-schemas/example-v1.json --sa
 To validate and add the schema to `gallery.config.json` in one explicit step:
 
 ```sh
-npm run process-new-schema -- --definition metadata-schemas/example-v1.json --sample-dir /path/to/examples --enable
+npm run process-new-schema -- --definition metadata-schemas/example-v1.json --sample-dir /path/to/examples --enable --category men
 ```
 
 The tool reads samples but never changes them or writes inside `gallery/`.
@@ -56,7 +57,6 @@ The tool reads samples but never changes them or writes inside `gallery/`.
   "definitionVersion": 1,
   "schema": "example/v1",
   "recordPath": "optional_wrapper",
-  "category": "men",
   "resolvedPrompt": { "path": "resolved_prompt" },
   "searchTokensPath": "search_tokens",
   "tags": {
@@ -98,6 +98,6 @@ If a future format requires computation that cannot be expressed by these operat
 
 ## Runtime behavior
 
-Definitions are loaded from `metadata-schemas/` at server startup. Invalid definitions, duplicate schema declarations, or enabled schemas without definitions cause a clear startup error. Parsed sidecars are cached by path, size, and modification time; changing a sidecar causes it to be normalized again.
+Definitions are loaded from `metadata-schemas/` at server startup. Invalid definitions, duplicate schema declarations, or enabled schemas without definitions cause a clear startup error. The legacy `metadata.enabledSchemas` shape is rejected with migration guidance. Parsed sidecars are cached by path, size, and modification time; changing a sidecar causes it to be normalized again.
 
 Compact image responses contain category and support status. Full tags and prompts remain in the detailed background response. The metadata dialog distinguishes missing, unsupported, disabled, and successfully normalized sidecars.

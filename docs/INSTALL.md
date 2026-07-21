@@ -26,7 +26,7 @@ Copy or clone the repository into `/opt/image-gallery`, then give the service ac
 sudo chown -R image-gallery:image-gallery /opt/image-gallery
 ```
 
-Keep the committed `metadata-schemas/` directory at the repository root. The service working directory is `/opt/image-gallery`, and the server loads enabled metadata definitions from that directory when it starts. After adding or enabling a definition, rebuild if application code also changed and restart the service.
+Keep the committed `metadata-schemas/`, `name-generation-schemas/`, and `gallery.config.json` at the repository root. The service loads metadata definitions and per-source-schema policies from there. Restart after changing runtime schema configuration; rebuild as well when browser-facing settings or application code change.
 
 ## 3. Build the application
 
@@ -44,8 +44,6 @@ Create `/etc/image-gallery.env`:
 ```ini
 GALLERY_DIR=/srv/image-gallery/images
 PREVIEW_CACHE_DIR=/var/cache/image-gallery
-# Optional for the waifu-gallery instance:
-# BATCH_NAME_STYLE=japanese-fantasy
 HOST=127.0.0.1
 PORT=8080
 
@@ -130,7 +128,7 @@ For regular uploads, place the new images and any same-name JSON sidecars direct
 sudo -u image-gallery bash /opt/image-gallery/process-batch.sh
 ```
 
-The command moves every unique root-level image into one timestamped batch subdirectory and caches only that batch's missing previews. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. Existing metadata and file sizes provide a cheap duplicate candidate index, and SHA-256 confirms image equality before an incoming image is rejected. Exact duplicate pairs are moved to the hidden, recoverable `.duplicates/<timestamp>/` directory; equal metadata with different image content is reported and retained. When `BATCH_NAME_STYLE=japanese-fantasy` is present, images and sidecars receive matching generated names. Existing previews remain valid across moves and renames and are skipped. Add `--dry-run` to inspect both the batch and quarantine without changing files.
+The command moves every unique root-level image into one timestamped batch subdirectory and caches only that batch's missing previews. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. Existing metadata and file sizes provide a cheap duplicate candidate index, and SHA-256 confirms image equality before an incoming image is rejected. Exact duplicate pairs are moved to the hidden, recoverable `.duplicates/<timestamp>/` directory; equal metadata with different image content is reported and retained. Source schemas with a configured `nameGeneration` policy receive generated names; other schemas retain their filenames. Existing previews remain valid across moves and renames and are skipped. Add `--dry-run` to inspect both the batch and quarantine without changing files.
 
 To apply generated names once to images already organized into batch directories, inspect and then run the explicit alternate command:
 
@@ -139,7 +137,7 @@ sudo -u image-gallery bash /opt/image-gallery/rename-existing.sh --dry-run
 sudo -u image-gallery bash /opt/image-gallery/rename-existing.sh
 ```
 
-This command requires `BATCH_NAME_STYLE=japanese-fantasy`, leaves root-level uploads alone, and renames matching JSON sidecars with their images. Running it again deliberately replaces the generated names with new ones.
+This command operates only on images whose source metadata schema has `nameGeneration` configured, leaves root-level uploads alone, and renames matching JSON sidecars with their images. Running it again deliberately replaces the generated names with new ones.
 
 Run the same script with no root-level images to check the full gallery and generate only missing previews. This also retries preview warming after a previous service or network failure.
 

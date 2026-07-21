@@ -27,7 +27,6 @@ export interface MetadataDefinition {
   definitionVersion: 1;
   draft?: boolean;
   schema: string;
-  category: GalleryCategory;
   recordPath?: string;
   resolvedPrompt?: PathMapping;
   tags: Record<string, ValueMapping>;
@@ -42,6 +41,7 @@ export interface MetadataDefinition {
 export interface MetadataDefinitionRegistry {
   definitions: ReadonlyMap<string, MetadataDefinition>;
   enabledSchemas: ReadonlySet<string>;
+  categories: ReadonlyMap<string, GalleryCategory>;
 }
 
 export interface NormalizedMetadataResult {
@@ -102,9 +102,6 @@ export function validateMetadataDefinition(value: unknown, source = "metadata de
   if (value.definitionVersion !== 1) throw new Error(`${source}.definitionVersion must be 1.`);
   if (value.draft !== undefined && typeof value.draft !== "boolean") throw new Error(`${source}.draft must be true or false.`);
   const schema = nonEmptyString(value.schema, `${source}.schema`);
-  if (value.category !== "women" && value.category !== "creatures" && value.category !== "men") {
-    throw new Error(`${source}.category must be women, creatures, or men.`);
-  }
   if (!isRecord(value.tags)) throw new Error(`${source}.tags must be an object.`);
 
   const tags: Record<string, ValueMapping> = {};
@@ -138,7 +135,6 @@ export function validateMetadataDefinition(value: unknown, source = "metadata de
     definitionVersion: 1,
     ...(value.draft === true ? { draft: true } : {}),
     schema,
-    category: value.category,
     ...(value.recordPath === undefined ? {} : { recordPath: nonEmptyString(value.recordPath, `${source}.recordPath`) }),
     ...(resolvedPrompt ? { resolvedPrompt } : {}),
     tags,
@@ -151,7 +147,7 @@ export function validateMetadataDefinition(value: unknown, source = "metadata de
 
 export function loadMetadataDefinitions(
   directory: string,
-  configuredEnabledSchemas?: readonly string[],
+  configuredSchemas?: Readonly<Record<string, { enabled: boolean; category?: GalleryCategory }>>,
 ): MetadataDefinitionRegistry {
   const definitions = new Map<string, MetadataDefinition>();
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -170,13 +166,17 @@ export function loadMetadataDefinitions(
   }
   if (definitions.size === 0) throw new Error(`No metadata definitions were found in ${directory}.`);
 
-  const enabledSchemas = configuredEnabledSchemas === undefined
+  const enabledSchemas = configuredSchemas === undefined
     ? new Set(definitions.keys())
-    : new Set(configuredEnabledSchemas);
+    : new Set(Object.entries(configuredSchemas).filter(([, schema]) => schema.enabled).map(([sourceSchema]) => sourceSchema));
+  const categories = new Map<string, GalleryCategory>();
+  for (const [sourceSchema, schemaConfig] of Object.entries(configuredSchemas ?? {})) {
+    if (schemaConfig.category) categories.set(sourceSchema, schemaConfig.category);
+  }
   for (const schema of enabledSchemas) {
     if (!definitions.has(schema)) throw new Error(`Enabled metadata schema ${schema} does not have a definition.`);
   }
-  return { definitions, enabledSchemas };
+  return { definitions, enabledSchemas, categories };
 }
 
 function valueAtPath(value: unknown, dottedPath: string): unknown {
@@ -271,14 +271,15 @@ export function normalizeParsedMetadata(
   const resolvedPrompt = definition.resolvedPrompt
     ? normalizedString(mappingValue(record, definition.resolvedPrompt), definition) ?? ""
     : "";
+  const category = registry.categories.get(definition.schema);
   return {
     schema: definition.schema,
     supported: true,
     enabled: true,
-    category: definition.category,
+    ...(category ? { category } : {}),
     metadata: {
       schema: definition.schema,
-      category: definition.category,
+      ...(category ? { category } : {}),
       resolvedPrompt,
       tags,
       searchTokens,

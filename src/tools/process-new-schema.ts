@@ -27,13 +27,13 @@ const scaffold = hasFlag("--scaffold");
 const enable = hasFlag("--enable");
 
 if (
-  (samplePath && sampleDirectory) || (scaffold && (!samplePath || !outputPath || !category)) ||
+  (samplePath && sampleDirectory) || (scaffold && (!samplePath || !outputPath)) ||
   (!scaffold && !definitionPath) || (!samplePath && !sampleDirectory) ||
   (category && !["women", "creatures", "men"].includes(category))
 ) {
   console.error("Usage:");
-  console.error("  npm run process-new-schema -- --sample <json> --category <women|creatures|men> --scaffold --output <definition.json>");
-  console.error("  npm run process-new-schema -- --definition <definition.json> (--sample <json> | --sample-dir <dir>) [--enable]");
+  console.error("  npm run process-new-schema -- --sample <json> --scaffold --output <definition.json>");
+  console.error("  npm run process-new-schema -- --definition <definition.json> (--sample <json> | --sample-dir <dir>) [--enable] [--category <women|creatures|men>]");
   process.exit(2);
 }
 
@@ -96,7 +96,6 @@ if (scaffold) {
     definitionVersion: 1,
     draft: true,
     schema: located.schema,
-    category,
     ...(candidatePaths.includes("resolved_prompt") ? { resolvedPrompt: { path: "resolved_prompt" } } : {}),
     tags: {},
     valueRules: { trim: true, omitEmpty: true, omitContaining: ["@@"] },
@@ -113,6 +112,7 @@ const definition = validateMetadataDefinition(await parseJson(absoluteDefinition
 const registry: MetadataDefinitionRegistry = {
   definitions: new Map([[definition.schema, definition]]),
   enabledSchemas: new Set([definition.schema]),
+  categories: new Map(category ? [[definition.schema, category]] : []),
 };
 const files = samplePath ? [path.resolve(samplePath)] : await sampleFiles(path.resolve(sampleDirectory!));
 if (files.length === 0) throw new Error("No JSON samples were found.");
@@ -136,7 +136,7 @@ for (const file of files) {
 if (matched === 0) throw new Error(`No samples matched ${definition.schema}.`);
 
 console.log(`Validated ${definition.schema} against ${matched} sample${matched === 1 ? "" : "s"}.`);
-console.log(`Category: ${definition.category}`);
+if (category) console.log(`Configured category: ${category}`);
 console.log("Tag coverage:");
 for (const [tag, count] of [...tagCounts].sort(([left], [right]) => left.localeCompare(right))) {
   console.log(`- ${tag}: ${count}/${matched}`);
@@ -157,11 +157,15 @@ if (enable) {
   const metadata = configRecord.metadata && typeof configRecord.metadata === "object" && !Array.isArray(configRecord.metadata)
     ? configRecord.metadata as Record<string, unknown>
     : {};
-  const existing = Array.isArray(metadata.enabledSchemas)
-    ? metadata.enabledSchemas.filter((value): value is string => typeof value === "string")
-    : [];
-  if (!existing.includes(definition.schema)) existing.push(definition.schema);
-  configRecord.metadata = { ...metadata, enabledSchemas: existing };
+  if (metadata.enabledSchemas !== undefined) throw new Error("Migrate metadata.enabledSchemas to metadata.schemas before enabling a definition.");
+  const schemas = metadata.schemas && typeof metadata.schemas === "object" && !Array.isArray(metadata.schemas)
+    ? metadata.schemas as Record<string, unknown>
+    : {};
+  const existing = schemas[definition.schema] && typeof schemas[definition.schema] === "object" && !Array.isArray(schemas[definition.schema])
+    ? schemas[definition.schema] as Record<string, unknown>
+    : {};
+  schemas[definition.schema] = { ...existing, enabled: true, ...(category ? { category } : {}) };
+  configRecord.metadata = { ...metadata, schemas };
   await writeAtomic(configPath, `${JSON.stringify(configRecord, null, 2)}\n`, true);
   console.log(`Enabled ${definition.schema} in gallery.config.json.`);
 }

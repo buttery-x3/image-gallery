@@ -7,8 +7,9 @@ import {
   type NormalizedMetadataResult,
 } from "./metadata-definitions.js";
 
-const supportedNameSchema = "image-gallery/name/v1";
-const registry = loadMetadataDefinitions(config.metadataDefinitionsDir, config.enabledMetadataSchemas);
+const legacyNameSchema = "image-gallery/name/v1";
+const supportedNameSchema = "image-gallery/name/v2";
+const registry = loadMetadataDefinitions(config.metadataDefinitionsDir, config.metadataSchemas);
 
 interface MetadataCacheEntry {
   size: number;
@@ -35,9 +36,19 @@ export async function readImageMetadataResult(filePath: string): Promise<Normali
 
 export async function readImageNameMetadata(filePath: string): Promise<GalleryShortName | undefined> {
   const parsed: unknown = JSON.parse(await readFile(filePath, "utf8"));
-  if (!isRecord(parsed) || parsed.schema !== supportedNameSchema || !isRecord(parsed.shortName)) return undefined;
+  return parseImageNameMetadata(parsed);
+}
+
+export function parseImageNameMetadata(parsed: unknown): GalleryShortName | undefined {
+  if (!isRecord(parsed) || !isRecord(parsed.shortName)) return undefined;
 
   const en = typeof parsed.shortName.en === "string" ? parsed.shortName.en.trim() : "";
   const ja = typeof parsed.shortName.ja === "string" ? parsed.shortName.ja.trim() : "";
-  return en && ja ? { en, ja } : undefined;
+  if (parsed.schema === legacyNameSchema) return en && ja ? { en, ja } : undefined;
+  if (
+    parsed.schema !== supportedNameSchema || (!en && !ja) ||
+    typeof parsed.sourceMetadataSchema !== "string" || !parsed.sourceMetadataSchema.trim() ||
+    typeof parsed.generatorSchema !== "string" || !parsed.generatorSchema.trim()
+  ) return undefined;
+  return { ...(en ? { en } : {}), ...(ja ? { ja } : {}) };
 }

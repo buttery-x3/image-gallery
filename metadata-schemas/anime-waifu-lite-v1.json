@@ -1,7 +1,6 @@
 {
   "definitionVersion": 1,
   "schema": "anime_waifu_lite/v1",
-  "category": "women",
   "resolvedPrompt": { "path": "resolved_prompt" },
   "searchTokensPath": "search_tokens",
   "tags": {

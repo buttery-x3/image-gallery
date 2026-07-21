@@ -4,10 +4,20 @@
   "showLanguageToggle": false,
   "showNames": false,
   "metadata": {
-    "enabledSchemas": [
-      "anime_waifu_lite/v1",
-      "anime_creature_lite_v4/v1"
-    ]
+    "schemas": {
+      "anime_waifu_lite/v1": {
+        "enabled": true,
+        "category": "women",
+        "nameGeneration": {
+          "definition": "image-gallery/name-generator/waifu-japanese-fantasy/v1",
+          "shortNames": ["en", "ja"]
+        }
+      },
+      "anime_creature_lite_v4/v1": {
+        "enabled": true,
+        "category": "creatures"
+      }
+    }
   },
   "enableReporting": false,
   "showWatermark": true,

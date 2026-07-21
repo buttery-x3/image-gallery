@@ -2,7 +2,6 @@
   "definitionVersion": 1,
   "schema": "anime_creature_lite_v4/v1",
   "recordPath": "anime_creature_lite_v4",
-  "category": "creatures",
   "resolvedPrompt": { "path": "resolved_prompt" },
   "tags": {
     "gender": { "path": "gender" },

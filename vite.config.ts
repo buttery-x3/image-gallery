@@ -14,7 +14,7 @@ type GalleryConfig = {
   showWatermark: boolean;
   watermarkText: string;
   watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
-  metadata?: { enabledSchemas?: string[] };
+  metadata?: { schemas?: Record<string, unknown> };
 };
 
 function readGalleryConfig(): GalleryConfig {
@@ -45,15 +45,14 @@ function readGalleryConfig(): GalleryConfig {
     if (!record.metadata || typeof record.metadata !== "object" || Array.isArray(record.metadata)) {
       throw new Error("gallery.config.json metadata must be an object.");
     }
-    const enabledSchemas = (record.metadata as Record<string, unknown>).enabledSchemas;
-    if (enabledSchemas !== undefined && (
-      !Array.isArray(enabledSchemas) || enabledSchemas.some((schema) => typeof schema !== "string" || !schema.trim())
-    )) {
-      throw new Error("gallery.config.json metadata.enabledSchemas must be an array of non-empty strings.");
+    const metadataRecord = record.metadata as Record<string, unknown>;
+    if (metadataRecord.enabledSchemas !== undefined) {
+      throw new Error("gallery.config.json metadata.enabledSchemas has been replaced by metadata.schemas.");
     }
-    metadata = enabledSchemas === undefined
-      ? {}
-      : { enabledSchemas: enabledSchemas.map((schema) => (schema as string).trim()) };
+    if (metadataRecord.schemas !== undefined && (
+      !metadataRecord.schemas || typeof metadataRecord.schemas !== "object" || Array.isArray(metadataRecord.schemas)
+    )) throw new Error("gallery.config.json metadata.schemas must be an object keyed by source metadata schema.");
+    metadata = metadataRecord.schemas === undefined ? {} : { schemas: metadataRecord.schemas as Record<string, unknown> };
   }
   return {
     siteName,

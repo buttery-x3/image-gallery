@@ -16,11 +16,12 @@ function definition(fileName: string) {
   );
 }
 
-function registryFor(fileName: string, enabled = true): MetadataDefinitionRegistry {
+function registryFor(fileName: string, enabled = true, category?: "women" | "creatures" | "men"): MetadataDefinitionRegistry {
   const selected = definition(fileName);
   return {
     definitions: new Map([[selected.schema, selected]]),
     enabledSchemas: new Set(enabled ? [selected.schema] : []),
+    categories: new Map(category ? [[selected.schema, category]] : []),
   };
 }
 
@@ -38,7 +39,7 @@ test("normalizes the existing women schema and respects active flags", () => {
     hair_accent: "blue tips",
     active_flags: { hair_accent_active: false },
     search_tokens: { style: [" soft ", 42] },
-  }, registryFor("anime-waifu-lite-v1.json"));
+  }, registryFor("anime-waifu-lite-v1.json", true, "women"));
 
   assert.equal(result.category, "women");
   assert.equal(result.metadata?.resolvedPrompt, "prompt");
@@ -62,7 +63,7 @@ test("normalizes creature fields, selects an outfit, and omits templates", () =>
         creature_color_primary: "green"
       }
     }
-  }, registryFor("anime-creature-lite-v4-v1.json"));
+  }, registryFor("anime-creature-lite-v4-v1.json", true, "creatures"));
 
   assert.equal(result.category, "creatures");
   assert.equal(result.metadata?.tags.outfit, "coat");
@@ -86,7 +87,6 @@ test("preserves status for unsupported and disabled schemas", () => {
 });
 
 test("rejects invalid definitions", () => {
-  assert.throws(() => validateMetadataDefinition({ definitionVersion: 1, schema: "x/v1", category: "other", tags: {} }));
-  assert.throws(() => validateMetadataDefinition({ definitionVersion: 1, draft: "yes", schema: "x/v1", category: "men", tags: {} }));
-  assert.throws(() => validateMetadataDefinition({ definitionVersion: 1, schema: "x/v1", category: "men", tags: { "Bad Tag": { path: "x" } } }));
+  assert.throws(() => validateMetadataDefinition({ definitionVersion: 1, draft: "yes", schema: "x/v1", tags: {} }));
+  assert.throws(() => validateMetadataDefinition({ definitionVersion: 1, schema: "x/v1", tags: { "Bad Tag": { path: "x" } } }));
 });
