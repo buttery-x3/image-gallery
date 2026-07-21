@@ -829,12 +829,6 @@ async function processIncomingBatch() {
     allowOrphanedMetadata: true,
     orphanedMetadataFiles,
   });
-  if (orphanedMetadataFiles.length > 0) {
-    throw new Error(
-      `Orphan JSON sidecar${orphanedMetadataFiles.length === 1 ? "" : "s"} must be paired or moved before batching:\n` +
-      orphanedMetadataFiles.map((filePath) => `- ${filePath}`).join("\n"),
-    );
-  }
   const incomingMissingMetadata = records.filter((record) => !record.metadataName).length;
   const printReport = ({
     added = 0,
@@ -854,10 +848,13 @@ async function processIncomingBatch() {
     console.log(`- Generated name metadata files ${dryRun ? "that would be added" : "added"}: ${generatedMetadataAdded}`);
     console.log(`- Duplicate images ${dryRun ? "that would be quarantined" : "quarantined"}: ${duplicatesQuarantined}`);
     console.log(`- Metadata collisions retained: ${metadataCollisionsRetained}`);
-    console.log(`- Orphan source JSON files: ${orphanedMetadataFiles.length}`);
+    console.log(
+      `- Orphan source JSON files ${dryRun ? "that would be quarantined" : "quarantined"}: ` +
+      orphanedMetadataFiles.length,
+    );
   };
 
-  if (records.length === 0) {
+  if (records.length === 0 && orphanedMetadataFiles.length === 0) {
     console.log("No root-level images are ready to process. Checking the full gallery for missing previews.");
     try {
       await cacheMissingPreviews();
@@ -871,7 +868,9 @@ async function processIncomingBatch() {
   }
 
   const { duplicates, metadataCollisions, uniqueRecords } = await classifyIncomingRecords(records);
-  const quarantineTarget = duplicates.length > 0 ? await nextQuarantineTarget() : undefined;
+  const quarantineTarget = duplicates.length > 0 || orphanedMetadataFiles.length > 0
+    ? await nextQuarantineTarget()
+    : undefined;
   const batchTarget = uniqueRecords.length > 0 ? await nextBatchTarget() : undefined;
   const definitions = await nameDefinitionsFor(uniqueRecords);
   await addGenerationContexts(uniqueRecords, definitions);
@@ -884,11 +883,30 @@ async function processIncomingBatch() {
   const newDirectories = [];
   const mappings = [];
   const quarantineMappings = [];
+  const quarantineSummary = [
+    duplicates.length > 0
+      ? `${duplicates.length} duplicate image${duplicates.length === 1 ? "" : "s"}`
+      : undefined,
+    orphanedMetadataFiles.length > 0
+      ? `${orphanedMetadataFiles.length} orphan source JSON file${orphanedMetadataFiles.length === 1 ? "" : "s"}`
+      : undefined,
+  ].filter(Boolean).join(" and ");
   let metadataCount = 0;
   let renamedCount = 0;
 
   if (quarantineTarget) {
     newDirectories.push(quarantineTarget.quarantineDirectory);
+    for (const orphanedMetadataFile of orphanedMetadataFiles) {
+      const orphanedMetadataName = path.basename(orphanedMetadataFile);
+      fileMoves.push({
+        sourcePath: path.join(galleryRoot, orphanedMetadataFile),
+        targetPath: path.join(quarantineTarget.quarantineDirectory, orphanedMetadataName),
+      });
+      quarantineMappings.push(
+        `- ${orphanedMetadataFile} -> ${quarantineTarget.quarantineRelativeDirectory}/ ` +
+        "(orphan source JSON; no same-name image)",
+      );
+    }
     for (const duplicate of duplicates) {
       const imageSourcePath = path.join(duplicate.record.directory, duplicate.record.imageName);
       const imageTargetPath = path.join(quarantineTarget.quarantineDirectory, duplicate.record.imageName);
@@ -956,10 +974,10 @@ async function processIncomingBatch() {
       : `- ${record.imageName}${metadataMapping}`);
   }
 
-  if (duplicates.length > 0) {
+  if (duplicates.length > 0 || orphanedMetadataFiles.length > 0) {
     console.log(
-      `${dryRun ? "Would quarantine" : "Quarantining"} ${duplicates.length} duplicate ` +
-      `image${duplicates.length === 1 ? "" : "s"} in ${quarantineTarget.quarantineRelativeDirectory}/`,
+      `${dryRun ? "Would quarantine" : "Quarantining"} ${quarantineSummary} ` +
+      `in ${quarantineTarget.quarantineRelativeDirectory}/`,
     );
     for (const mapping of quarantineMappings) console.log(mapping);
   }
@@ -1004,8 +1022,8 @@ async function processIncomingBatch() {
   if (createdCachePaths.length > 0) {
     console.log(`Preserved ${createdCachePaths.length} cached preview${createdCachePaths.length === 1 ? "" : "s"}.`);
   }
-  if (duplicates.length > 0) {
-    console.log(`Quarantined duplicates in ${quarantineTarget.quarantineRelativeDirectory}/.`);
+  if (duplicates.length > 0 || orphanedMetadataFiles.length > 0) {
+    console.log(`Quarantined ${quarantineSummary} in ${quarantineTarget.quarantineRelativeDirectory}/.`);
   }
 
   if (!batchTarget) {
