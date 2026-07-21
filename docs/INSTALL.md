@@ -141,7 +141,35 @@ This command operates only on images whose source metadata schema has `nameGener
 
 Normal configuration changes affect new batches only. Do not run `rename-existing.sh` during this upgrade unless renaming previously organized media is intentional.
 
-Run the same script with no root-level images to check the full gallery and generate only missing previews. This also retries preview warming after a previous service or network failure.
+Run the batch script with no root-level images to check the full gallery and generate only missing previews. This also retries preview warming after a previous service or network failure.
+
+## Maintenance cleanup
+
+Stop the service before applying a bulk cleanup so it cannot generate previews concurrently:
+
+```sh
+sudo systemctl stop image-gallery
+```
+
+Remove generated-name sidecars and preview cache only, preserving original images and source metadata:
+
+```sh
+sudo -u image-gallery npm run clear-generated-artifacts
+sudo -u image-gallery npm run clear-generated-artifacts -- --apply
+```
+
+Or permanently remove all gallery content, including images, source and generated metadata, duplicate quarantine, and preview cache:
+
+```sh
+sudo -u image-gallery npm run clear-gallery
+sudo -u image-gallery npm run clear-gallery -- --apply
+```
+
+Each command is a dry run by default. `--apply` requires an interactive terminal and the exact typed phrase displayed by the command; no non-interactive confirmation option is provided. The full cleanup leaves the configured gallery root in place and preserves `.gitkeep` when present. Restart the service afterward:
+
+```sh
+sudo systemctl start image-gallery
+```
 
 To permanently remove an image using the absolute direct URL copied from the gallery, run:
 

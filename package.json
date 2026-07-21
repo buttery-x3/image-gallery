@@ -13,6 +13,7 @@
     "test:metadata": "tsx --test src/server/metadata-definitions.test.ts src/server/metadata-name.test.ts",
     "test:name-generation": "node --test gallery-name-generator.test.mjs gallery-metadata-context.test.mjs",
     "test:batch": "node --test process-gallery-batch.test.mjs",
+    "test:cleanup": "node --test clear-gallery-data.test.mjs",
     "build:web": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
     "build": "npm run clean && npm run build:web && npm run build:server",
@@ -23,6 +24,8 @@
     "process-new-name-schema": "node process-new-name-schema.mjs",
     "remove-image": "node remove-gallery-image.mjs",
     "clear-untagged": "node clear-untagged-images.mjs",
+    "clear-generated-artifacts": "node clear-gallery-data.mjs --generated-only",
+    "clear-gallery": "node clear-gallery-data.mjs --all",
     "scan-for-duplicates": "node scan-for-duplicates.mjs",
     "start": "node dist/server/server/server.js"
   },

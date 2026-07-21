@@ -12,7 +12,7 @@ This repository is intentionally a small private image gallery. Keep the impleme
 - `src/tools` contains small local maintenance and schema-onboarding commands.
 - `metadata-schemas` contains declarative mappings from source metadata schemas to gallery tags.
 - `name-generation-schemas` contains declarative filename and optional short-name generation rules.
-- `gallery` is local content and must never be committed, modified, or deleted by application code.
+- `gallery` is local content and must never be committed, modified, or deleted by application code except through an explicitly requested, operator-invoked maintenance command with dry-run and confirmation safeguards.
 - The production build is generated under `dist` and is not committed.
 
 ## Product invariants
@@ -46,6 +46,7 @@ Run only the lightweight checks appropriate to this project:
 ```sh
 npm run typecheck
 npm run test:metadata
+npm run test:cleanup
 npm run build
 ```
 
