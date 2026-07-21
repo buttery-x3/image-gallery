@@ -39,6 +39,8 @@ Edit [`gallery.config.json`](gallery.config.json) before building or starting th
 | `watermarkText` | `waiaifu.lol` | Text shown in the lightbox watermark |
 | `watermarkPosition` | `bottom-right` | Watermark corner: `top-left`, `top-right`, `bottom-left`, or `bottom-right` |
 
+Each configured `typeLabel` also provides a direct gallery path using its lowercase URL slug. For example, `Waifus` is available at `/waifus` and `Beastais` at `/beastais`. Opening one of these paths selects that type immediately; changing the type selector updates the path, and selecting **All** returns to the gallery root. Direct paths continue to work behind a stripped reverse-proxy prefix.
+
 The file is intentionally conservative for a fresh clone: metadata search, the language toggle, and image names are disabled. Rebuild after changing browser-facing settings and restart the server after changing metadata schema policies. Runtime and deployment settings such as `GALLERY_DIR`, `PORT`, and SMTP credentials remain in `.env` or the service environment.
 
 ## Production build

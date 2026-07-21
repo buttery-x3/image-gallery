@@ -733,6 +733,49 @@ function mainPageUrl(): URL {
   return url;
 }
 
+function typeRouteSlug(label: string): string {
+  return label
+    .normalize("NFKD")
+    .toLocaleLowerCase("en")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function requestedTypeRouteSlug(): string | undefined {
+  const segment = window.location.pathname.split("/").filter(Boolean).at(-1);
+  if (!segment || segment === "slideshow") return undefined;
+  try {
+    return decodeURIComponent(segment).toLocaleLowerCase("en");
+  } catch {
+    return segment.toLocaleLowerCase("en");
+  }
+}
+
+function typeForRoute(slug: string | undefined): string | undefined {
+  if (!slug) return undefined;
+  for (const [schema, label] of galleryConfig.typeLabels) {
+    if (typeRouteSlug(label) === slug && allImages.some((image) => image.metadataSchema === schema)) return schema;
+  }
+  return undefined;
+}
+
+function syncTypeRoute(): void {
+  if (window.location.pathname.split("/").filter(Boolean).at(-1) === "slideshow") return;
+  const url = new URL(window.location.href);
+  const pathSegments = url.pathname.split("/").filter(Boolean);
+  const currentSlug = requestedTypeRouteSlug();
+  const configuredSlugs = new Set([...galleryConfig.typeLabels.values()].map(typeRouteSlug).filter(Boolean));
+  if (currentSlug && configuredSlugs.has(currentSlug)) pathSegments.pop();
+  if (activeType !== "all") {
+    const label = galleryConfig.typeLabels.get(activeType);
+    const slug = label ? typeRouteSlug(label) : "";
+    if (slug) pathSegments.push(slug);
+  }
+  url.pathname = pathSegments.length === 0 ? "/" : `/${pathSegments.join("/")}${activeType === "all" ? "/" : ""}`;
+  window.history.replaceState(null, "", url);
+}
+
 function returnToMainPage(): void {
   window.location.assign(mainPageUrl());
 }
@@ -1326,6 +1369,7 @@ function typeFilterControl(value: string, label: string, count: number): HTMLLab
   input.addEventListener("change", () => {
     if (!input.checked) return;
     activeType = input.value;
+    syncTypeRoute();
     void applyFiltersWithBusy();
   });
   const content = document.createElement("span");
@@ -2200,7 +2244,7 @@ async function loadGallery(): Promise<void> {
       return;
     }
     allImages = shuffledImages(payload.images.filter((image) => !reportedImagePaths.has(image.path)));
-    activeType = "all";
+    activeType = typeForRoute(requestedTypeRouteSlug()) ?? "all";
     rebuildTypeBuckets();
     galleryLoadState = "ready";
     activeFilters.clear();
