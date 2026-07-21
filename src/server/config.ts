@@ -10,6 +10,7 @@ export interface MetadataSchemaRuntimeConfig {
   category?: GalleryCategory;
   nameGeneration?: {
     definition: string;
+    pipeline?: "contextual/v1";
     shortNames: ShortNameRepresentation[];
   };
 }
@@ -62,6 +63,9 @@ function readGalleryRuntimeConfig(): {
               throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration.definition must be a non-empty string.`);
             }
             const shortNames = naming.shortNames ?? [];
+            if (naming.pipeline !== undefined && naming.pipeline !== "contextual/v1") {
+              throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration.pipeline must be contextual/v1.`);
+            }
             if (!Array.isArray(shortNames) || shortNames.some((language) => language !== "en" && language !== "ja")) {
               throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration.shortNames must contain only en and ja.`);
             }
@@ -70,6 +74,7 @@ function readGalleryRuntimeConfig(): {
             }
             nameGeneration = {
               definition: naming.definition.trim(),
+              ...(naming.pipeline === "contextual/v1" ? { pipeline: naming.pipeline } : {}),
               shortNames: [...shortNames] as ShortNameRepresentation[],
             };
           }

@@ -11,7 +11,7 @@
     "dev": "concurrently --kill-others \"vite\" \"tsx watch src/server/server.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.web.json",
     "test:metadata": "tsx --test src/server/metadata-definitions.test.ts src/server/metadata-name.test.ts",
-    "test:name-generation": "node --test gallery-name-generator.test.mjs",
+    "test:name-generation": "node --test gallery-name-generator.test.mjs gallery-metadata-context.test.mjs",
     "test:batch": "node --test process-gallery-batch.test.mjs",
     "build:web": "vite build",
     "build:server": "tsc -p tsconfig.server.json",

@@ -15,7 +15,12 @@
       },
       "anime_creature_lite_v4/v1": {
         "enabled": true,
-        "category": "creatures"
+        "category": "creatures",
+        "nameGeneration": {
+          "definition": "image-gallery/name-generator/creature-byname/v1",
+          "pipeline": "contextual/v1",
+          "shortNames": ["en", "ja"]
+        }
       }
     }
   },

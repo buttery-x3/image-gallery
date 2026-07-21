@@ -18,6 +18,14 @@ npm run process-new-name-schema -- --definition name-generation-schemas/example-
 
 The attachment command updates only `gallery.config.json`; it never reads or writes `gallery/`. Omit `--short-names` to generate filesystem names without creating display-name sidecars. Omitting `nameGeneration` from a source policy retains original filenames. One generator definition can be attached to several source schemas, and different source schemas can use different generators simultaneously.
 
+For a `pipeline/v1` definition, contextual execution must be opted into explicitly. Representative metadata can be supplied to exercise its real canonical context during preview:
+
+```sh
+npm run process-new-name-schema -- --definition name-generation-schemas/creature-byname-v1.json --attach-to anime_creature_lite_v4/v1 --pipeline contextual/v1 --short-names en,ja --sample-dir /path/to/examples --preview 10
+```
+
+See [Contextual name generation pipelines](NAME_GENERATION_PIPELINES.md) for the data flow, stage types, fallback behavior, and semantic Japanese requirements.
+
 The equivalent configuration is:
 
 ```json
@@ -85,8 +93,10 @@ The included `waifu-japanese-fantasy-v1.json` definition is the canonical workin
 
 Invalid configured definitions and missing requested representation rules stop processing before files move. Definitions that are installed but unused do not affect batching.
 
+The second bundled definition, `creature-byname-v1.json`, uses the composable `pipeline/v1` engine. Its given-name stage references the canonical waifu generator, while its byname stage uses canonical metadata tags. Dependencies are resolved by schema ID from `name-generation-schemas/` and validated together.
+
 ## Sidecars and migration
 
-New short names use `image-gallery/name/v2` sidecars with source and generator provenance. Either `en` or `ja` may be present. Existing `image-gallery/name/v1` sidecars remain readable and are retained when name generation is disabled. Backfill writes v2 only when a configured representation is missing; it preserves existing valid names and warns about records it cannot update safely.
+New short names use `image-gallery/name/v2` sidecars with source and generator provenance. Either `en` or `ja` may be present, and pipeline-generated sidecars may also carry generic component provenance. Existing `image-gallery/name/v1` sidecars remain readable and are retained when name generation is disabled. Direct mora-pair backfill writes v2 only when a configured representation is missing; it preserves existing valid names and warns about records it cannot update safely. Contextual pipeline names require generation-time metadata and are not reconstructed from existing filenames.
 
 `BATCH_NAME_STYLE` has been removed. If it is still present, the batcher exits with instructions to move the selection into `metadata.schemas.<source-schema>.nameGeneration`.

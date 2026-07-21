@@ -128,7 +128,7 @@ For regular uploads, place the new images and any same-name JSON sidecars direct
 sudo -u image-gallery bash /opt/image-gallery/process-batch.sh
 ```
 
-The command moves every unique root-level image into one timestamped batch subdirectory and caches only that batch's missing previews. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. Existing metadata and file sizes provide a cheap duplicate candidate index, and SHA-256 confirms image equality before an incoming image is rejected. Exact duplicate pairs are moved to the hidden, recoverable `.duplicates/<timestamp>/` directory; equal metadata with different image content is reported and retained. Source schemas with a configured `nameGeneration` policy receive generated names; other schemas retain their filenames. Existing previews remain valid across moves and renames and are skipped. Add `--dry-run` to inspect both the batch and quarantine without changing files.
+The command moves every unique root-level image into one timestamped batch subdirectory and caches only that batch's missing previews. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. Existing metadata and file sizes provide a cheap duplicate candidate index, and SHA-256 confirms image equality before an incoming image is rejected. Exact duplicate pairs are moved to the hidden, recoverable `.duplicates/<timestamp>/` directory; equal metadata with different image content is reported and retained. Source schemas with a configured `nameGeneration` policy receive generated names; other schemas retain their filenames. A contextual `pipeline/v1` generator runs only when its source policy explicitly sets `pipeline: "contextual/v1"`; it uses canonical values from the source's metadata definition and may emit semantic Japanese display vocabulary when `ja` is requested. Existing previews remain valid across moves and renames and are skipped. Add `--dry-run` to inspect both the batch and quarantine without changing files.
 
 To apply generated names once to images already organized into batch directories, inspect and then run the explicit alternate command:
 
@@ -138,6 +138,8 @@ sudo -u image-gallery bash /opt/image-gallery/rename-existing.sh
 ```
 
 This command operates only on images whose source metadata schema has `nameGeneration` configured, leaves root-level uploads alone, and renames matching JSON sidecars with their images. Running it again deliberately replaces the generated names with new ones.
+
+Normal configuration changes affect new batches only. Do not run `rename-existing.sh` during this upgrade unless renaming previously organized media is intentional.
 
 Run the same script with no root-level images to check the full gallery and generate only missing previews. This also retries preview warming after a previous service or network failure.
 

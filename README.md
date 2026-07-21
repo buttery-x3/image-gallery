@@ -68,7 +68,7 @@ Hidden entries, symbolic links, and unsupported files are ignored. New files app
 
 Images may have a same-name JSON sidecar in the same directory. Batching preserves any valid JSON sidecar regardless of its schema. Definitions under `metadata-schemas/` normalize enabled schemas into common gallery tags; `gallery.config.json` assigns product categories and optional name generation to each source schema. Unsupported, disabled, or missing metadata does not prevent the image from appearing. The top-level All / Women / Creatures / Men selector uses the configured category, while advanced filters combine canonical tags across every enabled schema. Every image exposes its filename stem to the default filename search. The containing subdirectory is available as a Batch filter.
 
-The included configuration maps `anime_waifu_lite/v1` to Women and `anime_creature_lite_v4/v1` to Creatures. Future formats, including a men-only source schema, can be added without changing the gallery UI or batcher. See [Metadata schemas](docs/METADATA_SCHEMAS.md) for source normalization and [Name generation schemas](docs/NAME_GENERATION_SCHEMAS.md) for declarative naming.
+The included configuration maps `anime_waifu_lite/v1` to Women and `anime_creature_lite_v4/v1` to Creatures. Waifus use the direct mora-pair generator. Creatures explicitly opt into a contextual pipeline that reuses the same given-name construction but replaces the human family name with a family- and trait-aware byname, such as `Mika Whitetail`; its Japanese form combines the katakana given name with semantic Japanese trait vocabulary. Future formats, including a men-only source schema, can be added without changing the gallery UI or batcher. See [Metadata schemas](docs/METADATA_SCHEMAS.md), [Name generation schemas](docs/NAME_GENERATION_SCHEMAS.md), and [Contextual name generation pipelines](docs/NAME_GENERATION_PIPELINES.md).
 
 When configured short-name representations are requested, generated names also receive a `<long-name>.gallery-name.json` sidecar using the `image-gallery/name/v2` schema. It records the source metadata schema, generator schema, and whichever of `en` and `ja` were requested. Legacy `image-gallery/name/v1` sidecars remain readable. When `showNames` is enabled, available names appear in tiles and lightbox overlays; if the selected language is absent, the gallery falls back to the other representation and then the filename. Generated names become searchable when `searchMetadata` is enabled.
 
@@ -82,11 +82,11 @@ bash ./process-batch.sh
 
 Images without JSON metadata are included. When a same-name JSON sidecar is present, its JSON syntax is validated and it is moved alongside its image without requiring a recognized schema. Orphaned or invalid JSON stops the batch before anything moves and is never deleted automatically. Before moving anything, the batcher indexes existing metadata and file sizes, then SHA-256 hashes only plausible same-size duplicate candidates. Exact duplicate image/JSON pairs are moved recoverably into `GALLERY_DIR/.duplicates/<timestamp>/`, which remains hidden from the site; metadata matches with different image content stay in the normal batch and are reported. Duplicate images are also detected when metadata is missing or has changed.
 
-For each incoming image, the batcher reads the source metadata schema and applies its `nameGeneration` policy from `gallery.config.json`. Schemas without that policy retain their original filenames. A policy may generate filenames only or also request `en`, `ja`, or both short-name representations. Existing previews remain valid across moves and renames, and only missing previews are requested, with up to four concurrent requests. The removed `BATCH_NAME_STYLE` variable now produces a migration error instead of being silently ignored.
+For each incoming image, the batcher reads the source metadata schema and applies its `nameGeneration` policy from `gallery.config.json`. Schemas without that policy retain their original filenames. A policy may generate filenames only or also request `en`, `ja`, or both short-name representations. Advanced contextual generation requires the explicit per-source `pipeline: "contextual/v1"` flag. It consumes canonical tags from that source's metadata definition and gracefully falls back when optional record values are absent. Composed names are checked for filename and display-name collisions and retried without numeric suffixes. Existing previews remain valid across moves and renames, and only missing previews are requested, with up to four concurrent requests. The removed `BATCH_NAME_STYLE` variable now produces a migration error instead of being silently ignored.
 
 Use `bash ./process-batch.sh --dry-run` to inspect the proposed batch and duplicate quarantine without changing files, or pass the public base URL as the final argument when the service is not available on its configured local port. Running the command when there are no root-level images checks the full gallery and generates only missing previews, which also provides the retry path if preview warming previously failed.
 
-To force a one-time rename of existing batched images whose source schemas have name generation configured, preview the complete mapping first:
+New configuration affects new batches only during normal processing. To force a one-time rename of existing batched images whose source schemas have name generation configured, preview the complete mapping first:
 
 ```sh
 bash ./rename-existing.sh --dry-run
@@ -102,7 +102,7 @@ npm run backfill-name-metadata -- --dry-run
 npm run backfill-name-metadata
 ```
 
-The backfill adds only representations requested by the current source-schema policy and already missing from a valid sidecar. It upgrades changed sidecars to v2 while retaining existing names. Filenames that cannot be parsed confidently are reported; invalid existing sidecars require manual repair and are never overwritten automatically.
+The backfill adds only representations requested by the current source-schema policy and already missing from a valid sidecar. It upgrades changed sidecars to v2 while retaining existing names. Filenames that cannot be parsed confidently are reported; invalid existing sidecars require manual repair and are never overwritten automatically. Contextual pipeline names cannot be reconstructed from a filename, so use the explicit rename workflow if an intentional migration is ever required.
 
 To audit every existing batch without changing the gallery, run `npm run scan-for-duplicates` or `bash ./scan-for-duplicates.sh`. The scan hashes every supported image in non-hidden batch directories with SHA-256, reports complete matching groups, and exits with status 1 when duplicates are found. Root-level incoming files, hidden directories, and symbolic links are excluded.
 
@@ -141,6 +141,7 @@ src/web/       Single-page gallery interface
 src/tools/     Local schema onboarding tools
 metadata-schemas/ Declarative metadata-to-gallery mappings
 name-generation-schemas/ Declarative filename and short-name generators
+gallery-metadata-context.mjs Canonical metadata extraction for contextual naming
 docs/          Installation documentation plus Caddy and systemd examples
 gallery/       Default local media directory (contents are ignored by Git)
 ```

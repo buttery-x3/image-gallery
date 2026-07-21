@@ -20,7 +20,12 @@ test("batch naming is selected independently for each source metadata schema", a
       writeFile(path.join(galleryDirectory, "woman.png"), new Uint8Array([1, 2, 3])),
       writeFile(path.join(galleryDirectory, "woman.json"), '{"schema":"anime_waifu_lite/v1"}'),
       writeFile(path.join(galleryDirectory, "creature.png"), new Uint8Array([4, 5, 6, 7])),
-      writeFile(path.join(galleryDirectory, "creature.json"), '{"schema":"anime_creature_lite_v4/v1"}'),
+      writeFile(path.join(galleryDirectory, "creature.json"), JSON.stringify({ anime_creature_lite_v4: {
+        schema: "anime_creature_lite_v4/v1",
+        creature_family: "CANINE",
+        species: "fox",
+        global_selections: { creature_color_primary: "white", creature_color_secondary: "black" },
+      } })),
     ]);
     const { stdout } = await execFileAsync(process.execPath, ["process-gallery-batch.mjs", "--dry-run"], {
       cwd: projectRoot,
@@ -32,10 +37,9 @@ test("batch naming is selected independently for each source metadata schema", a
       },
     });
     assert.match(stdout, /woman\.png -> [a-z]+-[a-z]+\.png/);
-    assert.match(stdout, /creature\.png \+ creature\.json/);
-    assert.doesNotMatch(stdout, /creature\.png ->/);
-    assert.match(stdout, /Images that would be renamed: 1/);
-    assert.match(stdout, /Generated name metadata files that would be added: 1/);
+    assert.match(stdout, /creature\.png -> [a-z]+-(?:white|black|soft|wild|bright|swift)(?:tail|paw|fang|ear)\.png/);
+    assert.match(stdout, /Images that would be renamed: 2/);
+    assert.match(stdout, /Generated name metadata files that would be added: 2/);
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

@@ -4,6 +4,7 @@ import { constants as fileSystemConstants, createReadStream, readFileSync } from
 import { access, copyFile, lstat, mkdir, readdir, readFile, rename, rm, rmdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { generateName, generateShortNameForStem, loadNameGenerationDefinitions } from "./gallery-name-generator.mjs";
+import { extractMetadataContext, loadMetadataContextDefinitions } from "./gallery-metadata-context.mjs";
 
 const supportedExtensions = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"]);
 const nameMetadataSuffix = ".gallery-name.json";
@@ -41,14 +42,22 @@ function readMetadataSchemaPolicies() {
           throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration must be an object.`);
         }
         const definition = value.nameGeneration.definition;
+        const pipeline = value.nameGeneration.pipeline;
         const shortNames = value.nameGeneration.shortNames ?? [];
         if (typeof definition !== "string" || !definition.trim()) {
           throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration.definition must be a non-empty string.`);
         }
+        if (pipeline !== undefined && pipeline !== "contextual/v1") {
+          throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration.pipeline must be contextual/v1.`);
+        }
         if (!Array.isArray(shortNames) || shortNames.some((language) => language !== "en" && language !== "ja") || new Set(shortNames).size !== shortNames.length) {
           throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration.shortNames must contain unique en/ja values.`);
         }
-        nameGeneration = { definition: definition.trim(), shortNames: [...shortNames] };
+        nameGeneration = {
+          definition: definition.trim(),
+          ...(pipeline === "contextual/v1" ? { pipeline } : {}),
+          shortNames: [...shortNames],
+        };
       }
       policies.set(sourceSchema, { enabled: value.enabled, ...(nameGeneration ? { nameGeneration } : {}) });
     }
@@ -81,6 +90,7 @@ const requestedBaseUrl = positionalArguments[0];
 const galleryRoot = path.resolve(process.env.GALLERY_DIR ?? "gallery");
 const previewCacheRoot = path.resolve(process.env.PREVIEW_CACHE_DIR ?? ".cache/previews");
 const nameGenerationDefinitionsRoot = path.resolve("name-generation-schemas");
+const metadataDefinitionsRoot = path.resolve("metadata-schemas");
 
 function sourceMetadataSchema(parsed) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
@@ -110,12 +120,13 @@ function supportedNameMetadataRecord(parsed) {
   };
 }
 
-function nameMetadataContents(sourceSchema, generatorSchema, shortName) {
+function nameMetadataContents(sourceSchema, generatorSchema, shortName, components) {
   return `${JSON.stringify({
     schema: nameMetadataSchema,
     sourceMetadataSchema: sourceSchema,
     generatorSchema,
     shortName,
+    ...(components ? { components } : {}),
   }, null, 2)}\n`;
 }
 
@@ -219,6 +230,7 @@ async function readImageRecords(directory, options = {}) {
       metadataName: jsonFile.name,
       metadataFingerprint: metadataFingerprint(parsed),
       sourceMetadataSchema: sourceMetadataSchema(parsed),
+      sourceMetadata: parsed,
     });
   }
 
@@ -260,6 +272,7 @@ async function readImageRecords(directory, options = {}) {
       metadataName: metadata?.metadataName,
       metadataFingerprint: metadata?.metadataFingerprint,
       sourceMetadataSchema: metadata?.sourceMetadataSchema,
+      sourceMetadata: metadata?.sourceMetadata,
       nameMetadataName: nameMetadata?.nameMetadataName,
       shortName: nameMetadata?.shortName,
       nameGeneratorSchema: nameMetadata?.nameGeneratorSchema,
@@ -427,10 +440,58 @@ async function nameDefinitionsFor(records) {
     for (const representation of policy.shortNames) requested.add(representation);
     requestedBySchema.set(policy.definition, requested);
   }
-  return loadNameGenerationDefinitions(
+  const definitions = await loadNameGenerationDefinitions(
     nameGenerationDefinitionsRoot,
     new Map([...requestedBySchema].map(([schema, representations]) => [schema, [...representations]])),
   );
+  for (const record of records) {
+    const policy = nameGenerationPolicy(record);
+    if (!policy) continue;
+    const definition = definitions.get(policy.definition);
+    if (policy.pipeline === "contextual/v1" && definition?.engine !== "pipeline/v1") {
+      throw new Error(`${policy.definition} must use engine pipeline/v1 when pipeline contextual/v1 is configured.`);
+    }
+    if (!policy.pipeline && definition?.engine === "pipeline/v1") {
+      throw new Error(`${policy.definition} requires nameGeneration.pipeline: contextual/v1.`);
+    }
+  }
+  return definitions;
+}
+
+function pipelineContextKeys(definition) {
+  return new Set(definition.stages.flatMap((stage) => {
+    if (stage.type === "contextual-compound/v1") {
+      return [stage.context.family, stage.context.species, ...stage.context.traits];
+    }
+    if (stage.type === "contextual-pool/v1") return stage.contexts;
+    return [];
+  }));
+}
+
+async function addGenerationContexts(records, nameDefinitions) {
+  const requestedSchemas = new Set(records.flatMap((record) =>
+    nameGenerationPolicy(record)?.pipeline === "contextual/v1" && record.sourceMetadataSchema
+      ? [record.sourceMetadataSchema]
+      : []
+  ));
+  const definitions = await loadMetadataContextDefinitions(metadataDefinitionsRoot, requestedSchemas);
+  for (const record of records) {
+    const policy = nameGenerationPolicy(record);
+    if (policy?.pipeline !== "contextual/v1" || !record.sourceMetadataSchema) continue;
+    const metadataDefinition = definitions.get(record.sourceMetadataSchema);
+    const nameDefinition = nameDefinitions.get(policy.definition);
+    const missingTags = [...pipelineContextKeys(nameDefinition)].filter((tag) => !(tag in metadataDefinition.tags));
+    if (missingTags.length > 0) {
+      throw new Error(
+        `${policy.definition} requests canonical context tag${missingTags.length === 1 ? "" : "s"} not provided by ` +
+        `${record.sourceMetadataSchema}: ${missingTags.join(", ")}`,
+      );
+    }
+    record.generationContext = extractMetadataContext(
+      record.sourceMetadata,
+      metadataDefinition,
+    );
+  }
 }
 
 function generateNameForRecord(record, definitions, usedNames, usedShortNames) {
@@ -438,7 +499,7 @@ function generateNameForRecord(record, definitions, usedNames, usedShortNames) {
   if (!policy) return undefined;
   const definition = definitions.get(policy.definition);
   if (!definition) throw new Error(`Name generation definition ${policy.definition} was not loaded.`);
-  return generateName(definition, policy.shortNames, usedNames, usedShortNames);
+  return generateName(definition, policy.shortNames, usedNames, usedShortNames, record.generationContext);
 }
 
 function previewCacheKey(identifier, size, modifiedAt) {
@@ -637,6 +698,7 @@ async function renameExistingBatches() {
   }
 
   const definitions = await nameDefinitionsFor(recordsToRename);
+  await addGenerationContexts(recordsToRename, definitions);
   const usedNames = await collectUsedImageStems();
   const usedShortNames = await collectUsedShortNames();
   const imageMoves = [];
@@ -673,7 +735,7 @@ async function renameExistingBatches() {
     if (policy.shortNames.length > 0) {
       fileWrites.push({
         targetPath: path.join(record.directory, nameMetadataTargetName),
-        contents: nameMetadataContents(record.sourceMetadataSchema, generated.generatorSchema, generated.shortName),
+        contents: nameMetadataContents(record.sourceMetadataSchema, generated.generatorSchema, generated.shortName, generated.components),
         replaceExisting: Boolean(record.nameMetadataName),
       });
     }
@@ -812,6 +874,7 @@ async function processIncomingBatch() {
   const quarantineTarget = duplicates.length > 0 ? await nextQuarantineTarget() : undefined;
   const batchTarget = uniqueRecords.length > 0 ? await nextBatchTarget() : undefined;
   const definitions = await nameDefinitionsFor(uniqueRecords);
+  await addGenerationContexts(uniqueRecords, definitions);
   const generatedNameCount = uniqueRecords.filter((record) => nameGenerationPolicy(record)).length;
   const usedNames = generatedNameCount > 0 ? await collectUsedImageStems() : new Set();
   const usedShortNames = generatedNameCount > 0 ? await collectUsedShortNames() : { en: new Set(), ja: new Set() };
@@ -884,7 +947,7 @@ async function processIncomingBatch() {
       const nameMetadataTargetName = `${targetStem}${nameMetadataSuffix}`;
       fileWrites.push({
         targetPath: path.join(batchTarget.batchDirectory, nameMetadataTargetName),
-        contents: nameMetadataContents(record.sourceMetadataSchema, generated.generatorSchema, generated.shortName),
+        contents: nameMetadataContents(record.sourceMetadataSchema, generated.generatorSchema, generated.shortName, generated.components),
       });
       nameMetadataMapping = ` + ${nameMetadataTargetName} (${Object.values(generated.shortName).join(" / ")})`;
     }

@@ -1,6 +1,6 @@
 # Metadata schemas
 
-The gallery keeps file organization separate from metadata interpretation. `process-gallery-batch.mjs` accepts any syntactically valid same-stem JSON sidecar and preserves it with the image. Definition files in `metadata-schemas/` decide how source schemas provide search data, filters, and prompt details. Product category and naming behavior are assigned separately in `gallery.config.json`.
+The gallery keeps file organization separate from metadata interpretation. `process-gallery-batch.mjs` accepts any syntactically valid same-stem JSON sidecar and preserves it with the image. Definition files in `metadata-schemas/` decide how source schemas provide search data, filters, prompt details, and canonical context for an explicitly enabled name-generation pipeline. Product category and naming behavior are assigned separately in `gallery.config.json`.
 
 ## Enable schemas
 
@@ -93,6 +93,8 @@ The mapper intentionally supports a small set of operations:
 - `valueRules` trims values and omits empty or unresolved template strings.
 
 Use lowercase snake-case canonical tag names. Equivalent concepts should share a name across definitions—for example, different source fields representing a scene should all map to `scene`. Schema-specific concepts such as `creature_family` may remain distinct.
+
+Contextual name pipelines reference these canonical tag names, never raw JSON paths. A configured pipeline may require that tags such as `creature_family`, `species`, and `creature_color_primary` are declared here, while individual records may omit their values and use the pipeline's fallback pools. Adding an equivalent source format therefore means mapping its fields to the expected canonical tags and attaching the pipeline in config; no batcher code changes are required.
 
 If a future format requires computation that cannot be expressed by these operations, add a narrowly scoped coded adapter rather than expanding the definition format into a programming language.
 

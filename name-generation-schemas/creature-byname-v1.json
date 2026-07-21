@@ -1,0 +1,212 @@
+{
+  "definitionVersion": 1,
+  "schema": "image-gallery/name-generator/creature-byname/v1",
+  "engine": "pipeline/v1",
+  "stages": [
+    {
+      "id": "given",
+      "type": "generator-component/v1",
+      "definition": "image-gallery/name-generator/waifu-japanese-fantasy/v1",
+      "component": "given"
+    },
+    {
+      "id": "byname",
+      "type": "contextual-compound/v1",
+      "context": {
+        "family": "creature_family",
+        "species": "species",
+        "traits": ["creature_color_primary", "creature_color_secondary"]
+      },
+      "familyAliases": {
+        "ANGEL": "supernatural",
+        "AQUATIC": "aquatic",
+        "ARACHNID": "arthropod",
+        "ARMOREDINSECT": "arthropod",
+        "AVIAN": "feathered",
+        "BAT": "furry",
+        "CANINE": "furry",
+        "DEER": "furry",
+        "DEMON": "supernatural",
+        "DRAGON": "scaled",
+        "EQUINE": "furry",
+        "FELINE": "furry",
+        "HEAVYMAMMAL": "furry",
+        "HORNEDHOOF": "furry",
+        "RABBIT": "furry",
+        "REPTILE": "scaled",
+        "SMOOTH": "smooth",
+        "SPECTRAL": "supernatural",
+        "WINGEDINSECT": "arthropod"
+      },
+      "defaultFamily": "supernatural",
+      "prefixes": {
+        "white": { "en": "White", "jaAttributive": "白い" },
+        "black": { "en": "Black", "jaAttributive": "黒い" },
+        "blue": { "en": "Blue", "jaAttributive": "青い" },
+        "gold": { "en": "Gold", "jaAttributive": "金色の" },
+        "silver": { "en": "Silver", "jaAttributive": "銀色の" },
+        "red": { "en": "Red", "jaAttributive": "赤い" },
+        "green": { "en": "Green", "jaAttributive": "緑の" },
+        "grey": { "en": "Grey", "jaAttributive": "灰色の" },
+        "dark": { "en": "Dark", "jaAttributive": "闇色の" },
+        "pale": { "en": "Pale", "jaAttributive": "淡い" },
+        "deep": { "en": "Deep", "jaAttributive": "深い" },
+        "sky": { "en": "Sky", "jaAttributive": "空色の" },
+        "crimson": { "en": "Crimson", "jaAttributive": "深紅の" },
+        "soft": { "en": "Soft", "jaAttributive": "柔らかな" },
+        "wild": { "en": "Wild", "jaAttributive": "野生の" },
+        "bright": { "en": "Bright", "jaAttributive": "輝く" },
+        "swift": { "en": "Swift", "jaAttributive": "素早い" },
+        "clear": { "en": "Clear", "jaAttributive": "透き通る" }
+      },
+      "features": {
+        "tail": { "en": "tail", "jaNoun": "尾" },
+        "fang": { "en": "fang", "jaNoun": "牙" },
+        "paw": { "en": "paw", "jaNoun": "肉球" },
+        "ear": { "en": "ear", "jaNoun": "耳" },
+        "mane": { "en": "mane", "jaNoun": "たてがみ" },
+        "claw": { "en": "claw", "jaNoun": "鉤爪" },
+        "scale": { "en": "scale", "jaNoun": "鱗" },
+        "horn": { "en": "horn", "jaNoun": "角" },
+        "crest": { "en": "crest", "jaNoun": "冠" },
+        "wing": { "en": "wing", "jaNoun": "翼" },
+        "feather": { "en": "feather", "jaNoun": "羽" },
+        "talon": { "en": "talon", "jaNoun": "鉤爪" },
+        "fin": { "en": "fin", "jaNoun": "ひれ" },
+        "gill": { "en": "gill", "jaNoun": "えら" },
+        "shell": { "en": "shell", "jaNoun": "甲殻" },
+        "sting": { "en": "sting", "jaNoun": "毒針" },
+        "web": { "en": "web", "jaNoun": "蜘蛛の糸" },
+        "skin": { "en": "skin", "jaNoun": "肌" },
+        "spot": { "en": "spot", "jaNoun": "斑点" },
+        "frill": { "en": "frill", "jaNoun": "襟飾り" },
+        "halo": { "en": "halo", "jaNoun": "光輪" },
+        "shade": { "en": "shade", "jaNoun": "影" }
+      },
+      "families": {
+        "furry": {
+          "features": ["tail", "fang", "paw", "ear", "mane", "claw"],
+          "fallbackPrefixes": ["soft", "wild", "bright", "swift"],
+          "speciesFeatures": {
+            "bat": ["wing", "fang", "ear"],
+            "bear": ["paw", "claw", "fang"],
+            "bunny": ["ear", "paw", "tail"],
+            "cow": ["horn", "tail"],
+            "dog": ["tail", "paw", "fang", "ear"],
+            "fox": ["tail", "paw", "fang", "ear"],
+            "goat": ["horn", "tail"],
+            "horse": ["mane", "tail"],
+            "kitsune": ["tail", "ear", "fang"],
+            "lion": ["mane", "fang", "claw"],
+            "pony": ["mane", "tail"],
+            "ram": ["horn", "paw"],
+            "sheep": ["paw", "horn"],
+            "stag": ["horn", "tail"],
+            "wolf": ["tail", "fang", "paw", "ear"]
+          }
+        },
+        "scaled": {
+          "features": ["scale", "horn", "crest", "tail", "claw", "fang"],
+          "fallbackPrefixes": ["bright", "wild", "deep", "swift"],
+          "speciesFeatures": {
+            "alligator": ["scale", "tail", "fang"],
+            "chameleon": ["scale", "crest", "tail"],
+            "dragon": ["scale", "horn", "crest", "claw", "tail"],
+            "lizard": ["scale", "tail", "claw"],
+            "oni-dragon": ["horn", "scale", "claw"]
+          }
+        },
+        "feathered": {
+          "features": ["wing", "feather", "talon", "crest"],
+          "fallbackPrefixes": ["bright", "swift", "wild", "sky"],
+          "speciesFeatures": {
+            "bird": ["wing", "feather", "crest"],
+            "eagle": ["wing", "feather", "talon"],
+            "harpy": ["wing", "feather", "talon"],
+            "owl": ["wing", "feather", "talon"],
+            "vulture": ["wing", "feather", "talon"]
+          }
+        },
+        "aquatic": {
+          "features": ["fin", "tail", "gill", "scale"],
+          "fallbackPrefixes": ["deep", "clear", "bright", "swift"],
+          "speciesFeatures": {
+            "koi": ["fin", "scale", "tail"],
+            "mermaid": ["fin", "tail", "scale"],
+            "shark": ["fin", "gill", "fang"]
+          }
+        },
+        "arthropod": {
+          "features": ["wing", "shell", "sting", "claw", "web"],
+          "fallbackPrefixes": ["bright", "wild", "swift", "dark"],
+          "speciesFeatures": {
+            "bee": ["wing", "sting"],
+            "beetle": ["shell", "wing"],
+            "centipede": ["shell", "sting"],
+            "dragonfly": ["wing"],
+            "mantis": ["claw", "wing"],
+            "moth": ["wing"],
+            "scorpion": ["sting", "claw", "shell"],
+            "spider": ["web", "fang"]
+          }
+        },
+        "smooth": {
+          "features": ["skin", "spot", "frill", "tail"],
+          "fallbackPrefixes": ["soft", "clear", "bright", "pale"],
+          "speciesFeatures": {
+            "frog": ["skin", "spot", "frill"],
+            "slime": ["skin", "spot"]
+          }
+        },
+        "supernatural": {
+          "features": ["horn", "wing", "halo", "shade", "fang"],
+          "fallbackPrefixes": ["dark", "pale", "bright", "crimson"],
+          "speciesFeatures": {
+            "angel": ["wing", "halo"],
+            "demon": ["horn", "wing", "shade"],
+            "oni": ["horn", "fang"],
+            "succubus": ["horn", "wing", "shade"],
+            "vampire": ["fang", "shade"]
+          }
+        }
+      },
+      "traitRules": [
+        {
+          "context": "creature_color_primary",
+          "weight": 3,
+          "values": {
+            "white": "white", "black": "black", "blue": "blue", "gold": "gold", "yellow": "gold",
+            "silver": "silver", "red": "red", "green": "green", "grey": "grey", "brown": "dark",
+            "dark grey": "dark", "dark brown": "dark", "dark purple": "dark", "dark green": "dark",
+            "light grey": "pale", "light pink": "pale", "cream": "pale", "peach": "pale",
+            "dark blue": "deep", "navy blue": "deep", "light blue": "sky", "aqua": "sky",
+            "dark red": "crimson", "bright red": "crimson", "mint green": "green", "light green": "green"
+          }
+        },
+        {
+          "context": "creature_color_secondary",
+          "weight": 2,
+          "values": {
+            "white": "white", "black": "black", "blue": "blue", "gold": "gold", "yellow": "gold",
+            "silver": "silver", "red": "red", "green": "green", "grey": "grey", "brown": "dark",
+            "dark grey": "dark", "dark brown": "dark", "dark purple": "dark", "dark green": "dark",
+            "light grey": "pale", "light pink": "pale", "cream": "pale", "peach": "pale",
+            "dark blue": "deep", "navy blue": "deep", "light blue": "sky", "aqua": "sky",
+            "dark red": "crimson", "bright red": "crimson", "mint green": "green", "light green": "green"
+          }
+        }
+      ],
+      "fallbackWeight": 1
+    },
+    {
+      "id": "result",
+      "type": "compose-name/v1",
+      "components": ["given", "byname"],
+      "fileSeparator": "-",
+      "representationSeparators": {
+        "en": " ",
+        "ja": "・"
+      }
+    }
+  ]
+}
