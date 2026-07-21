@@ -322,7 +322,7 @@ button { font: inherit; }
 
 .site-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 64rem) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 65rem) minmax(0, 1fr);
   align-items: center;
   width: 100%;
   padding: 22px 24px 18px;
