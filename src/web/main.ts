@@ -312,6 +312,11 @@ function syncHeaderLayout(): void {
     }
     return outerWidth(element);
   });
+  const typeFilterWidth = typeFilterFieldset.parentElement === headerControls
+    ? 0
+    : outerWidth(typeFilterFieldset);
+  const canonicalControlsWidth = controlsWidth
+    + (typeFilterWidth > 0 ? typeFilterWidth + pixelValue(window.getComputedStyle(headerControls).columnGap) : 0);
   const metaStyle = window.getComputedStyle(supportHeader);
   const metaWidths = [...supportHeader.children]
     .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== supportButton)
@@ -323,8 +328,11 @@ function syncHeaderLayout(): void {
   }
   const metaWidth = metaWidths.reduce((total, width) => total + width, 0)
     + Math.max(0, metaWidths.length - 1) * pixelValue(metaStyle.columnGap);
-  const requiredWidth = flexRowWidth(headerTitle)
-    + Math.max(controlsWidth, oneRowControlsTrackWidth)
+  const titleWidth = flexRowWidth(headerTitle, (element) => (
+    element === typeFilterFieldset ? 0 : outerWidth(element)
+  ));
+  const requiredWidth = titleWidth
+    + Math.max(canonicalControlsWidth, oneRowControlsTrackWidth)
     + metaWidth
     + 2 * pixelValue(headerStyle.columnGap);
   const availableWidth = siteHeader.clientWidth
@@ -334,6 +342,12 @@ function syncHeaderLayout(): void {
 
   const layoutChanged = siteHeader.classList.contains("is-stacked") !== shouldStack;
   siteHeader.classList.toggle("is-stacked", shouldStack);
+  const typeFilterBelongsInTitle = shouldStack && window.matchMedia("(min-width: 801px)").matches;
+  if (typeFilterBelongsInTitle && typeFilterFieldset.parentElement !== headerTitle) {
+    headerTitle.append(typeFilterFieldset);
+  } else if (!typeFilterBelongsInTitle && typeFilterFieldset.parentElement !== headerControls) {
+    headerControls.prepend(typeFilterFieldset);
+  }
   if (layoutChanged) syncSupportButtonPlacement();
 }
 

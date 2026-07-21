@@ -1699,6 +1699,15 @@ html[data-theme="accessible"] .theme-picker select { font-size: 0.8rem; }
 .site-header.is-stacked .search-field { max-width: 32rem; }
 .site-header.is-stacked .header-meta { grid-column: 2; grid-row: 1; }
 .site-header.is-stacked .header-meta > .support-button-host { display: none; }
+.site-header.is-stacked .header-title .category-filter {
+  height: 30px;
+  border-radius: 7px;
+}
+.site-header.is-stacked .header-title .category-filter label > span {
+  height: 24px;
+  padding-inline: 8px;
+  border-radius: 5px;
+}
 .support-card {
   display: flex;
   grid-row-end: span 8;
