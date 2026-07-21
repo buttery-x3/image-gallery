@@ -8,6 +8,7 @@ const fallbackDescription = "A simple private image gallery.";
 type GalleryConfig = {
   siteName: string;
   searchMetadata: boolean;
+  showTypeToggle: boolean;
   showLanguageToggle: boolean;
   showNames: boolean;
   enableReporting: boolean;
@@ -15,6 +16,7 @@ type GalleryConfig = {
   watermarkText: string;
   watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
   metadata?: { schemas?: Record<string, unknown> };
+  typeLabels: Record<string, string>;
 };
 
 function readGalleryConfig(): GalleryConfig {
@@ -34,6 +36,9 @@ function readGalleryConfig(): GalleryConfig {
   for (const key of ["searchMetadata", "showLanguageToggle", "showNames", "enableReporting", "showWatermark"] as const) {
     if (typeof record[key] !== "boolean") throw new Error(`gallery.config.json ${key} must be true or false.`);
   }
+  if (record.showTypeToggle !== undefined && typeof record.showTypeToggle !== "boolean") {
+    throw new Error("gallery.config.json showTypeToggle must be true or false when configured.");
+  }
   const watermarkText = typeof record.watermarkText === "string" ? record.watermarkText.trim() : "";
   if (!watermarkText) throw new Error("gallery.config.json watermarkText must be a non-empty string.");
   const watermarkPosition = record.watermarkPosition;
@@ -41,6 +46,7 @@ function readGalleryConfig(): GalleryConfig {
     throw new Error("gallery.config.json watermarkPosition must be a corner name.");
   }
   let metadata: GalleryConfig["metadata"];
+  const typeLabels: Record<string, string> = {};
   if (record.metadata !== undefined) {
     if (!record.metadata || typeof record.metadata !== "object" || Array.isArray(record.metadata)) {
       throw new Error("gallery.config.json metadata must be an object.");
@@ -52,17 +58,30 @@ function readGalleryConfig(): GalleryConfig {
     if (metadataRecord.schemas !== undefined && (
       !metadataRecord.schemas || typeof metadataRecord.schemas !== "object" || Array.isArray(metadataRecord.schemas)
     )) throw new Error("gallery.config.json metadata.schemas must be an object keyed by source metadata schema.");
+    if (metadataRecord.schemas !== undefined) {
+      for (const [sourceSchema, value] of Object.entries(metadataRecord.schemas as Record<string, unknown>)) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+        const typeLabel = (value as Record<string, unknown>).typeLabel;
+        if (typeLabel === undefined) continue;
+        if (typeof typeLabel !== "string" || !typeLabel.trim()) {
+          throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.typeLabel must be a non-empty string.`);
+        }
+        typeLabels[sourceSchema] = typeLabel.trim();
+      }
+    }
     metadata = metadataRecord.schemas === undefined ? {} : { schemas: metadataRecord.schemas as Record<string, unknown> };
   }
   return {
     siteName,
     searchMetadata: record.searchMetadata as boolean,
+    showTypeToggle: record.showTypeToggle === true,
     showLanguageToggle: record.showLanguageToggle as boolean,
     showNames: record.showNames as boolean,
     enableReporting: record.enableReporting as boolean,
     showWatermark: record.showWatermark as boolean,
     watermarkText,
     watermarkPosition: watermarkPosition as GalleryConfig["watermarkPosition"],
+    typeLabels,
     ...(metadata ? { metadata } : {}),
   };
 }
@@ -123,6 +142,8 @@ function galleryHtml(title: string, description: string, siteUrl: URL | undefine
       return html
         .replaceAll("__GALLERY_TITLE__", escapeHtml(title))
         .replace("__GALLERY_SEARCH_METADATA__", String(config.searchMetadata))
+        .replace("__GALLERY_TYPE_TOGGLE__", String(config.showTypeToggle))
+        .replace("__GALLERY_TYPE_LABELS__", escapeHtml(JSON.stringify(config.typeLabels)))
         .replace("__GALLERY_LANGUAGE_TOGGLE__", String(config.showLanguageToggle))
         .replace("__GALLERY_SHOW_NAMES__", String(config.showNames))
         .replace("__GALLERY_ENABLE_REPORTING__", String(config.enableReporting))

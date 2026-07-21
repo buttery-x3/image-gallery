@@ -23,17 +23,19 @@ const sampleDirectory = option("--sample-dir");
 const definitionPath = option("--definition");
 const outputPath = option("--output");
 const category = option("--category") as GalleryCategory | undefined;
+const typeLabel = option("--type-label")?.trim();
 const scaffold = hasFlag("--scaffold");
 const enable = hasFlag("--enable");
 
 if (
   (samplePath && sampleDirectory) || (scaffold && (!samplePath || !outputPath)) ||
   (!scaffold && !definitionPath) || (!samplePath && !sampleDirectory) ||
-  (category && !["women", "creatures", "men"].includes(category))
+  (category && !["women", "creatures", "men"].includes(category)) ||
+  (args.includes("--type-label") && !typeLabel)
 ) {
   console.error("Usage:");
   console.error("  npm run process-new-schema -- --sample <json> --scaffold --output <definition.json>");
-  console.error("  npm run process-new-schema -- --definition <definition.json> (--sample <json> | --sample-dir <dir>) [--enable] [--category <women|creatures|men>]");
+  console.error("  npm run process-new-schema -- --definition <definition.json> (--sample <json> | --sample-dir <dir>) [--enable] [--category <women|creatures|men>] [--type-label <label>]");
   process.exit(2);
 }
 
@@ -137,6 +139,7 @@ if (matched === 0) throw new Error(`No samples matched ${definition.schema}.`);
 
 console.log(`Validated ${definition.schema} against ${matched} sample${matched === 1 ? "" : "s"}.`);
 if (category) console.log(`Configured category: ${category}`);
+if (typeLabel) console.log(`Configured type label: ${typeLabel}`);
 console.log("Tag coverage:");
 for (const [tag, count] of [...tagCounts].sort(([left], [right]) => left.localeCompare(right))) {
   console.log(`- ${tag}: ${count}/${matched}`);
@@ -164,7 +167,12 @@ if (enable) {
   const existing = schemas[definition.schema] && typeof schemas[definition.schema] === "object" && !Array.isArray(schemas[definition.schema])
     ? schemas[definition.schema] as Record<string, unknown>
     : {};
-  schemas[definition.schema] = { ...existing, enabled: true, ...(category ? { category } : {}) };
+  schemas[definition.schema] = {
+    ...existing,
+    enabled: true,
+    ...(category ? { category } : {}),
+    ...(typeLabel ? { typeLabel } : {}),
+  };
   configRecord.metadata = { ...metadata, schemas };
   await writeAtomic(configPath, `${JSON.stringify(configRecord, null, 2)}\n`, true);
   console.log(`Enabled ${definition.schema} in gallery.config.json.`);

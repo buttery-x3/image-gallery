@@ -1,6 +1,7 @@
 {
   "siteName": "Image Gallery",
   "searchMetadata": false,
+  "showTypeToggle": true,
   "showLanguageToggle": false,
   "showNames": false,
   "metadata": {
@@ -8,6 +9,7 @@
       "anime_waifu_lite/v1": {
         "enabled": true,
         "category": "women",
+        "typeLabel": "Waifus",
         "nameGeneration": {
           "definition": "image-gallery/name-generator/waifu-japanese-fantasy/v1",
           "shortNames": ["en", "ja"]
@@ -16,6 +18,7 @@
       "anime_creature_lite_v4/v1": {
         "enabled": true,
         "category": "creatures",
+        "typeLabel": "Beastais",
         "nameGeneration": {
           "definition": "image-gallery/name-generator/creature-byname/v1",
           "pipeline": "contextual/v1",

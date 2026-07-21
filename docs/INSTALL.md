@@ -26,7 +26,7 @@ Copy or clone the repository into `/opt/image-gallery`, then give the service ac
 sudo chown -R image-gallery:image-gallery /opt/image-gallery
 ```
 
-Keep the committed `metadata-schemas/`, `name-generation-schemas/`, and `gallery.config.json` at the repository root. The service loads metadata definitions and per-source-schema policies from there. Restart after changing runtime schema configuration; rebuild as well when browser-facing settings or application code change.
+Keep the committed `metadata-schemas/`, `name-generation-schemas/`, and `gallery.config.json` at the repository root. The service loads metadata definitions and per-source-schema policies from there. Restart after changing runtime schema configuration. Rebuild after changing browser-facing settings such as `showTypeToggle` or a schema's `typeLabel`, as well as after application-code changes.
 
 ## 3. Build the application
 

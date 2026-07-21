@@ -30,6 +30,7 @@ This repository is intentionally a small private image gallery. Keep the impleme
 - Ordinary same-stem JSON sidecars must be preserved regardless of whether their schema is enabled or understood.
 - The batcher must remain schema-neutral; new metadata formats should normally be added through declarative definitions.
 - Product categories and name generation are assigned per source metadata schema in `gallery.config.json`, not embedded in reusable definitions.
+- The optional top-level type selector is keyed directly by source metadata schema and uses its configured `typeLabel`; render only present configured schemas and hide the selector unless at least two types are present.
 - Contextual name generation must remain explicit per source schema through `pipeline: "contextual/v1"`; direct generators remain the default.
 - Pipeline stages and the batcher must remain feature-neutral. Domain behavior belongs in declarative name definitions and consumes canonical tags from metadata definitions.
 - Missing optional contextual values must fall back without blocking. Japanese contextual display names use declared semantic Japanese vocabulary, not automatic phonetic transliteration.

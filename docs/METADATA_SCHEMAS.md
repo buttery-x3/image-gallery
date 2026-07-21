@@ -8,11 +8,12 @@ The gallery keeps file organization separate from metadata interpretation. `proc
 
 ```json
 {
+  "showTypeToggle": true,
   "metadata": {
     "schemas": {
-      "anime_waifu_lite/v1": { "enabled": true, "category": "women" },
-      "anime_creature_lite_v4/v1": { "enabled": true, "category": "creatures" },
-      "future_men/v1": { "enabled": false, "category": "men" }
+      "anime_waifu_lite/v1": { "enabled": true, "typeLabel": "Waifus", "category": "women" },
+      "anime_creature_lite_v4/v1": { "enabled": true, "typeLabel": "Beastais", "category": "creatures" },
+      "future_men/v1": { "enabled": false, "typeLabel": "Husbundai", "category": "men" }
     }
   }
 }
@@ -20,7 +21,9 @@ The gallery keeps file organization separate from metadata interpretation. `proc
 
 When `metadata.schemas` is omitted, every non-draft definition is enabled without a product category. An unknown or explicitly disabled schema is preserved but is not normalized. Its image remains visible under **All**.
 
-Category is a product-level policy independent of reusable tag mappings. A male creature source can remain in `creatures`; a future men-only source can be assigned to `men`. Multiple enabled schemas may share a category and are filtered together without scanning their tags.
+`typeLabel` is the browser-facing name for that exact source schema. With `showTypeToggle: true`, only labels whose schemas are present in the current gallery are rendered. The selector is hidden with zero or one present type. Each schema remains a distinct fast bucket, so eight present configured schemas produce eight type choices without scanning tags.
+
+Category remains a separate product-level policy independent of reusable tag mappings and the schema type selector. A male creature source can remain in `creatures`; a future men-only source can be assigned to `men` while displaying the label `Husbundai`.
 
 ## Add a schema
 
@@ -45,7 +48,7 @@ npm run process-new-schema -- --definition metadata-schemas/example-v1.json --sa
 To validate and add the schema to `gallery.config.json` in one explicit step:
 
 ```sh
-npm run process-new-schema -- --definition metadata-schemas/example-v1.json --sample-dir /path/to/examples --enable --category men
+npm run process-new-schema -- --definition metadata-schemas/example-v1.json --sample-dir /path/to/examples --enable --category men --type-label Husbundai
 ```
 
 The tool reads samples but never changes them or writes inside `gallery/`.

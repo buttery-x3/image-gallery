@@ -391,6 +391,7 @@ main { flex: 1 0 auto; }
   background: rgba(255, 255, 255, 0.05);
 }
 
+.category-filter[hidden] { display: none; }
 .category-filter label { position: relative; cursor: pointer; }
 .category-filter input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .category-filter label > span {

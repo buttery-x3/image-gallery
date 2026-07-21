@@ -8,6 +8,7 @@ export type ShortNameRepresentation = "en" | "ja";
 export interface MetadataSchemaRuntimeConfig {
   enabled: boolean;
   category?: GalleryCategory;
+  typeLabel?: string;
   nameGeneration?: {
     definition: string;
     pipeline?: "contextual/v1";
@@ -50,6 +51,9 @@ function readGalleryRuntimeConfig(): {
           if (schema.category !== undefined && !["women", "creatures", "men"].includes(schema.category as string)) {
             throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.category must be women, creatures, or men.`);
           }
+          if (schema.typeLabel !== undefined && (typeof schema.typeLabel !== "string" || !schema.typeLabel.trim())) {
+            throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.typeLabel must be a non-empty string.`);
+          }
           let nameGeneration: MetadataSchemaRuntimeConfig["nameGeneration"];
           if (schema.nameGeneration !== undefined) {
             if (!schema.enabled) {
@@ -81,6 +85,7 @@ function readGalleryRuntimeConfig(): {
           metadataSchemas[sourceSchema] = {
             enabled: schema.enabled,
             ...(schema.category ? { category: schema.category as GalleryCategory } : {}),
+            ...(typeof schema.typeLabel === "string" ? { typeLabel: schema.typeLabel.trim() } : {}),
             ...(nameGeneration ? { nameGeneration } : {}),
           };
         }

@@ -1,7 +1,6 @@
 import "./styles.css";
 import type {
   ErrorResponse,
-  GalleryCategory,
   GalleryImage,
   GalleryResponse,
   ImageDetailsResponse,
@@ -14,8 +13,17 @@ function requiredElement<T extends Element>(selector: string): T {
 }
 
 const gallery = requiredElement<HTMLElement>("#gallery");
+function configuredTypeLabels(): ReadonlyMap<string, string> {
+  const raw = document.documentElement.dataset.galleryTypeLabels ?? "{}";
+  const parsed = JSON.parse(raw) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid gallery type labels");
+  return new Map(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+}
+
 const galleryConfig = {
   searchMetadata: document.documentElement.dataset.gallerySearchMetadata === "true",
+  showTypeToggle: document.documentElement.dataset.galleryTypeToggle === "true",
+  typeLabels: configuredTypeLabels(),
   showLanguageToggle: document.documentElement.dataset.galleryLanguageToggle === "true",
   showNames: document.documentElement.dataset.galleryShowNames === "true",
   enableReporting: document.documentElement.dataset.galleryEnableReporting === "true",
@@ -40,8 +48,7 @@ const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const slideshowButton = requiredElement<HTMLButtonElement>("#slideshow");
 const searchInput = requiredElement<HTMLInputElement>("#search");
 const favoritesOnly = requiredElement<HTMLInputElement>("#favorites-only");
-const categoryInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="gallery-category"]')];
-if (categoryInputs.length !== 4) throw new Error("Missing gallery category controls");
+const typeFilterFieldset = requiredElement<HTMLFieldSetElement>(".category-filter");
 const nameLanguageFieldset = requiredElement<HTMLElement>(".name-language");
 const nameLanguageInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="name-language"]')];
 if (nameLanguageInputs.length !== 2) throw new Error("Missing name language controls");
@@ -116,8 +123,8 @@ let lightboxTouchStart: { identifier: number; x: number; y: number; startedAt: n
 let activeImageLoads = 0;
 let allImages: GalleryImage[] = [];
 let galleryImages: GalleryImage[] = [];
-let activeCategory: "all" | GalleryCategory = "all";
-const categoryBuckets = new Map<GalleryCategory, GalleryImage[]>();
+let activeType = "all";
+const typeBuckets = new Map<string, GalleryImage[]>();
 let searchTimer: number | undefined;
 let shufflePending = false;
 let slideshowSequence: GalleryImage[] = [];
@@ -150,11 +157,8 @@ const uiCopy = {
     slideshow: "Slideshow",
     searchImages: "Search images",
     onlyFavorites: "Only favorites",
-    categoryFilter: "Gallery category",
+    typeFilter: "Gallery type",
     all: "All",
-    women: "Women",
-    creatures: "Creatures",
-    men: "Men",
     displayLanguage: "Display name language",
     advanced: "Advanced",
     buyCoffee: "Buy me a coffee",
@@ -191,11 +195,8 @@ const uiCopy = {
     loadFailed: "The gallery could not be loaded.",
   },
   ja: {
-    categoryFilter: "\u30ae\u30e3\u30e9\u30ea\u30fc\u306e\u30ab\u30c6\u30b4\u30ea\u30fc",
+    typeFilter: "\u30ae\u30e3\u30e9\u30ea\u30fc\u306e\u7a2e\u985e",
     all: "\u3059\u3079\u3066",
-    women: "\u5973\u6027",
-    creatures: "\u30af\u30ea\u30fc\u30c1\u30e3\u30fc",
-    men: "\u7537\u6027",
     shuffle: "シャッフル",
     slideshow: "スライドショー",
     searchImages: "画像を検索",
@@ -436,7 +437,7 @@ function shuffleGallery(): void {
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
       allImages = shuffledImages(allImages);
-      rebuildCategoryBuckets();
+      rebuildTypeBuckets();
       reorderTiles();
       applyFilters();
       window.requestAnimationFrame(() => {
@@ -739,7 +740,7 @@ function hideReportedImage(path: string, persist: boolean): void {
 
   const hiddenImage = allImages.find((image) => image.path === path);
   allImages = allImages.filter((image) => image.path !== path);
-  rebuildCategoryBuckets();
+  rebuildTypeBuckets();
   if (hiddenImage) {
     const tile = tilesByImage.get(hiddenImage);
     tile?.remove();
@@ -1299,21 +1300,50 @@ function updateFilterCount(): void {
     : (nameLanguage === "ja" ? `${count}件のフィルターが有効` : `Advanced filters, ${count} active`));
 }
 
-function rebuildCategoryBuckets(): void {
-  categoryBuckets.clear();
-  for (const category of ["women", "creatures", "men"] as const) categoryBuckets.set(category, []);
+function typeFilterControl(value: string, label: string, count: number): HTMLLabelElement {
+  const control = document.createElement("label");
+  const input = document.createElement("input");
+  input.type = "radio";
+  input.name = "gallery-type";
+  input.value = value;
+  input.checked = activeType === value;
+  input.addEventListener("change", () => {
+    if (!input.checked) return;
+    activeType = input.value;
+    void applyFiltersWithBusy();
+  });
+  const content = document.createElement("span");
+  const text = document.createElement("span");
+  text.textContent = label;
+  if (value === "all") text.dataset.i18n = "all";
+  const countElement = document.createElement("small");
+  countElement.textContent = String(count);
+  content.append(text, " ", countElement);
+  control.append(input, content);
+  return control;
+}
+
+function rebuildTypeBuckets(): void {
+  typeBuckets.clear();
   for (const image of allImages) {
-    if (image.category) categoryBuckets.get(image.category)!.push(image);
+    if (!image.metadataSchema || !galleryConfig.typeLabels.has(image.metadataSchema)) continue;
+    const bucket = typeBuckets.get(image.metadataSchema) ?? [];
+    bucket.push(image);
+    typeBuckets.set(image.metadataSchema, bucket);
   }
-  for (const element of document.querySelectorAll<HTMLElement>("[data-category-count]")) {
-    const category = element.dataset.categoryCount;
-    element.textContent = String(category === "all" ? allImages.length : categoryBuckets.get(category as GalleryCategory)?.length ?? 0);
+  const presentTypes = [...galleryConfig.typeLabels].filter(([schema]) => (typeBuckets.get(schema)?.length ?? 0) > 0);
+  if (activeType !== "all" && !typeBuckets.has(activeType)) activeType = "all";
+  for (const control of typeFilterFieldset.querySelectorAll("label")) control.remove();
+  typeFilterFieldset.append(typeFilterControl("all", t("all"), allImages.length));
+  for (const [schema, label] of presentTypes) {
+    typeFilterFieldset.append(typeFilterControl(schema, label, typeBuckets.get(schema)!.length));
   }
+  typeFilterFieldset.hidden = !galleryConfig.showTypeToggle || presentTypes.length <= 1;
 }
 
 function applyFilters(): void {
   const terms = normalized(searchInput.value).split(/\s+/).filter(Boolean);
-  const candidates = activeCategory === "all" ? allImages : categoryBuckets.get(activeCategory) ?? [];
+  const candidates = activeType === "all" ? allImages : typeBuckets.get(activeType) ?? [];
   const images = candidates.filter((image) => {
     if (favoritesOnly.checked && !isFavorite(image)) return false;
     if (terms.some((term) => !searchIndex(image).includes(term))) return false;
@@ -1396,13 +1426,6 @@ searchInput.addEventListener("input", () => {
   searchTimer = window.setTimeout(() => void applyFiltersWithBusy(), 120);
 });
 favoritesOnly.addEventListener("change", () => void applyFiltersWithBusy());
-for (const input of categoryInputs) {
-  input.addEventListener("change", () => {
-    if (!input.checked) return;
-    activeCategory = input.value as "all" | GalleryCategory;
-    void applyFiltersWithBusy();
-  });
-}
 
 function resizeTile(tile: HTMLElement): void {
   const styles = window.getComputedStyle(gallery);
@@ -2161,9 +2184,8 @@ async function loadGallery(): Promise<void> {
       return;
     }
     allImages = shuffledImages(payload.images.filter((image) => !reportedImagePaths.has(image.path)));
-    activeCategory = "all";
-    for (const input of categoryInputs) input.checked = input.value === "all";
-    rebuildCategoryBuckets();
+    activeType = "all";
+    rebuildTypeBuckets();
     galleryLoadState = "ready";
     activeFilters.clear();
     renderFilterControls();
