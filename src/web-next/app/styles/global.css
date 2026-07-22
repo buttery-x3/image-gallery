@@ -81,8 +81,8 @@ body.consent-pending > .support-card { visibility: hidden; }
 .site-header .support-button-host { min-height: 34px; }
 
 @container gallery-app (max-width: 1500px) {
-  .site-header { grid-template-areas: "title title" "controls meta"; grid-template-columns: minmax(0, 1fr) auto; }
-  .header-controls { width: 100%; justify-content: center; }
+  .site-header { grid-template-areas: "title meta" "controls controls"; grid-template-columns: minmax(0, 1fr) auto; }
+  .header-controls { width: min(100%, 720px); justify-self:center; justify-content: center; }
   .header-meta { justify-content: end; }
 }
 @container gallery-app (max-width: 620px) {
