@@ -1,6 +1,6 @@
 # Roadmap
 
-These items are intentionally outside the public-gallery rewrite.
+The Svelte public-gallery rewrite is complete. These items remain intentionally outside that parity and performance pass.
 
 ## Stable media identity and SQLite
 

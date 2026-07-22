@@ -2,7 +2,8 @@
 
 ## Runtime boundaries
 
-- `src/web` is the Svelte 5 public gallery. Components own rendering and interaction state; framework-independent services own storage, clipboard, routing, masonry placement, and media scheduling.
+- `src/web-next` is the default Svelte 5 public gallery. Components own rendering and interaction state; framework-independent services own storage, clipboard, routing, masonry placement, and media scheduling.
+- `src/web` is the retired framework-free frontend, retained only as a temporary rollback and parity reference. Normal development, production builds, and serving do not use it.
 - `src/server` is the Express read-only media and catalog service.
 - `src/shared` defines browser/server API contracts.
 - Schema and name-generation definitions remain declarative and independent from gallery UI behavior.
@@ -19,6 +20,8 @@ Dimensions are read with Sharp and cached at `DIMENSION_CACHE_PATH`, which must 
 The masonry engine is pure TypeScript. It calculates stable absolute rectangles from the catalog before image loads. A spatial bucket index selects only rectangles near the viewport, keeping DOM size bounded as the catalog grows.
 
 One media scheduler owns URL assignment. It prioritizes viewport tiles, permits no more than four active loads, and then drains the complete catalog in the background. Virtual tile unmounting does not cancel or duplicate completed work.
+
+The header uses CSS grid, flexbox, and container queries for its responsive rows. It does not continuously measure element widths in JavaScript. Gallery routes, type-specific routes, slideshow return links, and direct media URLs are resolved relative to the deployed base so the same build works at `/` and behind a stripped proxy prefix.
 
 ## Browser state
 

@@ -57,6 +57,8 @@ npm start
 
 The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/INSTALL.md) for a complete Linux, systemd, and Caddy installation.
 
+The Svelte 5 interface in `src/web-next/` is the default development and production frontend. The pre-rewrite implementation remains in `src/web/` only as a short-term rollback reference; it is not served by `npm run dev`, `npm run build`, or `npm start`. If a comparison build is needed during decommissioning, use `npm run dev:legacy` or `npm run build:web:legacy` explicitly.
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -147,8 +149,11 @@ The command does not prompt. It validates the URL and gallery path, then removes
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Run the Vite frontend and Express server with live reload |
+| `npm run dev:legacy` | Run the retired framework-free frontend for rollback comparison only |
 | `npm run typecheck` | Check browser and server TypeScript |
+| `npm run test:web-next` | Run the Svelte frontend unit tests |
 | `npm run build` | Compile the browser and server production output |
+| `npm run build:web:legacy` | Build the retired frontend into `dist/public-legacy` for comparison only |
 | `npm start` | Run the compiled production server |
 | `bash ./process-batch.sh` | Organize root-level uploads and generate only missing previews |
 | `bash ./rename-existing.sh` | Force generated names onto images already inside batch directories |
@@ -167,8 +172,8 @@ On the Linux server described in the installation guide, deploy an update with `
 ```text
 src/server/    Express server, directory scanning, and media delivery
 src/shared/    Types shared by the browser and server
-src/web-next/  Svelte single-page gallery interface
-src/web/       Legacy gallery retained temporarily for rollback comparison
+src/web-next/  Default Svelte 5 single-page gallery interface
+src/web/       Retired framework-free frontend kept only as a rollback reference
 src/tools/     Local schema onboarding tools
 metadata-schemas/ Declarative metadata-to-gallery mappings
 name-generation-schemas/ Declarative filename and short-name generators

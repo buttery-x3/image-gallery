@@ -7,7 +7,8 @@ This repository is intentionally a small private image gallery. Keep the impleme
 ## Architecture
 
 - `src/server` contains the Node.js/Express service.
-- `src/web` contains the framework-free Vite/TypeScript SPA.
+- `src/web-next` contains the default Svelte 5 SPA.
+- `src/web` contains the retired framework-free Vite/TypeScript SPA and is retained only as a temporary rollback reference.
 - `src/shared` contains the API types shared by both sides.
 - `src/tools` contains small local maintenance and schema-onboarding commands.
 - `metadata-schemas` contains declarative mappings from source metadata schemas to gallery tags.
