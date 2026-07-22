@@ -267,7 +267,6 @@ const mobileSupportCardImageIndex = 24;
 const pendingTiles: HTMLElement[] = [];
 let queueRefreshFrame: number | undefined;
 let headerLayoutFrame: number | undefined;
-let oneRowControlsTrackWidth = 0;
 let tileBuildFrame: number | undefined;
 let tileBuildToken = 0;
 
@@ -296,25 +295,14 @@ function flexRowWidth(container: HTMLElement, widthFor?: (element: HTMLElement) 
 function syncHeaderLayout(): void {
   headerLayoutFrame = undefined;
   const headerStyle = window.getComputedStyle(siteHeader);
-  if (!siteHeader.classList.contains("is-stacked")) {
-    oneRowControlsTrackWidth = Math.max(
-      oneRowControlsTrackWidth,
-      headerControls.getBoundingClientRect().width,
-    );
-  }
   const controlsWidth = flexRowWidth(headerControls, (element) => {
     const style = window.getComputedStyle(element);
-    const flexBasis = style.flexBasis.endsWith("px") ? pixelValue(style.flexBasis) : 0;
-    if (flexBasis > 0) {
-      return flexBasis + pixelValue(style.marginLeft) + pixelValue(style.marginRight);
-    }
+    const minimumWidth = pixelValue(style.minWidth);
+    if (minimumWidth > 0) return minimumWidth
+      + pixelValue(style.marginLeft)
+      + pixelValue(style.marginRight);
     return outerWidth(element);
   });
-  const typeFilterWidth = typeFilterFieldset.parentElement === headerControls
-    ? 0
-    : outerWidth(typeFilterFieldset);
-  const canonicalControlsWidth = controlsWidth
-    + (typeFilterWidth > 0 ? typeFilterWidth + pixelValue(window.getComputedStyle(headerControls).columnGap) : 0);
   const metaStyle = window.getComputedStyle(supportHeader);
   const metaWidths = [...supportHeader.children]
     .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== supportButton)
@@ -328,11 +316,9 @@ function syncHeaderLayout(): void {
   }
   const metaWidth = metaWidths.reduce((total, width) => total + width, 0)
     + Math.max(0, metaWidths.length - 1) * pixelValue(metaStyle.columnGap);
-  const titleWidth = flexRowWidth(headerTitle, (element) => (
-    element === typeFilterFieldset ? 0 : outerWidth(element)
-  ));
+  const titleWidth = flexRowWidth(headerTitle);
   const requiredWidth = titleWidth
-    + Math.max(canonicalControlsWidth, oneRowControlsTrackWidth)
+    + controlsWidth
     + metaWidth
     + 2 * pixelValue(headerStyle.columnGap);
   const availableWidth = siteHeader.clientWidth

@@ -322,7 +322,7 @@ button { font: inherit; }
 
 .site-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 65rem) minmax(0, 1fr);
+  grid-template-columns: auto minmax(220px, 1fr) auto;
   align-items: center;
   width: 100%;
   padding: 22px 24px 18px;
@@ -366,9 +366,10 @@ main { flex: 1 0 auto; }
 .header-controls {
   display: flex;
   align-items: center;
+  justify-content: center;
   min-width: 0;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .category-filter {
@@ -405,7 +406,7 @@ main { flex: 1 0 auto; }
   position: relative;
   flex: 1 1 32rem;
   max-width: 32rem;
-  min-width: 0;
+  min-width: 180px;
 }
 
 .search-field svg {
@@ -1682,7 +1683,7 @@ html[data-theme="accessible"] .theme-picker select { font-size: 0.8rem; }
 }
 
 .site-header.is-stacked {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px 16px;
 }
 
