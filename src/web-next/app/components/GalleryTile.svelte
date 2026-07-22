@@ -5,6 +5,7 @@
   import type { GalleryAppearancePreferencesV1 } from "../preferences";
   import { tileMediaUrl } from "../api/gallery-api";
   import type { MediaLoadScheduler } from "../services/media-loader";
+  import Icon from "./Icon.svelte";
 
   interface Props {
     image: GalleryImage;
@@ -66,18 +67,18 @@
     {#if showName}<span class="tile-name">{displayName}</span>{/if}
   </button>
   <div class="tile-actions" aria-label={`Actions for ${displayName}`}>
-    <button class:is-favorite={favorite} type="button" aria-pressed={favorite} aria-label={favorite ? "Remove favorite" : "Add favorite"} title={favorite ? "Remove favorite" : "Add favorite"} onclick={onfavorite}>★</button>
-    <button type="button" aria-label="Image information" title="Image information" onclick={oninfo}>ⓘ</button>
-    <button class="secondary-action" type="button" aria-label="Copy image" title="Copy image" onclick={oncopyimage}>▣</button>
-    <button class="secondary-action" type="button" aria-label="Copy link" title="Copy link" onclick={oncopylink}>↗</button>
-    {#if onreport}<button class="secondary-action" type="button" aria-label="Report image" title="Report image" onclick={onreport}>!</button>{/if}
+    <button class:is-favorite={favorite} type="button" aria-pressed={favorite} aria-label={favorite ? "Remove favorite" : "Add favorite"} title={favorite ? "Remove favorite" : "Add favorite"} onclick={onfavorite}><Icon name="favorite" /></button>
+    <button type="button" aria-label="Image information" title="Image information" onclick={oninfo}><Icon name="info" /></button>
+    <button class="secondary-action" type="button" aria-label="Copy image" title="Copy image" onclick={oncopyimage}><Icon name="copy-image" /></button>
+    <button class="secondary-action" type="button" aria-label="Copy link" title="Copy link" onclick={oncopylink}><Icon name="copy-link" /></button>
+    {#if onreport}<button class="secondary-action" type="button" aria-label="Report image" title="Report image" onclick={onreport}><Icon name="report" /></button>{/if}
     <details class="tile-action-menu">
-      <summary aria-label="More image actions" title="More image actions">⋯</summary>
+      <summary aria-label="More image actions" title="More image actions"><Icon name="menu" /></summary>
       <div>
-        <button type="button" aria-label="Image information" onclick={() => { oninfo(); }}>ⓘ</button>
-        <button type="button" aria-label="Copy image" onclick={() => { oncopyimage(); }}>▣</button>
-        <button type="button" aria-label="Copy link" onclick={() => { oncopylink(); }}>↗</button>
-        {#if onreport}<button type="button" aria-label="Report image" onclick={() => { onreport(); }}>!</button>{/if}
+        <button type="button" aria-label="Image information" onclick={() => { oninfo(); }}><Icon name="info" /></button>
+        <button type="button" aria-label="Copy image" onclick={() => { oncopyimage(); }}><Icon name="copy-image" /></button>
+        <button type="button" aria-label="Copy link" onclick={() => { oncopylink(); }}><Icon name="copy-link" /></button>
+        {#if onreport}<button type="button" aria-label="Report image" onclick={() => { onreport(); }}><Icon name="report" /></button>{/if}
       </div>
     </details>
   </div>

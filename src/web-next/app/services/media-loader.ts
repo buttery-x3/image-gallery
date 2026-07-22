@@ -24,7 +24,9 @@ export class MediaLoadScheduler {
   enqueue(key: string, priority: number, start: () => Promise<boolean>): void {
     if (this.#completed.has(key)) return;
     const existing = this.#pending.get(key);
-    this.#pending.set(key, { key, priority, order: existing?.order ?? this.#order++, start });
+    if (!existing || priority < existing.priority) {
+      this.#pending.set(key, { key, priority, order: existing?.order ?? this.#order++, start });
+    }
     this.#drain();
   }
 
@@ -53,7 +55,10 @@ export class MediaLoadScheduler {
       this.#active += 1;
       this.#activeKeys.add(next.key);
       void Promise.resolve().then(next.start).then((completed) => {
-        if (completed) this.#completed.add(next.key);
+        if (completed) {
+          this.#completed.add(next.key);
+          this.#pending.delete(next.key);
+        }
       }).finally(() => {
         this.#active -= 1;
         this.#activeKeys.delete(next.key);

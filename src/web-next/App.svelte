@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import type { GalleryImage, GalleryIndexItem, ImageDetailsResponse } from "../shared/types";
-  import { absoluteMediaUrl, loadGalleryIndex, loadImageDetails, loadImages } from "./app/api/gallery-api";
+  import { absoluteMediaUrl, applicationUrl, configureApplicationBase, loadGalleryIndex, loadImageDetails, loadImages } from "./app/api/gallery-api";
+  import Icon from "./app/components/Icon.svelte";
   import Lightbox from "./app/components/Lightbox.svelte";
   import Slideshow from "./app/components/Slideshow.svelte";
   import VirtualGallery from "./app/components/VirtualGallery.svelte";
@@ -26,6 +27,7 @@
   const watermark = root.dataset.galleryShowWatermark === "true" ? root.dataset.galleryWatermarkText : undefined;
   const watermarkPosition = (root.dataset.galleryWatermarkPosition ?? "bottom-right") as Corner;
   const typeLabels = new Map<string, string>(Object.entries(JSON.parse(root.dataset.galleryTypeLabels ?? "{}") as Record<string, string>));
+  configureApplicationBase([...typeLabels.values()].map((label) => label.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")));
   const favoritesKey = "image-gallery:favorites:v1";
   const reportedKey = "image-gallery:reported-images:v1";
   const languageKey = "image-gallery:name-language:v1";
@@ -33,11 +35,12 @@
   const consentKey = "image-gallery:content-consent:v1";
   const overlayKey = "image-gallery:overlay-preferences:v1";
   const themes: Theme[] = ["editorial", "glass", "studio", "classic", "daylight", "neon", "accessible"];
+  const themeLabels: Record<Theme, string> = { editorial: "Editorial", glass: "Glass", studio: "Studio", classic: "Classic", daylight: "Daylight", neon: "Neon Grid", accessible: "Accessible" };
   const corners: Corner[] = ["top-left", "bottom-left", "bottom-right", "top-right"];
 
   const copy = {
-    en: { search: "Search images", favorites: "Only favorites", filters: "Filters", shuffle: "Shuffle", slideshow: "Slideshow", appearance: "Appearance", loading: "Loading images…", empty: "No images match your search and filters.", information: "Image information" },
-    ja: { search: "画像を検索", favorites: "お気に入りのみ", filters: "フィルター", shuffle: "シャッフル", slideshow: "スライドショー", appearance: "表示設定", loading: "画像を読み込んでいます…", empty: "検索条件に一致する画像はありません。", information: "画像情報" },
+    en: { search: "Search images", favorites: "Only favorites", filters: "Advanced", shuffle: "Shuffle", slideshow: "Slideshow", appearance: "Appearance", loading: "Loading images…", empty: "No images match your search and filters.", information: "Image information" },
+    ja: { search: "画像を検索", favorites: "お気に入りのみ", filters: "詳細設定", shuffle: "シャッフル", slideshow: "スライドショー", appearance: "表示設定", loading: "画像を読み込んでいます…", empty: "検索条件に一致する画像はありません。", information: "画像情報" },
   } as const;
 
   let images = $state<GalleryImage[]>([]);
@@ -99,6 +102,11 @@
   });
   const activeIndex = $derived(activePath ? filteredImages.findIndex((image) => image.path === activePath) : -1);
   const activeImage = $derived(activeIndex >= 0 ? filteredImages[activeIndex] : undefined);
+  const imageCountText = $derived(language === "ja"
+    ? (filteredImages.length === images.length ? `${images.length}枚` : `${images.length}枚中${filteredImages.length}枚`)
+    : (filteredImages.length === images.length
+      ? (images.length === 1 ? "1 image" : `${images.length} images`)
+      : `${filteredImages.length} of ${images.length} images`));
 
   function readStringSet(key: string): Set<string> {
     try {
@@ -205,7 +213,7 @@
   async function reportImage(image: GalleryImage): Promise<void> {
     if (!confirm(`Report ${displayName(image)} as explicit content?`)) return;
     try {
-      const response = await fetch(new URL("api/reports", document.baseURI), {
+      const response = await fetch(applicationUrl("api/reports"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imagePath: image.path }),
@@ -264,6 +272,7 @@
       if (corners.includes(overlay.namePosition as Corner)) namePosition = overlay.namePosition as Corner;
     } catch { /* Defaults remain active. */ }
     if (localStorage.getItem(consentKey) !== "agreed") consentDialog?.showModal();
+    else document.body.classList.remove("consent-pending");
     const handleStorage = (event: StorageEvent): void => {
       if (event.key === appearanceStorageKey) appearance = loadAppearance();
       if (event.key === favoritesKey) favorites = readStringSet(favoritesKey);
@@ -271,12 +280,12 @@
     window.addEventListener("storage", handleStorage);
     const supportButton = document.querySelector<HTMLElement>("#support-button");
     const supportCard = document.querySelector<HTMLElement>("#support-card");
-    const headerActions = document.querySelector<HTMLElement>(".header-actions");
+    const headerMeta = document.querySelector<HTMLElement>(".header-meta");
     const compactHeader = window.matchMedia("(max-width: 620px)");
     const placeSupportButton = (): void => {
-      if (!supportButton || !headerActions) return;
+      if (!supportButton || !headerMeta) return;
       if (compactHeader.matches && supportCard) supportCard.append(supportButton);
-      else headerActions.append(supportButton);
+      else headerMeta.append(supportButton);
     };
     placeSupportButton();
     compactHeader.addEventListener("change", placeSupportButton);
@@ -317,8 +326,10 @@
 <svelte:head><title>{siteName}</title></svelte:head>
 
 <header class="site-header">
-  <div class="header-brand">
-    <div class="title-block"><h1>{siteName}</h1><div class="header-status" aria-live="polite">{loading ? copy[language].loading : `${filteredImages.length}${filteredImages.length === images.length ? "" : ` of ${images.length}`} images`}</div></div>
+  <div class="header-title">
+    <h1>{siteName}</h1>
+    <button class="shuffle-button" type="button" disabled={images.length < 2} onclick={() => { images = shuffle(images); }}><Icon name="shuffle" /><span>{copy[language].shuffle}</span></button>
+    <button class="shuffle-button" type="button" disabled={filteredImages.length < 2} onclick={openSlideshow}><Icon name="slideshow" /><span>{copy[language].slideshow}</span></button>
     {#if showTypeToggle && presentTypes.length >= 2}
       <fieldset class="type-filter" aria-label="Gallery type">
         <label><input type="radio" name="type" value="all" bind:group={activeType} onchange={syncTypeRoute} /><span>All <small>{images.length}</small></span></label>
@@ -328,18 +339,22 @@
       </fieldset>
     {/if}
   </div>
-  <div class="header-search">
+  <div class="header-controls">
     <label class="search-field"><span class="visually-hidden">{copy[language].search}</span><input type="search" bind:value={search} placeholder={copy[language].search} autocomplete="off" /></label>
-    {#if searchMetadata}<button type="button" onclick={() => { draftFilters = { ...activeFilters }; filterDialog?.showModal(); }}>{copy[language].filters}{Object.keys(activeFilters).length ? ` (${Object.keys(activeFilters).length})` : ""}</button>{/if}
-    <label class="toggle"><input type="checkbox" bind:checked={favoritesOnly} /> <span>{copy[language].favorites}</span></label>
+    <label class="toggle"><input type="checkbox" bind:checked={favoritesOnly} /><span class="toggle-track" aria-hidden="true"><span></span></span><span>{copy[language].favorites}</span></label>
+    {#if showLanguageToggle}
+      <fieldset class="name-language" aria-label="Display name language">
+        <label><input type="radio" name="name-language" value="en" bind:group={language} onchange={() => setLanguage("en")} /><span>EN</span></label>
+        <label><input type="radio" name="name-language" value="ja" bind:group={language} onchange={() => setLanguage("ja")} /><span>JP</span></label>
+      </fieldset>
+    {/if}
+    {#if searchMetadata}<button class="advanced-button" type="button" onclick={() => { draftFilters = { ...activeFilters }; filterDialog?.showModal(); }}>{copy[language].filters}{Object.keys(activeFilters).length ? ` (${Object.keys(activeFilters).length})` : ""}</button>{/if}
   </div>
-  <nav class="header-actions" aria-label="Gallery actions">
-    <button type="button" disabled={images.length < 2} onclick={() => { images = shuffle(images); }}>{copy[language].shuffle}</button>
-    <button type="button" disabled={filteredImages.length < 2} onclick={openSlideshow}>{copy[language].slideshow}</button>
+  <div class="header-meta">
+    <p class="image-count" aria-live="polite">{loading ? copy[language].loading : imageCountText}</p>
     <button type="button" onclick={() => appearanceDialog?.showModal()}>{copy[language].appearance}</button>
-    <select aria-label="Theme" value={theme} onchange={(event) => setTheme(event.currentTarget.value as Theme)}>{#each themes as value}<option {value}>{value}</option>{/each}</select>
-    {#if showLanguageToggle}<button type="button" onclick={() => setLanguage(language === "en" ? "ja" : "en")}>{language === "en" ? "JP" : "EN"}</button>{/if}
-  </nav>
+    <select aria-label="Visual style" value={theme} onchange={(event) => setTheme(event.currentTarget.value as Theme)}>{#each themes as value}<option {value}>{themeLabels[value]}</option>{/each}</select>
+  </div>
 </header>
 
 <main>
@@ -384,8 +399,29 @@
   </form>
 </dialog>
 
-<dialog bind:this={consentDialog} class="consent-dialog" aria-labelledby="consent-title" oncancel={(event) => event.preventDefault()}>
-  <h2 id="consent-title">Content notice</h2><p>This private gallery may contain mature or explicit material. Continue only if it is legal and appropriate for you to view it.</p><button type="button" onclick={() => { localStorage.setItem(consentKey, "agreed"); consentDialog?.close(); }}>I understand and agree</button>
+<dialog bind:this={consentDialog} class="consent-dialog" aria-labelledby="consent-title" aria-describedby="consent-message" oncancel={(event) => event.preventDefault()}>
+  <div class="consent-card">
+    <h2 id="consent-title">Content notice</h2>
+    <div id="consent-message" class="consent-message">
+      <p>This website is intended not to show any sexually explicit content such as nudity.</p>
+      <p>Due to the AI generated content some images may bypass initial review.</p>
+      <p>This site is considered not safe for work despite not being explicit.</p>
+      <p>Ecchi is considered okay -- Porn is not intended.</p>
+      <p>Do you agree you will report any images using the red button which you find sexually explicit?</p>
+    </div>
+    <button class="consent-agree" type="button" onclick={() => { localStorage.setItem(consentKey, "agreed"); consentDialog?.close(); document.body.classList.remove("consent-pending"); }}>I agree</button>
+    <details class="consent-more">
+      <summary>more information (disclaimer)</summary>
+      <div class="consent-more-content">
+        <p>The reason for this is to gain clearer understanding.</p>
+        <p>Sheared clothing exposing breasts is common in fashion shows for example as fully unrestricted and viewable by all ages.</p>
+        <p>The content on this site is similarly tasteful and artistic despite being AI generated as an artistic tool use.</p>
+        <p>Complaints and questions are welcomed via e-mail at <a href="mailto:admin@flamehorn.com">admin@flamehorn.com</a>.</p>
+        <p>This site is produced under good faith as an artistic/personal endeavor.</p>
+        <p>I would also like to take this opportunity to pay my respects to the elders and traditional land owners of the Bunurong people on who's land this was thankfully developed.</p>
+      </div>
+    </details>
+  </div>
 </dialog>
 
 {#if toast}<div class="toast" role="status">{toast}</div>{/if}

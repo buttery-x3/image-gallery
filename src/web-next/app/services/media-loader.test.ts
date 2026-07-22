@@ -37,4 +37,21 @@ describe("media load scheduler", () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(started).toEqual(["viewport"]);
   });
+
+  it("does not duplicate active work or let background work demote viewport work", async () => {
+    const scheduler = new MediaLoadScheduler(1);
+    let releaseFirst!: () => void;
+    const started: string[] = [];
+    scheduler.enqueue("active", 0, () => new Promise<boolean>((resolve) => {
+      started.push("active");
+      releaseFirst = () => resolve(true);
+    }));
+    scheduler.enqueue("active", 1_000_000, async () => { started.push("duplicate"); return true; });
+    scheduler.enqueue("visible", 10, async () => { started.push("visible"); return true; });
+    scheduler.enqueue("visible", 1_000_000, async () => { started.push("background"); return true; });
+    await Promise.resolve();
+    releaseFirst();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(started).toEqual(["active", "visible"]);
+  });
 });

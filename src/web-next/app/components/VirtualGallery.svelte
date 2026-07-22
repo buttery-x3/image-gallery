@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import type { GalleryImage } from "../../../shared/types";
   import type { GalleryAppearancePreferencesV1 } from "../preferences";
   import { calculateMasonryLayout, visibleMasonryIndexes, type MasonryLayout } from "../layout/masonry-layout";
   import { MediaLoadScheduler } from "../services/media-loader";
+  import { tileMediaUrl } from "../api/gallery-api";
   import GalleryTile from "./GalleryTile.svelte";
 
   interface Props {
@@ -27,6 +28,7 @@
   let viewportTop = $state(0);
   let viewportHeight = $state(typeof window === "undefined" ? 800 : window.innerHeight);
   const scheduler = new MediaLoadScheduler(4);
+  const backgroundPreloads = new Map<string, HTMLImageElement>();
 
   let layout = $derived<MasonryLayout>(calculateMasonryLayout(
     images.map((image) => ({ key: image.path, width: image.width, height: image.height })),
@@ -57,16 +59,35 @@
     window.addEventListener("scroll", scheduleMeasure, { passive: true });
     window.addEventListener("resize", scheduleMeasure);
     measureViewport();
-    for (const [index, image] of backgroundImages.entries()) {
-      scheduler.enqueue(image.path, 1_000_000 + index, () => new Promise<boolean>((resolve) => {
-        const preload = new Image();
-        preload.onload = () => resolve(true);
-        preload.onerror = () => resolve(false);
-        preload.src = new URL(image.previewUrl ?? image.url, document.baseURI).href;
-      }));
-    }
+    let backgroundFrame: number | undefined;
+    void tick().then(() => {
+      backgroundFrame = requestAnimationFrame(() => {
+        for (const [index, image] of backgroundImages.entries()) {
+          scheduler.enqueue(image.path, 1_000_000 + index, () => new Promise<boolean>((resolve) => {
+            const preload = new Image();
+            backgroundPreloads.set(image.path, preload);
+            const timeout = window.setTimeout(() => {
+              preload.src = "";
+              backgroundPreloads.delete(image.path);
+              resolve(false);
+            }, 30_000);
+            const finish = (completed: boolean): void => {
+              window.clearTimeout(timeout);
+              backgroundPreloads.delete(image.path);
+              resolve(completed);
+            };
+            preload.onload = () => finish(true);
+            preload.onerror = () => finish(false);
+            preload.src = tileMediaUrl(image);
+          }));
+        }
+      });
+    });
     return () => {
       if (frame !== undefined) cancelAnimationFrame(frame);
+      if (backgroundFrame !== undefined) cancelAnimationFrame(backgroundFrame);
+      for (const preload of backgroundPreloads.values()) preload.src = "";
+      backgroundPreloads.clear();
       resizeObserver.disconnect();
       window.removeEventListener("scroll", scheduleMeasure);
       window.removeEventListener("resize", scheduleMeasure);
