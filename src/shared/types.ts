@@ -27,6 +27,8 @@ export interface GalleryImage {
   previewUrl?: string;
   previewCached?: boolean;
   modifiedAt: string;
+  width?: number;
+  height?: number;
   type: ImageKind;
   batch?: string;
   category?: GalleryCategory;
@@ -41,6 +43,17 @@ export interface GalleryImage {
 
 export interface GalleryResponse {
   images: GalleryImage[];
+}
+
+export interface GalleryIndexItem {
+  path: string;
+  searchText: string;
+  tags: Record<string, string>;
+  shortName?: GalleryShortName;
+}
+
+export interface GalleryIndexResponse {
+  images: GalleryIndexItem[];
 }
 
 export interface ImageDetailsResponse {

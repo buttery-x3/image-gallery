@@ -109,6 +109,7 @@ function readGalleryRuntimeConfig(): {
 const runtimeConfig = readGalleryRuntimeConfig();
 const galleryDir = path.resolve(projectRoot, process.env.GALLERY_DIR ?? "gallery");
 const previewCacheDir = path.resolve(projectRoot, process.env.PREVIEW_CACHE_DIR ?? ".cache/previews");
+const dimensionCachePath = path.resolve(projectRoot, process.env.DIMENSION_CACHE_PATH ?? ".cache/catalog-dimensions.json");
 
 const cacheRelativeToGallery = path.relative(galleryDir, previewCacheDir);
 if (
@@ -116,6 +117,14 @@ if (
   (!cacheRelativeToGallery.startsWith("..") && !path.isAbsolute(cacheRelativeToGallery))
 ) {
   throw new Error("PREVIEW_CACHE_DIR must be outside GALLERY_DIR.");
+}
+
+const dimensionsRelativeToGallery = path.relative(galleryDir, dimensionCachePath);
+if (
+  dimensionsRelativeToGallery === "" ||
+  (!dimensionsRelativeToGallery.startsWith("..") && !path.isAbsolute(dimensionsRelativeToGallery))
+) {
+  throw new Error("DIMENSION_CACHE_PATH must be outside GALLERY_DIR.");
 }
 
 function parsePort(value: string | undefined): number {
@@ -152,6 +161,7 @@ const supportEmbedEnabled = optionalBoolean(process.env.ENABLE_SUPPORT_EMBED, "E
 export const config = {
   galleryDir,
   previewCacheDir,
+  dimensionCachePath,
   reportListPath: path.resolve(projectRoot, process.env.REPORT_LIST_PATH ?? "reported-image-paths.txt"),
   metadataDefinitionsDir: path.join(projectRoot, "metadata-schemas"),
   metadataSchemas: runtimeConfig.metadataSchemas,

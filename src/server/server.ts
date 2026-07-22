@@ -9,6 +9,7 @@ import { imagePreviewPath } from "./previews.js";
 import type {
   ErrorResponse,
   GalleryResponse,
+  GalleryIndexResponse,
   ImageReportRequest,
   ImageReportResponse,
 } from "../shared/types.js";
@@ -50,6 +51,7 @@ async function readCachedGalleryImages(includeDetails: boolean, includePreviewSt
     includeDetails,
     includePreviewStatus,
     previewCacheDir: config.previewCacheDir,
+    dimensionCachePath: config.dimensionCachePath,
   }).then((images) => {
     const body = JSON.stringify({ images } satisfies GalleryResponse);
     const entry: GalleryCacheEntry = {
@@ -132,6 +134,62 @@ app.get("/api/images", async (request, response) => {
       error: error instanceof GalleryDirectoryError ? error.message : "The gallery could not be loaded.",
     };
     response.status(503).json(payload);
+  }
+});
+
+app.get("/api/v2/images", async (_request, response) => {
+  try {
+    const cached = await readCachedGalleryImages(false, false);
+    response.setHeader("Cache-Control", "private, max-age=0, must-revalidate");
+    response.setHeader("ETag", cached.etag);
+    if (_request.get("if-none-match")?.split(",").some((value) => value.trim() === cached.etag)) {
+      return void response.status(304).end();
+    }
+    response.type("application/json").send(cached.body);
+  } catch (error) {
+    response.status(503).json({
+      error: error instanceof GalleryDirectoryError ? error.message : "The gallery could not be loaded.",
+    } satisfies ErrorResponse);
+  }
+});
+
+app.get("/api/v2/gallery-index", async (request, response) => {
+  try {
+    const cached = await readCachedGalleryImages(true, false);
+    const payload: GalleryIndexResponse = {
+      images: cached.images.map((image) => ({
+        path: image.path,
+        searchText: [
+          image.displayName,
+          image.name,
+          image.path,
+          image.shortName?.en,
+          image.shortName?.ja,
+          image.batch,
+          image.metadata?.schema,
+          image.metadata?.resolvedPrompt,
+          ...Object.values(image.metadata?.tags ?? {}),
+          ...Object.values(image.metadata?.searchTokens ?? {}).flat(),
+        ].filter(Boolean).join("\n").normalize("NFKC").toLocaleLowerCase(),
+        tags: {
+          ...(image.batch ? { batch: image.batch } : {}),
+          ...(image.metadata?.tags ?? {}),
+        },
+        ...(image.shortName ? { shortName: image.shortName } : {}),
+      })),
+    };
+    const body = JSON.stringify(payload);
+    const etag = `W/"${createHash("sha256").update(body).digest("base64url")}"`;
+    response.setHeader("Cache-Control", "private, max-age=0, must-revalidate");
+    response.setHeader("ETag", etag);
+    if (request.get("if-none-match")?.split(",").some((value) => value.trim() === etag)) {
+      return void response.status(304).end();
+    }
+    response.type("application/json").send(body);
+  } catch (error) {
+    response.status(503).json({
+      error: error instanceof GalleryDirectoryError ? error.message : "The gallery index could not be loaded.",
+    } satisfies ErrorResponse);
   }
 });
 

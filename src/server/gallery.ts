@@ -3,6 +3,7 @@ import path from "node:path";
 import type { GalleryImage, ImageDetailsResponse, ImageKind } from "../shared/types.js";
 import { readImageMetadataResult, readImageNameMetadata } from "./metadata.js";
 import { imagePreviewIsCached } from "./previews.js";
+import { ImageDimensionCache } from "./dimensions.js";
 
 const supportedExtensions = new Map<string, ImageKind>([
   [".jpg", "jpeg"],
@@ -30,6 +31,7 @@ interface GalleryReadOptions {
   includePreviewStatus?: boolean;
   previewCacheDir?: string;
   includeDetails?: boolean;
+  dimensionCachePath?: string;
 }
 
 export async function readGalleryImages(root: string, options: GalleryReadOptions = {}): Promise<GalleryImage[]> {
@@ -46,6 +48,7 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
   }
 
   const images: GalleryImage[] = [];
+  const dimensionCache = options.dimensionCachePath ? new ImageDimensionCache(options.dimensionCachePath) : undefined;
 
   async function walk(directory: string): Promise<void> {
     const entries = await readdir(directory, { withFileTypes: true });
@@ -80,6 +83,7 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
 
       const stats = await lstat(absolutePath);
       const relativePath = path.relative(root, absolutePath).split(path.sep).join("/");
+      const dimensions = await dimensionCache?.dimensions(absolutePath, relativePath, stats.size, stats.mtimeMs);
       const relativeDirectory = path.posix.dirname(relativePath);
       const previewUrl = type === "gif" || type === "png"
         ? `previews/${toUrlPath(relativePath)}?v=${Math.trunc(stats.mtimeMs)}-${stats.size}`
@@ -138,6 +142,7 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
         ...(previewUrl ? { previewUrl } : {}),
         ...(previewCached === undefined ? {} : { previewCached }),
         modifiedAt: stats.mtime.toISOString(),
+        ...(dimensions ?? {}),
         type,
         ...(relativeDirectory === "." ? {} : { batch: relativeDirectory }),
         ...(category ? { category } : {}),
@@ -154,6 +159,7 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
 
   try {
     await walk(root);
+    await dimensionCache?.flush();
   } catch {
     throw new GalleryDirectoryError("The gallery directory could not be scanned.");
   }
