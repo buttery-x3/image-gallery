@@ -4,7 +4,23 @@ import path from "node:path";
 import sharp from "sharp";
 
 const previewWidth = 300;
+const maximumConcurrentPreviewGenerations = 2;
 const pendingPreviews = new Map<string, Promise<string>>();
+const previewGenerationWaiters: Array<() => void> = [];
+let activePreviewGenerations = 0;
+
+async function withPreviewGenerationSlot<T>(operation: () => Promise<T>): Promise<T> {
+  if (activePreviewGenerations >= maximumConcurrentPreviewGenerations) {
+    await new Promise<void>((resolve) => previewGenerationWaiters.push(resolve));
+  }
+  activePreviewGenerations += 1;
+  try {
+    return await operation();
+  } finally {
+    activePreviewGenerations -= 1;
+    previewGenerationWaiters.shift()?.();
+  }
+}
 
 function cacheKey(identifier: string, size: number, modifiedAt: number): string {
   return createHash("sha256")
@@ -105,7 +121,7 @@ export async function imagePreviewPath(
   const existing = pendingPreviews.get(outputPath);
   if (existing) return existing;
 
-  const pending = generatePreview(sourcePath, outputPath);
+  const pending = withPreviewGenerationSlot(() => generatePreview(sourcePath, outputPath));
   pendingPreviews.set(outputPath, pending);
   try {
     return await pending;
