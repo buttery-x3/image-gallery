@@ -342,12 +342,6 @@ function syncHeaderLayout(): void {
 
   const layoutChanged = siteHeader.classList.contains("is-stacked") !== shouldStack;
   siteHeader.classList.toggle("is-stacked", shouldStack);
-  const typeFilterBelongsInTitle = shouldStack && window.matchMedia("(min-width: 801px)").matches;
-  if (typeFilterBelongsInTitle && typeFilterFieldset.parentElement !== headerTitle) {
-    headerTitle.append(typeFilterFieldset);
-  } else if (!typeFilterBelongsInTitle && typeFilterFieldset.parentElement !== headerControls) {
-    headerControls.prepend(typeFilterFieldset);
-  }
   if (layoutChanged) syncSupportButtonPlacement();
 }
 

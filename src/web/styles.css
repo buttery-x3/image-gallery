@@ -373,6 +373,7 @@ main { flex: 1 0 auto; }
 
 .category-filter {
   display: inline-flex;
+  min-width: 0;
   height: 36px;
   margin: 0;
   padding: 2px;
@@ -1736,7 +1737,7 @@ html[data-theme="accessible"] .theme-picker select { font-size: 0.8rem; }
     grid-template-columns: minmax(180px, 1fr) auto auto auto;
   }
   .header-meta { gap: 8px; }
-  .category-filter { flex: 0 0 auto; max-width: 100%; overflow-x: auto; }
+  .category-filter { flex: 0 1 auto; max-width: 100%; overflow-x: auto; }
   .category-filter label { flex: 0 0 auto; }
   .site-header.is-stacked .category-filter { grid-column: 1 / -1; justify-self: start; }
   .search-field { flex-basis: 180px; }
