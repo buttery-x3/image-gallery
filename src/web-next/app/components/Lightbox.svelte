@@ -92,6 +92,14 @@
     const dy = touch.clientY - start.y;
     if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.3) onnavigate(dx < 0 ? 1 : -1);
   }
+
+  function handleBackdropClick(event: MouseEvent): void {
+    const target = event.target;
+    if (target instanceof Element && target.closest(".lightbox-media, .lightbox-nav, .lightbox-actions button")) return;
+    event.preventDefault();
+    onreturn();
+  }
+
 </script>
 
 <dialog
@@ -100,11 +108,10 @@
   aria-label="Image preview"
   onkeydown={keydown}
   oncancel={(event) => { event.preventDefault(); onclose(); }}
-  onclick={(event) => { if (event.target === dialog) onclose(); }}
+  onclick={handleBackdropClick}
   ontouchstart={(event) => { const touch = event.touches[0]; if (touch) touchStart = { x: touch.clientX, y: touch.clientY, at: Date.now() }; }}
   ontouchend={touchend}
 >
-  <button class="lightbox-close" type="button" aria-label="Close preview" onclick={onclose}><Icon name="close" /></button>
   <div class="lightbox-grid">
     <section class="lightbox-content">
       <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!previousImage} onclick={() => onnavigate(-1)}><Icon name="chevron-left" /></button>
