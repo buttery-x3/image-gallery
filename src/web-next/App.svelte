@@ -245,7 +245,12 @@
   async function returnToTile(): Promise<void> {
     const path = activePath;
     activePath = undefined;
+    if (path) await scrollGalleryToPath(path);
+  }
+
+  async function scrollGalleryToPath(path: string): Promise<void> {
     await tick();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     const index = filteredImages.findIndex((image) => image.path === path);
     if (index >= 0) galleryComponent?.scrollToIndex(index);
   }
@@ -284,9 +289,7 @@
         });
       } else replaceSlideshowRoute();
     }
-    await tick();
-    const index = filteredImages.findIndex((candidate) => candidate.path === image.path);
-    if (index >= 0) galleryComponent?.scrollToIndex(index);
+    await scrollGalleryToPath(image.path);
   }
 
   function applyFilters(): void {

@@ -21,6 +21,9 @@
   let image = $derived(images[index]!);
   let previousImage = $state<GalleryImage>();
   let fadeTimer: number | undefined;
+  let advanceTimer: number | undefined;
+  let mounted = false;
+  const preloads = new Map<string, Promise<void>>();
   let namePosition = $state<"top-left" | "top-right" | "bottom-left" | "bottom-right">("bottom-right");
   const positions = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
   const oppositePositions = { "top-left": "bottom-right", "top-right": "bottom-left", "bottom-left": "top-right", "bottom-right": "top-left" } as const;
@@ -35,12 +38,45 @@
     fadeTimer = window.setTimeout(() => { previousImage = undefined; }, 1_000);
   }
 
+  function preloadAt(candidateIndex: number): Promise<void> {
+    const candidate = images[candidateIndex % images.length]!;
+    const existing = preloads.get(candidate.path);
+    if (existing) return existing;
+
+    const preload = new Image();
+    const ready = new Promise<void>((resolve) => {
+      const finish = async (): Promise<void> => {
+        try { await preload.decode(); } catch { /* Loading still completed; the visible image can retry decoding. */ }
+        resolve();
+      };
+      preload.onload = () => { void finish(); };
+      preload.onerror = () => resolve();
+      preload.src = absoluteMediaUrl(candidate);
+    });
+    preloads.set(candidate.path, ready);
+    return ready;
+  }
+
+  function scheduleAdvance(): void {
+    window.clearTimeout(advanceTimer);
+    advanceTimer = window.setTimeout(async () => {
+      await preloadAt(index + 1);
+      if (!mounted) return;
+      advance();
+      void preloadAt(index + 1);
+      scheduleAdvance();
+    }, 5_000);
+  }
+
   onMount(() => {
+    mounted = true;
     dialog?.showModal();
     document.body.classList.add("slideshow-open");
-    const timer = window.setInterval(advance, 5_000);
+    void preloadAt(index + 1);
+    scheduleAdvance();
     return () => {
-      window.clearInterval(timer);
+      mounted = false;
+      window.clearTimeout(advanceTimer);
       window.clearTimeout(fadeTimer);
       document.body.classList.remove("slideshow-open");
     };
