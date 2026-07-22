@@ -36,6 +36,7 @@
   const originalPreloads = new Map<string, Promise<void>>();
   const oppositePositions = { "top-left": "bottom-right", "top-right": "bottom-left", "bottom-left": "top-right", "bottom-right": "top-left" } as const;
   let effectiveWatermarkPosition = $derived(showNames ? oppositePositions[namePosition] : watermarkPosition);
+  let imageAspectRatio = $derived(image.width && image.height && image.width > 0 && image.height > 0 ? image.width / image.height : 1);
 
   function preloadOriginal(candidate: GalleryImage | undefined): Promise<void> | undefined {
     if (!candidate) return undefined;
@@ -108,9 +109,9 @@
     <section class="lightbox-content">
       <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!previousImage} onclick={() => onnavigate(-1)}><Icon name="chevron-left" /></button>
       <div class="lightbox-media" data-name-position={namePosition} data-watermark-position={effectiveWatermarkPosition} style={`--lightbox-name-fill:${colors.fill};--lightbox-name-outline:${colors.outline};--lightbox-name-en-size:${englishNameSize}px;--lightbox-name-ja-size:${englishNameSize / 2}px;`}>
-        <div class="lightbox-image-stack" class:has-preview={Boolean(image.previewUrl)}>
-          {#if image.previewUrl}<img class="lightbox-preview" src={tileMediaUrl(image)} alt="" aria-hidden="true" />{/if}
-          <img bind:this={imageElement} class="lightbox-original" class:is-loaded={loadedOriginalPath === image.path} src={absoluteMediaUrl(image)} alt={displayName} onload={() => { loadedOriginalPath = image.path; }} />
+        <div class="lightbox-image-stack" class:has-preview={Boolean(image.previewUrl)} style={`--lightbox-image-aspect:${imageAspectRatio};`}>
+          {#if image.previewUrl}<img class="lightbox-preview" src={tileMediaUrl(image)} alt="" aria-hidden="true" width={image.width} height={image.height} />{/if}
+          <img bind:this={imageElement} class="lightbox-original" class:is-loaded={loadedOriginalPath === image.path} src={absoluteMediaUrl(image)} alt={displayName} width={image.width} height={image.height} onload={() => { loadedOriginalPath = image.path; }} />
         </div>
         {#if showNames && nameVisible && (image.shortName?.en || image.shortName?.ja)}
           <button class="lightbox-name-overlay" type="button" onclick={onreturn}>
