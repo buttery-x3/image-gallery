@@ -620,22 +620,22 @@ function parseOverlayPreferences(value: string | null): {
   nameVisible: boolean;
   namePosition: OverlayNamePosition;
 } {
-  if (!value) return { nameVisible: true, namePosition: "top-left" };
+  if (!value) return { nameVisible: true, namePosition: "bottom-right" };
   try {
     const parsed: unknown = JSON.parse(value);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return { nameVisible: true, namePosition: "top-left" };
+      return { nameVisible: true, namePosition: "bottom-right" };
     }
     const record = parsed as Record<string, unknown>;
     const namePosition = overlayNamePositions.includes(record.namePosition as OverlayNamePosition)
       ? record.namePosition as OverlayNamePosition
-      : "top-left";
+      : "bottom-right";
     return {
       nameVisible: typeof record.nameVisible === "boolean" ? record.nameVisible : true,
       namePosition,
     };
   } catch {
-    return { nameVisible: true, namePosition: "top-left" };
+    return { nameVisible: true, namePosition: "bottom-right" };
   }
 }
 
@@ -643,7 +643,7 @@ function loadOverlayPreferences(): { nameVisible: boolean; namePosition: Overlay
   try {
     return parseOverlayPreferences(window.localStorage.getItem(overlayPreferencesStorageKey));
   } catch {
-    return { nameVisible: true, namePosition: "top-left" };
+    return { nameVisible: true, namePosition: "bottom-right" };
   }
 }
 

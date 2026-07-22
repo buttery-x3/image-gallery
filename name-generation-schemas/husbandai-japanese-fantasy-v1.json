@@ -1,0 +1,187 @@
+{
+  "definitionVersion": 1,
+  "schema": "image-gallery/name-generator/husbandai-japanese-fantasy/v1",
+  "engine": "declarative-name-generator/v1",
+  "compose": {
+    "fileSeparator": "-",
+    "representationSeparators": {
+      "en": " ",
+      "ja": "・"
+    },
+    "outputs": [
+      "given",
+      "family",
+      "full_en",
+      "full_ja"
+    ]
+  },
+  "given": {
+    "prefixes": [
+      "Ha",
+      "Ka",
+      "Re",
+      "Aki",
+      "Yu",
+      "Sora",
+      "Kou",
+      "Ren",
+      "Tou",
+      "Itsu",
+      "Nao",
+      "Shin",
+      "Kira",
+      "Rui",
+      "Sei",
+      "Kai",
+      "Haru",
+      "Ryo",
+      "Masa",
+      "Taka"
+    ],
+    "middles": [
+      "ru",
+      "ri",
+      "to",
+      "ma",
+      "ya",
+      "shi",
+      "ki",
+      "na",
+      "sa",
+      "no",
+      "i",
+      "e",
+      "ta",
+      "ku",
+      "ra",
+      "mi",
+      "ji",
+      "zu",
+      "yo"
+    ],
+    "suffixes": [
+      "to",
+      "ya",
+      "ki",
+      "shi",
+      "ma",
+      "ro",
+      "sei",
+      "jin",
+      "kai",
+      "ren",
+      "rei",
+      "rui",
+      "ta",
+      "suke",
+      "hiro",
+      "nobu",
+      "ichi",
+      "ya",
+      "omu",
+      "zen"
+    ],
+    "patterns": [
+      "prefix+suffix",
+      "prefix+middle+suffix"
+    ],
+    "katakanaStyle": "direct-phonetic"
+  },
+  "family": {
+    "prefixes": [
+      "Kage",
+      "Sora",
+      "Tsuki",
+      "Hoshi",
+      "Aki",
+      "Kaze",
+      "Yume",
+      "Kuro",
+      "Ame",
+      "Fuyu",
+      "Mori",
+      "Hane",
+      "Taka",
+      "Rai",
+      "Shiro",
+      "Ao",
+      "Mizu",
+      "Yoru",
+      "Asa",
+      "Umi"
+    ],
+    "middles": [
+      "mori",
+      "hara",
+      "kawa",
+      "zora",
+      "mine",
+      "gane",
+      "saki",
+      "nami",
+      "hane",
+      "giri",
+      "tsuki",
+      "gumo",
+      "yama",
+      "nagi",
+      "hiko",
+      "kiri",
+      "sora",
+      "hoshi",
+      "taki",
+      "gawa"
+    ],
+    "suffixes": [
+      "mori",
+      "hara",
+      "kawa",
+      "mine",
+      "zora",
+      "gane",
+      "saki",
+      "nami",
+      "hane",
+      "zuki",
+      "gumo",
+      "tsuki",
+      "yama",
+      "taki",
+      "gawa",
+      "sora",
+      "nagi",
+      "kiri",
+      "hiko",
+      "ori"
+    ],
+    "patterns": [
+      "prefix+suffix",
+      "prefix+middle",
+      "prefix+middle+suffix"
+    ],
+    "katakanaStyle": "direct-phonetic"
+  },
+  "sampleOutputs": [
+    {
+      "en": "Haruto Kagemori",
+      "ja": "ハルト・カゲモリ"
+    },
+    {
+      "en": "Renji Sorakane",
+      "ja": "レンジ・ソラカネ"
+    },
+    {
+      "en": "Akito Fuyuzora",
+      "ja": "アキト・フユゾラ"
+    },
+    {
+      "en": "Kairi Tsukihara",
+      "ja": "カイリ・ツキハラ"
+    },
+    {
+      "en": "Touma Hanegawa",
+      "ja": "トウマ・ハネガワ"
+    }
+  ],
+  "notes": "Fantasy-flavoured masculine/neutral Japanese-style names for HusbandAI images. Katakana output is phonetic rather than invented kanji."
+}
