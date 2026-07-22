@@ -370,15 +370,15 @@
     <h1>{siteName}</h1>
     <button class="shuffle-button" type="button" disabled={images.length < 2} onclick={() => { images = shuffle(images); }}><Icon name="shuffle" /><span>{copy[language].shuffle}</span></button>
     <button class="shuffle-button" type="button" disabled={filteredImages.length < 2} onclick={openSlideshow}><Icon name="slideshow" /><span>{copy[language].slideshow}</span></button>
-    {#if showTypeToggle && presentTypes.length >= 2}
-      <fieldset class="type-filter" aria-label="Gallery type">
-        <label><input type="radio" name="type" value="all" bind:group={activeType} onchange={syncTypeRoute} /><span>All <small>{images.length}</small></span></label>
-        {#each presentTypes as [schema, label]}
-          <label><input type="radio" name="type" value={schema} bind:group={activeType} onchange={syncTypeRoute} /><span>{label} <small>{images.filter((image) => image.metadataSchema === schema).length}</small></span></label>
-        {/each}
-      </fieldset>
-    {/if}
   </div>
+  {#if showTypeToggle && presentTypes.length >= 2}
+    <fieldset class="type-filter" aria-label="Gallery type">
+      <label><input type="radio" name="type" value="all" bind:group={activeType} onchange={syncTypeRoute} /><span>All <small>{images.length}</small></span></label>
+      {#each presentTypes as [schema, label]}
+        <label><input type="radio" name="type" value={schema} bind:group={activeType} onchange={syncTypeRoute} /><span>{label} <small>{images.filter((image) => image.metadataSchema === schema).length}</small></span></label>
+      {/each}
+    </fieldset>
+  {/if}
   <div class="header-controls">
     <label class="search-field"><span class="visually-hidden">{copy[language].search}</span><input type="search" bind:value={search} placeholder={copy[language].search} autocomplete="off" /></label>
     <button class="header-icon-button favorites-button" class:is-active={favoritesOnly} type="button" aria-label={copy[language].favorites} title={copy[language].favorites} aria-pressed={favoritesOnly} onclick={() => { favoritesOnly = !favoritesOnly; }}><Icon name="favorite" /></button>
