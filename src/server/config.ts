@@ -18,13 +18,19 @@ export interface MetadataSchemaRuntimeConfig {
 
 function readGalleryRuntimeConfig(): {
   reportingEnabled: boolean;
+  supportEmbedEnabled: boolean;
   metadataSchemas?: Record<string, MetadataSchemaRuntimeConfig>;
 } {
   const configPath = path.join(projectRoot, "gallery.config.json");
   try {
     const parsed: unknown = JSON.parse(readFileSync(configPath, "utf8"));
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { reportingEnabled: false };
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { reportingEnabled: false, supportEmbedEnabled: false };
+    }
     const record = parsed as Record<string, unknown>;
+    if (record.enableSupportEmbed !== undefined && typeof record.enableSupportEmbed !== "boolean") {
+      throw new Error("gallery.config.json enableSupportEmbed must be true or false when configured.");
+    }
     const metadata = record.metadata;
     let metadataSchemas: Record<string, MetadataSchemaRuntimeConfig> | undefined;
     if (metadata !== undefined) {
@@ -91,7 +97,11 @@ function readGalleryRuntimeConfig(): {
         }
       }
     }
-    return { reportingEnabled: record.enableReporting === true, ...(metadataSchemas ? { metadataSchemas } : {}) };
+    return {
+      reportingEnabled: record.enableReporting === true,
+      supportEmbedEnabled: record.enableSupportEmbed === true,
+      ...(metadataSchemas ? { metadataSchemas } : {}),
+    };
   } catch (error) {
     throw new Error(`Could not read gallery runtime configuration: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -118,6 +128,27 @@ function parsePort(value: string | undefined): number {
   return port;
 }
 
+function optionalBoolean(value: string | undefined, name: string): boolean | undefined {
+  if (value === undefined || value === "") return undefined;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(`${name} must be true or false when configured.`);
+}
+
+function supportScriptOrigins(value: string | undefined): string[] {
+  if (!value?.trim()) return [];
+  return [...new Set(value.split(/[\s,]+/).filter(Boolean).map((entry) => {
+    const url = new URL(entry);
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) {
+      throw new Error("SUPPORT_SCRIPT_ORIGINS must contain only http or https origins without credentials.");
+    }
+    return url.origin;
+  }))];
+}
+
+const supportEmbedEnabled = optionalBoolean(process.env.ENABLE_SUPPORT_EMBED, "ENABLE_SUPPORT_EMBED")
+  ?? runtimeConfig.supportEmbedEnabled;
+
 export const config = {
   galleryDir,
   previewCacheDir,
@@ -129,4 +160,6 @@ export const config = {
   host: process.env.HOST ?? "127.0.0.1",
   port: parsePort(process.env.PORT),
   reportingEnabled: runtimeConfig.reportingEnabled,
+  supportEmbedEnabled,
+  supportScriptOrigins: supportEmbedEnabled ? supportScriptOrigins(process.env.SUPPORT_SCRIPT_ORIGINS) : [],
 };

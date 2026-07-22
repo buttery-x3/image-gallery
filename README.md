@@ -35,6 +35,7 @@ Edit [`gallery.config.json`](gallery.config.json) before building or starting th
 | `showNames` | `false` | Show image names in tiles and the lightbox |
 | `metadata.schemas` | configured per schema | Enables source schemas and optionally assigns a display type, category, and name generator |
 | `enableReporting` | `false` | Show controls for reporting an image as explicit content |
+| `enableSupportEmbed` | `false` | Allow a locally configured support/donation embed; an `.env` override and private HTML file can enable it for one deployment |
 | `showWatermark` | `true` | Show the watermark in the lightbox |
 | `watermarkText` | `waiaifu.lol` | Text shown in the lightbox watermark |
 | `watermarkPosition` | `bottom-right` | Watermark corner: `top-left`, `top-right`, `bottom-left`, or `bottom-right` |
@@ -42,6 +43,8 @@ Edit [`gallery.config.json`](gallery.config.json) before building or starting th
 Each configured `typeLabel` also provides a direct gallery path using its lowercase URL slug. For example, `Waifus` is available at `/waifus` and `Beastais` at `/beastais`. Opening one of these paths selects that type immediately; changing the type selector updates the path, and selecting **All** returns to the gallery root. Direct paths continue to work behind a stripped reverse-proxy prefix.
 
 The file is intentionally conservative for a fresh clone: metadata search, the language toggle, and image names are disabled. Rebuild after changing browser-facing settings and restart the server after changing metadata schema policies. Runtime and deployment settings such as `GALLERY_DIR`, `PORT`, and SMTP credentials remain in `.env` or the service environment.
+
+Support embeds are also private and disabled for fresh clones. To enable one deployment without committing account-specific markup, set `ENABLE_SUPPORT_EMBED=true`, keep the fragment at `.private/support-embed.html`, and rebuild. The fragment is inserted into the existing responsive header/card placement and may contain trusted third-party embed markup. If it loads scripts from another origin, list each origin in `SUPPORT_SCRIPT_ORIGINS` so the server can add it to the Content Security Policy. The entire `.private/` directory is ignored by Git; the build fails if support is enabled but its fragment is missing or empty.
 
 ## Production build
 
@@ -62,6 +65,9 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 | `PREVIEW_CACHE_DIR` | `./.cache/previews` | Directory outside the gallery for generated GIF and PNG WebP previews |
 | `GALLERY_DESCRIPTION` | `A simple private image gallery.` | Description used in browser and social metadata (applied at build time) |
 | `SITE_URL` | unset | Full public gallery URL used for canonical and absolute social-preview URLs (applied at build time) |
+| `ENABLE_SUPPORT_EMBED` | value from `gallery.config.json` | Optional `true`/`false` deployment override for the support embed (applied at build and runtime) |
+| `SUPPORT_EMBED_FILE` | `.private/support-embed.html` | Ignored, trusted HTML fragment inserted when the support embed is enabled (applied at build time) |
+| `SUPPORT_SCRIPT_ORIGINS` | unset | Space- or comma-separated script origins required by the private embed's CSP (applied at runtime) |
 | `PM2_APP_NAME` | unset | Existing PM2 process name restarted by `deploy.sh`; must be set per instance |
 | `HOST` | `127.0.0.1` | Address used by the Express server |
 | `PORT` | `8080` | Port used by the Express server |

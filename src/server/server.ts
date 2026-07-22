@@ -26,6 +26,7 @@ type GalleryCacheEntry = {
 };
 const galleryCache = new Map<string, GalleryCacheEntry>();
 const galleryReadsInFlight = new Map<string, Promise<GalleryCacheEntry>>();
+const scriptSources = ["'self'", ...config.supportScriptOrigins].join(" ");
 
 try {
   fs.watch(config.galleryDir, { recursive: true }, () => galleryCache.clear());
@@ -71,7 +72,7 @@ app.use((_request, response, next) => {
   response.setHeader("X-Frame-Options", "SAMEORIGIN");
   response.setHeader("Referrer-Policy", "no-referrer");
   response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  response.setHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; script-src 'self' https://cdnjs.buymeacoffee.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
+  response.setHeader("Content-Security-Policy", `default-src 'self'; img-src 'self' data:; script-src ${scriptSources}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'`);
   next();
 });
 

@@ -28,6 +28,7 @@
     }
   },
   "enableReporting": false,
+  "enableSupportEmbed": false,
   "showWatermark": true,
   "watermarkText": "waiaifu.lol",
   "watermarkPosition": "bottom-right"

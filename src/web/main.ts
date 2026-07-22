@@ -42,8 +42,8 @@ const statusClose = requiredElement<HTMLButtonElement>("#status-close");
 const imageCount = requiredElement<HTMLElement>("#image-count");
 const themeSelect = requiredElement<HTMLSelectElement>("#theme");
 const supportHeader = requiredElement<HTMLElement>(".header-meta");
-const supportButton = requiredElement<HTMLElement>("#support-button");
-const supportCard = requiredElement<HTMLElement>("#support-card");
+const supportButton = document.querySelector<HTMLElement>("#support-button");
+const supportCard = document.querySelector<HTMLElement>("#support-card");
 const shuffleButton = requiredElement<HTMLButtonElement>("#shuffle");
 const slideshowButton = requiredElement<HTMLButtonElement>("#slideshow");
 const searchInput = requiredElement<HTMLInputElement>("#search");
@@ -161,7 +161,6 @@ const uiCopy = {
     all: "All",
     displayLanguage: "Display name language",
     advanced: "Advanced",
-    buyCoffee: "Buy me a coffee",
     enjoyingGallery: "Enjoying the gallery?",
     loadingGallery: "Loading gallery\u2026",
     imageGallery: "Image gallery",
@@ -203,7 +202,6 @@ const uiCopy = {
     onlyFavorites: "お気に入りのみ",
     displayLanguage: "表示言語",
     advanced: "詳細設定",
-    buyCoffee: "コーヒーをおごる",
     enjoyingGallery: "ギャラリーを楽しんでいますか？",
     loadingGallery: "ギャラリーを読み込み中…",
     imageGallery: "画像ギャラリー",
@@ -322,9 +320,11 @@ function syncHeaderLayout(): void {
     .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== supportButton)
     .map((element) => outerWidth(element))
     .filter((width) => width > 0);
-  const supportStyle = window.getComputedStyle(supportButton);
-  if (supportStyle.display !== "none") {
-    metaWidths.push(outerWidth(supportButton, pixelValue(supportStyle.width)));
+  if (supportButton) {
+    const supportStyle = window.getComputedStyle(supportButton);
+    if (supportStyle.display !== "none") {
+      metaWidths.push(outerWidth(supportButton, pixelValue(supportStyle.width)));
+    }
   }
   const metaWidth = metaWidths.reduce((total, width) => total + width, 0)
     + Math.max(0, metaWidths.length - 1) * pixelValue(metaStyle.columnGap);
@@ -356,11 +356,18 @@ function scheduleHeaderLayout(): void {
   headerLayoutFrame = window.requestAnimationFrame(syncHeaderLayout);
 }
 
+function supportEmbedReady(): boolean {
+  return Boolean(supportButton && [...supportButton.children].some(
+    (element) => element.tagName !== "SCRIPT" && element.tagName !== "STYLE",
+  ));
+}
+
 function syncSupportButtonPlacement(): void {
+  if (!supportButton || !supportCard) return;
   const mobile = siteHeader.classList.contains("is-stacked");
   const anchorImage = galleryImages[mobileSupportCardImageIndex - 1];
   const anchorTile = anchorImage ? tilesByImage.get(anchorImage) : undefined;
-  const buttonReady = Boolean(supportButton.querySelector(".bmc-btn"));
+  const buttonReady = supportEmbedReady();
   const showCard = mobile && Boolean(anchorTile) && buttonReady;
 
   supportCard.hidden = !showCard;
@@ -371,7 +378,9 @@ function syncSupportButtonPlacement(): void {
     gallery.insertAdjacentElement("afterend", supportCard);
     if (supportButton.parentElement !== supportHeader) supportHeader.append(supportButton);
   }
-  supportButton.querySelector<HTMLAnchorElement>(".bmc-btn")?.setAttribute("rel", "noopener noreferrer");
+  for (const link of supportButton.querySelectorAll<HTMLAnchorElement>("a")) {
+    link.setAttribute("rel", "noopener noreferrer");
+  }
 }
 
 function t(key: UiCopyKey): string {
@@ -396,17 +405,21 @@ function syncStaticUi(): void {
     const key = element.dataset.i18nDataText as UiCopyKey | undefined;
     if (key) element.dataset.text = t(key);
   }
-  const supportText = supportButton.querySelector<HTMLElement>(".bmc-btn-text");
-  if (supportText) supportText.textContent = t("buyCoffee");
+  for (const source of supportButton?.querySelectorAll<HTMLElement>("[data-support-text-selector][data-support-text-i18n]") ?? []) {
+    const key = source.dataset.supportTextI18n as UiCopyKey | undefined;
+    const selector = source.dataset.supportTextSelector;
+    const target = selector ? supportButton?.querySelector<HTMLElement>(selector) : undefined;
+    if (key && target) target.textContent = t(key);
+  }
 }
 
-const supportButtonObserver = new MutationObserver(() => {
-  if (!supportButton.querySelector(".bmc-btn")) return;
-  supportButtonObserver.disconnect();
-  syncStaticUi();
-  syncSupportButtonPlacement();
-});
-if (!supportButton.querySelector(".bmc-btn")) {
+if (supportButton && !supportEmbedReady()) {
+  const supportButtonObserver = new MutationObserver(() => {
+    if (!supportEmbedReady()) return;
+    supportButtonObserver.disconnect();
+    syncStaticUi();
+    syncSupportButtonPlacement();
+  });
   supportButtonObserver.observe(supportButton, { childList: true, subtree: true });
 }
 

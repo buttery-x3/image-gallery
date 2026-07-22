@@ -12,6 +12,7 @@ type GalleryConfig = {
   showLanguageToggle: boolean;
   showNames: boolean;
   enableReporting: boolean;
+  enableSupportEmbed: boolean;
   showWatermark: boolean;
   watermarkText: string;
   watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -38,6 +39,9 @@ function readGalleryConfig(): GalleryConfig {
   }
   if (record.showTypeToggle !== undefined && typeof record.showTypeToggle !== "boolean") {
     throw new Error("gallery.config.json showTypeToggle must be true or false when configured.");
+  }
+  if (record.enableSupportEmbed !== undefined && typeof record.enableSupportEmbed !== "boolean") {
+    throw new Error("gallery.config.json enableSupportEmbed must be true or false when configured.");
   }
   const watermarkText = typeof record.watermarkText === "string" ? record.watermarkText.trim() : "";
   if (!watermarkText) throw new Error("gallery.config.json watermarkText must be a non-empty string.");
@@ -78,12 +82,34 @@ function readGalleryConfig(): GalleryConfig {
     showLanguageToggle: record.showLanguageToggle as boolean,
     showNames: record.showNames as boolean,
     enableReporting: record.enableReporting as boolean,
+    enableSupportEmbed: record.enableSupportEmbed === true,
     showWatermark: record.showWatermark as boolean,
     watermarkText,
     watermarkPosition: watermarkPosition as GalleryConfig["watermarkPosition"],
     typeLabels,
     ...(metadata ? { metadata } : {}),
   };
+}
+
+function optionalBoolean(value: string | undefined, name: string): boolean | undefined {
+  if (value === undefined || value === "") return undefined;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(`${name} must be true or false when configured.`);
+}
+
+function readSupportEmbed(enabled: boolean, configuredPath: string | undefined): string | undefined {
+  if (!enabled) return undefined;
+  const relativePath = configuredPath?.trim() || ".private/support-embed.html";
+  const embedPath = path.resolve(process.cwd(), relativePath);
+  let markup: string;
+  try {
+    markup = fs.readFileSync(embedPath, "utf8").trim();
+  } catch (error) {
+    throw new Error(`Could not read enabled support embed ${embedPath}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!markup) throw new Error(`Enabled support embed ${embedPath} must not be empty.`);
+  return markup;
 }
 
 function escapeHtml(value: string): string {
@@ -109,7 +135,13 @@ function publicSiteUrl(value: string | undefined): URL | undefined {
   return siteUrl;
 }
 
-function galleryHtml(title: string, description: string, siteUrl: URL | undefined, config: GalleryConfig): Plugin {
+function galleryHtml(
+  title: string,
+  description: string,
+  siteUrl: URL | undefined,
+  config: GalleryConfig,
+  supportEmbed: string | undefined,
+): Plugin {
   return {
     name: "gallery-html-metadata",
     transformIndexHtml(html) {
@@ -150,6 +182,16 @@ function galleryHtml(title: string, description: string, siteUrl: URL | undefine
         .replace("__GALLERY_SHOW_WATERMARK__", String(config.showWatermark))
         .replace("__GALLERY_WATERMARK_TEXT__", escapeHtml(config.watermarkText))
         .replace("__GALLERY_WATERMARK_POSITION__", config.watermarkPosition)
+        .replace(
+          "<!-- gallery-support-button -->",
+          supportEmbed ? `<div id="support-button" class="support-button-host">${supportEmbed}</div>` : "",
+        )
+        .replace(
+          "<!-- gallery-support-card -->",
+          supportEmbed
+            ? '<aside id="support-card" class="support-card" aria-label="Support this site" data-i18n-aria-label="supportSite" hidden><p data-i18n="enjoyingGallery">Enjoying the gallery?</p></aside>'
+            : "",
+        )
         .replace("<!-- gallery-metadata -->", metadata.join("\n    "));
     },
   };
@@ -161,11 +203,13 @@ export default defineConfig(({ mode }) => {
   const title = config.siteName || fallbackTitle;
   const description = env.GALLERY_DESCRIPTION?.trim() || fallbackDescription;
   const siteUrl = publicSiteUrl(env.SITE_URL);
+  const supportEnabled = optionalBoolean(env.ENABLE_SUPPORT_EMBED, "ENABLE_SUPPORT_EMBED") ?? config.enableSupportEmbed;
+  const supportEmbed = readSupportEmbed(supportEnabled, env.SUPPORT_EMBED_FILE);
 
   return {
     root: "src/web",
     base: "./",
-    plugins: [galleryHtml(title, description, siteUrl, config)],
+    plugins: [galleryHtml(title, description, siteUrl, config, supportEmbed)],
     build: {
       outDir: "../../dist/public",
       emptyOutDir: false,

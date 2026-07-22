@@ -344,17 +344,7 @@ main { flex: 1 0 auto; }
 .support-button-host {
   position: relative;
   justify-self: end;
-  width: 137px;
-  height: 30px;
   line-height: 0;
-}
-
-.support-button-host .bmc-btn-container {
-  position: absolute;
-  top: 0;
-  right: 0;
-  transform: scale(0.5);
-  transform-origin: top right;
 }
 
 .support-card { display: none; }
