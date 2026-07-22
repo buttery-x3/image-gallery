@@ -1,8 +1,8 @@
 # Image Gallery
 
-A small, private, self-hosted image gallery. Copy images and GIFs into a folder, refresh the page, and they are displayed in a full-width masonry gallery. Search defaults to filenames; metadata search and filters can be enabled in `gallery.config.json`.
+A small, private, self-hosted image gallery. Copy images and GIFs into a folder, refresh the page, and they are displayed in a virtualized full-width masonry gallery. Search defaults to filenames; metadata search and filters can be enabled in `gallery.config.json`.
 
-Gallery media is shown at exactly 300px wide with its natural height. Clicking an image opens it against a dark lightbox. The Slideshow button plays the currently filtered images in a randomized loop, changing every five seconds with a fade; press Escape or click the black margin to close it. On desktop, hover actions can copy either the image itself or its direct public URL; mobile relies on native image controls.
+Gallery media defaults to exactly 300px wide with its natural height. The Appearance control can select compact, large, or adaptive tiles; natural, square, portrait, or landscape ratios; crop or contain behavior for fixed ratios; optional hover zoom; and alternative tile-action layouts. These browser-local settings never alter source media. Clicking an image opens the original against a dark lightbox. The Slideshow button plays the currently filtered images in a randomized loop, changing every five seconds with a fade; press Escape or click the black margin to close it. Tile actions can copy either the image itself or its absolute direct public URL.
 
 ## Requirements
 
@@ -63,6 +63,7 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 | --- | --- | --- |
 | `GALLERY_DIR` | `./gallery` | Directory scanned recursively for media |
 | `PREVIEW_CACHE_DIR` | `./.cache/previews` | Directory outside the gallery for generated GIF and PNG WebP previews |
+| `DIMENSION_CACHE_PATH` | `./.cache/catalog-dimensions.json` | File outside the gallery that caches intrinsic media dimensions for masonry layout |
 | `GALLERY_DESCRIPTION` | `A simple private image gallery.` | Description used in browser and social metadata (applied at build time) |
 | `SITE_URL` | unset | Full public gallery URL used for canonical and absolute social-preview URLs (applied at build time) |
 | `ENABLE_SUPPORT_EMBED` | value from `gallery.config.json` | Optional `true`/`false` deployment override for the support embed (applied at build and runtime) |
@@ -73,7 +74,7 @@ The server listens on `127.0.0.1:8080` by default. See [docs/INSTALL.md](docs/IN
 | `PORT` | `8080` | Port used by the Express server |
 | `REPORT_LIST_PATH` | `./reported-image-paths.txt` | Local file that receives one absolute media path per explicit-content report |
 
-Hidden entries, symbolic links, and unsupported files are ignored. New files appear after a page refresh; no rebuild is required. Images near the viewport are loaded first, then loading continues through the full gallery in the background with no more than four media files loading concurrently.
+Hidden entries, symbolic links, and unsupported files are ignored. New files appear after a page refresh; no rebuild is required. Only viewport-adjacent tiles remain mounted. Images near the viewport are loaded first, then loading continues through the full gallery in the background with no more than four media files loading concurrently. Intrinsic dimensions are cached outside the gallery so natural masonry positions are known before media loads.
 
 Images may have a same-name JSON sidecar in the same directory. Batching preserves any valid JSON sidecar regardless of its schema. Definitions under `metadata-schemas/` normalize enabled schemas into common gallery tags; `gallery.config.json` assigns display types, product categories, and optional name generation to each source schema. Unsupported, disabled, or missing metadata does not prevent the image from appearing. When `showTypeToggle` is enabled, the top selector contains **All** plus one `typeLabel` for each configured source schema actually present in the gallery. It is hidden when fewer than two configured types are present; eight present schemas produce eight independent type choices. Advanced filters continue to combine canonical tags across every enabled schema. Every image exposes its filename stem to the default filename search. The containing subdirectory is available as a Batch filter.
 
@@ -166,7 +167,8 @@ On the Linux server described in the installation guide, deploy an update with `
 ```text
 src/server/    Express server, directory scanning, and media delivery
 src/shared/    Types shared by the browser and server
-src/web/       Single-page gallery interface
+src/web-next/  Svelte single-page gallery interface
+src/web/       Legacy gallery retained temporarily for rollback comparison
 src/tools/     Local schema onboarding tools
 metadata-schemas/ Declarative metadata-to-gallery mappings
 name-generation-schemas/ Declarative filename and short-name generators

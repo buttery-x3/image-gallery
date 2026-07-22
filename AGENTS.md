@@ -17,12 +17,13 @@ This repository is intentionally a small private image gallery. Keep the impleme
 
 ## Product invariants
 
-- Gallery images are exactly 300px wide above the narrow-mobile breakpoint.
-- Image height is always natural and unconstrained; never crop thumbnails.
+- Gallery images default to exactly 300px wide above the narrow-mobile breakpoint. Browser-local appearance settings may select compact, large, or adaptive widths.
+- Gallery image height defaults to natural and unconstrained. Explicit fixed-ratio appearance modes may use `cover` or `contain`; natural mode must never crop or distort thumbnails.
 - Gallery images have rounded corners.
 - Lightbox images have square corners and use `object-fit: contain` with a viewport margin.
 - GIF animation must be preserved.
-- Media files must be viewport-prioritized and limited to four concurrent loads, then continue through the full gallery in the background; do not assign every image URL during initial rendering.
+- Gallery DOM must remain viewport-virtualized. Media files must be viewport-prioritized and limited to four concurrent loads, then continue through the full gallery in the background; do not assign every image URL during initial rendering.
+- Header responsiveness must be CSS-driven through grid/flex layout and container queries. Do not reintroduce continuous JavaScript element-width measurement.
 - The Copy link control must produce an absolute direct media URL. Copy image may fall back to that URL when image clipboard writing is unsupported.
 - All browser requests must remain compatible with both `/` and a stripped Caddy prefix such as `/image-gallery/`.
 - The server is read-only and must not add upload, delete, rename, or image-processing behavior unless explicitly requested.
