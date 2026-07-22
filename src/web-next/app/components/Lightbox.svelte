@@ -80,10 +80,9 @@
   <button class="lightbox-close" type="button" aria-label="Close preview" onclick={onclose}><Icon name="close" /></button>
   <div class="lightbox-grid">
     <section class="lightbox-content">
+      <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!hasPrevious} onclick={() => onnavigate(-1)}><Icon name="chevron-left" /></button>
       <div class="lightbox-media" data-name-position={namePosition} data-watermark-position={effectiveWatermarkPosition} style={`--lightbox-name-fill:${colors.fill};--lightbox-name-outline:${colors.outline};--lightbox-name-en-size:${englishNameSize}px;--lightbox-name-ja-size:${englishNameSize / 2}px;`}>
         <img bind:this={imageElement} src={absoluteMediaUrl(image)} alt={displayName} />
-        <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!hasPrevious} onclick={() => onnavigate(-1)}><Icon name="chevron-left" /></button>
-        <button class="lightbox-nav next" type="button" aria-label="Next image" disabled={!hasNext} onclick={() => onnavigate(1)}><Icon name="chevron-right" /></button>
         {#if showNames && nameVisible && (image.shortName?.en || image.shortName?.ja)}
           <button class="lightbox-name-overlay" type="button" onclick={onreturn}>
             {#if image.shortName?.en}<span class="lightbox-short-name-en">{image.shortName.en}</span>{/if}
@@ -92,6 +91,7 @@
         {/if}
         {#if watermark}<a class="lightbox-watermark" href={watermarkHref} aria-label="Back to gallery">{watermark}</a>{/if}
       </div>
+      <button class="lightbox-nav next" type="button" aria-label="Next image" disabled={!hasNext} onclick={() => onnavigate(1)}><Icon name="chevron-right" /></button>
       <nav class="lightbox-actions" aria-label="Image actions">
         <button type="button" onclick={oninfo}><Icon name="info" /> <span>Information</span></button>
         <button class:is-favorite={favorite} type="button" aria-pressed={favorite} onclick={onfavorite}><Icon name="favorite" /> <span>{favorite ? "Remove favorite" : "Add favorite"}</span></button>
