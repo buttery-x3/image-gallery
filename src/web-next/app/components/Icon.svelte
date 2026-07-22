@@ -1,11 +1,19 @@
 <script lang="ts">
-  type IconName = "copy-image" | "copy-link" | "favorite" | "filter-list" | "info" | "menu" | "palette" | "shuffle" | "slideshow";
+  type IconName = "chevron-left" | "chevron-right" | "close" | "copy-image" | "copy-link" | "favorite" | "filter-list" | "info" | "menu" | "palette" | "report" | "shuffle" | "slideshow";
   let { name }: { name: IconName } = $props();
 </script>
 
 <svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
   {#if name === "favorite"}
     <path d="m12 2.75 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35-5.7-3-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.75Z" />
+  {:else if name === "chevron-left"}
+    <path d="m15 18-6-6 6-6" />
+  {:else if name === "chevron-right"}
+    <path d="m9 6 6 6-6 6" />
+  {:else if name === "close"}
+    <path d="M6 6l12 12M18 6 6 18" />
+  {:else if name === "report"}
+    <path d="M12 8v5M12 17h.01" /><path d="M10.3 3.9 2.5 17.4A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.6L13.7 3.9a2 2 0 0 0-3.4 0Z" />
   {:else if name === "info"}
     <circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.25h.01" />
   {:else if name === "copy-image"}

@@ -76,16 +76,13 @@
   ontouchstart={(event) => { const touch = event.touches[0]; if (touch) touchStart = { x: touch.clientX, y: touch.clientY, at: Date.now() }; }}
   ontouchend={touchend}
 >
-  <button class="lightbox-close" type="button" aria-label="Close preview" onclick={onclose}>×</button>
+  <button class="lightbox-close" type="button" aria-label="Close preview" onclick={onclose}><Icon name="close" /></button>
   <div class="lightbox-grid">
-    <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!hasPrevious} onclick={() => onnavigate(-1)}>‹</button>
     <section class="lightbox-content">
-      <div class="lightbox-heading">
-        <button class="lightbox-title" type="button" onclick={onreturn}>{displayName}</button>
-        {#if onreport}<button class="report-button lightbox-report" type="button" aria-label="Report image" title="Report image" onclick={onreport}>!</button>{/if}
-      </div>
       <div class="lightbox-media" data-name-position={namePosition} data-watermark-position={effectiveWatermarkPosition} style={`--lightbox-name-fill:${colors.fill};--lightbox-name-outline:${colors.outline};--lightbox-name-en-size:${englishNameSize}px;--lightbox-name-ja-size:${englishNameSize / 2}px;`}>
         <img bind:this={imageElement} src={absoluteMediaUrl(image)} alt={displayName} />
+        <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!hasPrevious} onclick={() => onnavigate(-1)}><Icon name="chevron-left" /></button>
+        <button class="lightbox-nav next" type="button" aria-label="Next image" disabled={!hasNext} onclick={() => onnavigate(1)}><Icon name="chevron-right" /></button>
         {#if showNames && nameVisible && (image.shortName?.en || image.shortName?.ja)}
           <button class="lightbox-name-overlay" type="button" onclick={onreturn}>
             {#if image.shortName?.en}<span class="lightbox-short-name-en">{image.shortName.en}</span>{/if}
@@ -97,10 +94,10 @@
       <nav class="lightbox-actions" aria-label="Image actions">
         <button type="button" onclick={oninfo}><Icon name="info" /> <span>Information</span></button>
         <button class:is-favorite={favorite} type="button" aria-pressed={favorite} onclick={onfavorite}><Icon name="favorite" /> <span>{favorite ? "Remove favorite" : "Add favorite"}</span></button>
+        {#if onreport}<button class="lightbox-action-report" type="button" onclick={onreport}><Icon name="report" /> <span>Report image</span></button>{/if}
         {#if showNames}<button type="button" aria-pressed={nameVisible} onclick={ontogglename}>Aa <span>{nameVisible ? "Hide name" : "Show name"}</span></button>{/if}
         {#if showNames}<button type="button" onclick={onposition}>⌖ <span>Move name</span></button>{/if}
       </nav>
     </section>
-    <button class="lightbox-nav next" type="button" aria-label="Next image" disabled={!hasNext} onclick={() => onnavigate(1)}>›</button>
   </div>
 </dialog>

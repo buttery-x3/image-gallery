@@ -145,19 +145,22 @@ main { padding: 16px clamp(8px, 2vw, 24px) 40px; }
 
 .modern-lightbox, .modern-slideshow { width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 16px; overflow: hidden; border: 0; border-radius: 0; color: #fff; background: rgba(0, 0, 0, .96); }
 .modern-lightbox::backdrop, .modern-slideshow::backdrop { background: #000; }
-.lightbox-grid { display: grid; grid-template-columns: 54px minmax(0, 1fr) 54px; align-items: center; width: 100%; height: 100%; gap: 12px; }
-.lightbox-content { display: grid; min-width: 0; min-height: 0; max-height: calc(100dvh - 32px); justify-items: center; }
-.lightbox-heading { display: flex; align-items: flex-start; justify-content: space-between; width: 100%; gap: 16px; margin-bottom: 10px; }
-.lightbox-title { width: 100%; max-width: min(900px, 100%); overflow: hidden; padding: 0; border: 0; color: #f3f3f3; background: transparent; font-size: .9rem; font-weight: 600; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
-.lightbox-report { flex: 0 0 auto; }
-.lightbox-media { --lightbox-name-en-size:40px; --lightbox-name-ja-size:20px; --lightbox-name-fill:#fff; --lightbox-name-outline:#000; position: relative; display: grid; min-width: 0; min-height: 0; place-items: center; }
-.lightbox-media > img { display: block; max-width: calc(100vw - 180px); max-height: calc(100dvh - 180px); border-radius: 0; object-fit: contain; }
-.lightbox-close { position: fixed; z-index: 3; top: 12px; right: 12px; width: 42px; padding: 0; font-size: 1.6rem; }
-.lightbox-nav { width: 48px; padding: 0; font-size: 2rem; }
+.lightbox-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; width: 100%; height: 100%; }
+.lightbox-content { display: grid; grid-template-rows:minmax(0,1fr) auto; min-width: 0; min-height: 0; max-height: calc(100dvh - 32px); justify-items: center; }
+.lightbox-media { --lightbox-name-en-size:40px; --lightbox-name-ja-size:20px; --lightbox-name-fill:#fff; --lightbox-name-outline:#000; position: relative; display: inline-grid; width:fit-content; height:fit-content; min-width: 0; min-height: 0; place-items: center; }
+.lightbox-media > img { display: block; max-width: calc(100vw - 48px); max-height: calc(100dvh - 104px); border-radius: 0; object-fit: contain; }
+.lightbox-close { position: fixed; z-index: 4; top: 12px; right: 12px; display:grid; width: 42px; padding: 0; place-items:center; }
+.lightbox-close .icon { width:22px; height:22px; }
+.lightbox-nav { position:absolute; z-index:3; top:50%; display:grid; width:42px; min-height:48px; padding:0; place-items:center; border-color:rgba(255,255,255,.3); color:#fff; background:rgba(12,13,14,.78); transform:translateY(-50%); }
+.lightbox-nav.previous { left:clamp(7px,1.5vw,16px); }
+.lightbox-nav.next { right:clamp(7px,1.5vw,16px); }
+.lightbox-nav .icon { width:24px; height:24px; }
 .lightbox-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 9px; }
 .lightbox-actions button { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; }
 .lightbox-actions .icon { width: 17px; height: 17px; }
 .lightbox-actions .is-favorite { color: #ffd65a; }
+.lightbox-action-report { border-color:rgba(255,150,142,.46); color:#ffaaa2; }
+.lightbox-action-report:hover { border-color:rgba(255,185,178,.76); color:#ffd0cc; background:rgba(74,24,25,.94); }
 .lightbox-name-overlay { position:absolute; z-index:2; display:flex; flex-direction:column; align-items:flex-start; width:calc(100% - clamp(20px,4vw,48px)); padding:0; border:0; background:transparent; font-family:inherit; }
 .lightbox-media[data-name-position="top-left"] .lightbox-name-overlay { top:clamp(10px,2vw,24px); left:clamp(10px,2vw,24px); }
 .lightbox-media[data-name-position="top-right"] .lightbox-name-overlay { top:clamp(10px,2vw,24px); right:clamp(10px,2vw,24px); align-items:flex-end; }
@@ -176,12 +179,6 @@ main { padding: 16px clamp(8px, 2vw, 24px) 40px; }
 .modern-slideshow { display: grid; place-items: center; }
 .modern-slideshow figure { --slideshow-name-en-size:clamp(24px,9vw,72px); --slideshow-name-ja-size:clamp(12px,4.5vw,36px); --slideshow-name-fill:#fff; --slideshow-name-outline:#000; position: relative; display: inline-grid; width: fit-content; height: fit-content; max-width: calc(100vw - 48px); max-height: calc(100dvh - 48px); margin: 0; place-items: center; overflow:hidden; }
 .modern-slideshow img { display:block; max-width: calc(100vw - 48px); max-height: calc(100dvh - 48px); object-fit: contain; animation: slide-fade 600ms ease; }
-.slideshow-nav { position:absolute; z-index:3; top:50%; width:42px; min-height:48px; padding:0; border-color:rgba(255,255,255,.3); color:#fff; background:rgba(12,13,14,.78); font-size:2rem; transform:translateY(-50%); }
-.slideshow-nav.previous { left:clamp(7px,1.5vw,16px); }
-.slideshow-nav.next { right:clamp(7px,1.5vw,16px); }
-.slideshow-nav:hover { background:rgba(12,13,14,.94); }
-.slideshow-report { position:absolute; z-index:3; top:clamp(7px,1.5vw,16px); right:clamp(7px,1.5vw,16px); min-height:34px; padding:5px 10px; border-color:rgba(255,150,142,.46); color:#ffaaa2; background:rgba(12,13,14,.9); font-size:.78rem; font-weight:700; box-shadow:0 4px 14px rgba(0,0,0,.38); }
-.slideshow-report:hover { border-color:rgba(255,185,178,.76); color:#ffd0cc; background:rgba(74,24,25,.94); }
 .slideshow-name-overlay { position:absolute; z-index:2; display:flex; flex-direction:column; align-items:flex-start; width:calc(100% - clamp(20px,4vw,48px)); padding:0; border:0; color:#fff; background:transparent; font-family:inherit; }
 .modern-slideshow [data-name-position="top-left"] .slideshow-name-overlay { top:clamp(10px,2vw,24px); left:clamp(10px,2vw,24px); }
 .modern-slideshow [data-name-position="top-right"] .slideshow-name-overlay { top:clamp(10px,2vw,24px); right:clamp(10px,2vw,24px); align-items:flex-end; }
@@ -196,7 +193,6 @@ main { padding: 16px clamp(8px, 2vw, 24px) 40px; }
 .modern-slideshow [data-watermark-position="top-right"] .slideshow-watermark { top:clamp(10px,2vw,24px); right:clamp(10px,2vw,24px); }
 .modern-slideshow [data-watermark-position="bottom-left"] .slideshow-watermark { bottom:clamp(10px,2vw,24px); left:clamp(10px,2vw,24px); }
 .modern-slideshow [data-watermark-position="bottom-right"] .slideshow-watermark { right:clamp(10px,2vw,24px); bottom:clamp(10px,2vw,24px); }
-.slideshow-close { position: fixed; z-index: 3; top: 12px; right: 12px; width: 42px; padding: 0; font-size: 1.6rem; }
 @keyframes slide-fade { from { opacity: 0; } }
 body.lightbox-open, body.slideshow-open { overflow: hidden; }
 

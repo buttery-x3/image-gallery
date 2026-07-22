@@ -60,6 +60,7 @@
   let appearance = $state<GalleryAppearancePreferencesV1>({ ...defaultAppearancePreferences });
   let activePath = $state<string>();
   let slideshowImages = $state<GalleryImage[]>();
+  let slideshowPushedRoute = false;
   let details = $state<ImageDetailsResponse>();
   let detailsImage = $state<GalleryImage>();
   let detailsLoading = $state(false);
@@ -251,10 +252,37 @@
     const url = new URL(window.location.href);
     if (routeTail() !== "slideshow") url.pathname = `${url.pathname.replace(/\/?$/, "/")}slideshow/`;
     history.pushState(null, "", url);
+    slideshowPushedRoute = true;
+  }
+  function replaceSlideshowRoute(): void {
+    const url = new URL(window.location.href);
+    const segments = url.pathname.split("/").filter(Boolean);
+    if (segments.at(-1)?.toLocaleLowerCase() === "slideshow") segments.pop();
+    url.pathname = `/${segments.join("/")}${segments.length ? "/" : ""}`;
+    history.replaceState(null, "", url);
   }
   function closeSlideshow(): void {
     slideshowImages = undefined;
-    if (routeTail() === "slideshow") history.back();
+    if (routeTail() !== "slideshow") return;
+    if (slideshowPushedRoute) {
+      slideshowPushedRoute = false;
+      history.back();
+    } else replaceSlideshowRoute();
+  }
+  async function returnFromSlideshow(image: GalleryImage): Promise<void> {
+    slideshowImages = undefined;
+    if (routeTail() === "slideshow") {
+      if (slideshowPushedRoute) {
+        slideshowPushedRoute = false;
+        await new Promise<void>((resolve) => {
+          window.addEventListener("popstate", () => resolve(), { once: true });
+          history.back();
+        });
+      } else replaceSlideshowRoute();
+    }
+    await tick();
+    const index = filteredImages.findIndex((candidate) => candidate.path === image.path);
+    if (index >= 0) galleryComponent?.scrollToIndex(index);
   }
 
   function applyFilters(): void {
@@ -296,7 +324,10 @@
     compactHeader.addEventListener("change", placeSupportButton);
     if (supportCard) supportCard.hidden = false;
     const handlePopState = (): void => {
-      if (routeTail() !== "slideshow") slideshowImages = undefined;
+      if (routeTail() !== "slideshow") {
+        slideshowPushedRoute = false;
+        slideshowImages = undefined;
+      }
       else if (!slideshowImages && filteredImages.length >= 2) slideshowImages = shuffle(filteredImages);
     };
     window.addEventListener("popstate", handlePopState);
@@ -374,7 +405,7 @@
   <Lightbox image={activeImage} displayName={displayName(activeImage)} favorite={favorites.has(activeImage.path)} {showNames} {namePosition} {nameVisible} {watermark} {watermarkPosition} colors={colorsFor(activeImage)} hasPrevious={activeIndex > 0} hasNext={activeIndex < filteredImages.length - 1} onclose={() => { activePath = undefined; }} onnavigate={navigateLightbox} onfavorite={() => toggleFavorite(activeImage)} oninfo={() => void showDetails(activeImage)} onreport={reportingEnabled ? () => void reportImage(activeImage) : undefined} ontogglename={() => { nameVisible = !nameVisible; }} onposition={() => { namePosition = corners[(corners.indexOf(namePosition) + 1) % corners.length]!; }} onreturn={() => void returnToTile()} />
 {/if}
 
-{#if slideshowImages}<Slideshow images={slideshowImages} {displayName} {showNames} {watermark} {watermarkPosition} {colorsFor} onclose={closeSlideshow} onreport={reportingEnabled ? (image) => void reportImage(image) : undefined} />{/if}
+{#if slideshowImages}<Slideshow images={slideshowImages} {displayName} {showNames} {watermark} {watermarkPosition} {colorsFor} onclose={closeSlideshow} onreturn={(image) => void returnFromSlideshow(image)} />{/if}
 
 <dialog bind:this={appearanceDialog} class="settings-dialog" aria-labelledby="appearance-title">
   <form method="dialog"><header><h2 id="appearance-title">Gallery appearance</h2><button value="close" aria-label="Close">×</button></header>
