@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, loadEnv, type Plugin } from "vite";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 const fallbackTitle = "Image Gallery";
 const fallbackDescription = "A simple private image gallery.";
@@ -206,15 +207,21 @@ export default defineConfig(({ mode }) => {
   const supportEnabled = optionalBoolean(env.ENABLE_SUPPORT_EMBED, "ENABLE_SUPPORT_EMBED") ?? config.enableSupportEmbed;
   const supportEmbed = readSupportEmbed(supportEnabled, env.SUPPORT_EMBED_FILE);
 
+  const legacyFrontend = mode === "legacy";
   return {
-    root: "src/web",
+    root: legacyFrontend ? "src/web" : "src/web-next",
+    publicDir: legacyFrontend ? "public" : "../web/public",
     base: "./",
-    plugins: [galleryHtml(title, description, siteUrl, config, supportEmbed)],
+    plugins: [
+      ...(!legacyFrontend ? [svelte()] : []),
+      galleryHtml(title, description, siteUrl, config, supportEmbed),
+    ],
     build: {
-      outDir: "../../dist/public",
+      outDir: legacyFrontend ? "../../dist/public-legacy" : "../../dist/public",
       emptyOutDir: false,
     },
     server: {
+      ...(mode === "next" ? { host: "0.0.0.0" } : {}),
       proxy: {
         "/api": "http://127.0.0.1:8080",
         "/media": "http://127.0.0.1:8080",
