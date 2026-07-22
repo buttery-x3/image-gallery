@@ -54,4 +54,45 @@ describe("media load scheduler", () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(started).toEqual(["active", "visible"]);
   });
+
+  it("reserves capacity for viewport work and preempts background loads when needed", async () => {
+    const scheduler = new MediaLoadScheduler(4, 2);
+    const started: string[] = [];
+    const cancelled: string[] = [];
+    const releases = new Map<string, (completed: boolean) => void>();
+
+    const queue = (key: string, lane: "foreground" | "background"): void => {
+      scheduler.enqueue(key, lane === "foreground" ? 0 : 1_000_000, () => new Promise<boolean>((resolve) => {
+        started.push(key);
+        releases.set(key, resolve);
+      }), {
+        lane,
+        ...(lane === "background" ? {
+          cancel: () => {
+            cancelled.push(key);
+            releases.get(key)?.(false);
+          },
+        } : {}),
+      });
+    };
+
+    for (let index = 0; index < 4; index += 1) queue(`background-${index}`, "background");
+    await Promise.resolve();
+    expect(started).toEqual(["background-0", "background-1"]);
+
+    queue("visible-0", "foreground");
+    queue("visible-1", "foreground");
+    await Promise.resolve();
+    expect(started).toContain("visible-0");
+    expect(started).toContain("visible-1");
+
+    queue("visible-2", "foreground");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(cancelled).toEqual(["background-0"]);
+    expect(started).toContain("visible-2");
+    expect(scheduler.pending).toBe(3);
+
+    for (const release of releases.values()) release(true);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  });
 });

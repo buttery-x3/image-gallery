@@ -68,23 +68,33 @@
         backgroundFrame = requestAnimationFrame(() => {
           measureViewport();
           for (const [index, image] of backgroundImages.entries()) {
+            let cancelRequested = false;
+            let cancelLoad = (): void => { cancelRequested = true; };
             scheduler.enqueue(image.path, 1_000_000 + index, () => new Promise<boolean>((resolve) => {
               const preload = new Image();
               backgroundPreloads.set(image.path, preload);
+              let settled = false;
               const timeout = window.setTimeout(() => {
                 preload.src = "";
                 backgroundPreloads.delete(image.path);
                 resolve(false);
               }, 30_000);
               const finish = (completed: boolean): void => {
+                if (settled) return;
+                settled = true;
                 window.clearTimeout(timeout);
                 backgroundPreloads.delete(image.path);
                 resolve(completed);
               };
+              cancelLoad = () => {
+                preload.src = "";
+                finish(false);
+              };
               preload.onload = () => finish(true);
               preload.onerror = () => finish(false);
-              preload.src = tileMediaUrl(image);
-            }));
+              if (cancelRequested) cancelLoad();
+              else preload.src = tileMediaUrl(image);
+            }), { lane: "background", cancel: () => cancelLoad() });
           }
         });
       });
