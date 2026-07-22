@@ -306,11 +306,13 @@ export function validateNameGenerationDefinition(value, requestedRepresentations
   throw new Error(`${schema} uses unsupported engine ${String(value.engine)}.`);
 }
 
-export async function loadNameGenerationDefinitions(directory, requestedBySchema) {
-  if (requestedBySchema.size === 0) return new Map();
+export async function loadNameGenerationDefinitions(directory, requestedBySchema, options = {}) {
+  if (requestedBySchema.size === 0 && options.validateAll !== true) return new Map();
   const parsedBySchema = new Map();
+  const sourceBySchema = new Map();
   const duplicateSchemas = new Set();
   const parseErrors = [];
+  const missingSchemaFiles = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     if (entry.name.startsWith(".") || entry.isSymbolicLink() || !entry.isFile() || path.extname(entry.name).toLowerCase() !== ".json") continue;
     const filePath = path.join(directory, entry.name);
@@ -322,9 +324,23 @@ export async function loadNameGenerationDefinitions(directory, requestedBySchema
       continue;
     }
     const schema = isRecord(parsed) && typeof parsed.schema === "string" ? parsed.schema.trim() : "";
-    if (!schema) continue;
+    if (!schema) {
+      if (options.validateAll === true) missingSchemaFiles.push(entry.name);
+      continue;
+    }
     if (parsedBySchema.has(schema)) duplicateSchemas.add(schema);
     parsedBySchema.set(schema, parsed);
+    sourceBySchema.set(schema, entry.name);
+  }
+
+  if (options.validateAll === true && parseErrors.length > 0) {
+    throw new Error(`Invalid name generation definition JSON: ${parseErrors.join("; ")}`);
+  }
+  if (options.validateAll === true && missingSchemaFiles.length > 0) {
+    throw new Error(`Invalid name generation definition: ${missingSchemaFiles.join(", ")} must declare a non-empty schema.`);
+  }
+  if (options.validateAll === true && duplicateSchemas.size > 0) {
+    throw new Error(`Name generation schema ${[...duplicateSchemas].join(", ")} is defined more than once.`);
   }
 
   const definitions = new Map();
@@ -341,13 +357,27 @@ export async function loadNameGenerationDefinitions(directory, requestedBySchema
     }
     validating.add(cacheKey);
     try {
-      const definition = validateNameGenerationDefinition(parsed, representations, { resolveDefinition });
+      let definition;
+      try {
+        definition = validateNameGenerationDefinition(parsed, representations, { resolveDefinition });
+      } catch (error) {
+        const source = sourceBySchema.get(schema) ?? schema;
+        throw new Error(`Invalid name generation definition ${source}: ${error instanceof Error ? error.message : String(error)}`);
+      }
       definitions.set(cacheKey, definition);
       return definition;
     } finally {
       validating.delete(cacheKey);
     }
   };
+  if (options.validateAll === true) {
+    for (const [schema, parsed] of parsedBySchema) {
+      const declaredRepresentations = parsed.engine === "mora-pair/v1" && isRecord(parsed.representations)
+        ? Object.keys(parsed.representations).filter((representation) => supportedRepresentations.has(representation))
+        : [];
+      resolveDefinition(schema, declaredRepresentations);
+    }
+  }
   const requestedDefinitions = new Map();
   for (const [schema, representations] of requestedBySchema) {
     requestedDefinitions.set(schema, resolveDefinition(schema, representations));

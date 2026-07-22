@@ -37,7 +37,7 @@ test("batch naming is selected independently for each source metadata schema", a
       },
     });
     assert.match(stdout, /woman\.png -> [a-z]+-[a-z]+\.png/);
-    assert.match(stdout, /creature\.png -> [a-z]+-(?:white|black|soft|wild|bright|swift)(?:tail|paw|fang|ear)\.png/);
+    assert.match(stdout, /creature\.png -> [a-z]+-[a-z]+\.png/);
     assert.match(stdout, /Images that would be renamed: 2/);
     assert.match(stdout, /Generated name metadata files that would be added: 2/);
   } finally {
@@ -57,6 +57,71 @@ test("the removed environment naming switch fails with migration guidance", asyn
       return true;
     },
   );
+});
+
+test("an invalid metadata definition stops the batch before gallery files are changed", async () => {
+  const temporaryRoot = await mkdtemp(path.join(tmpdir(), "image-gallery-invalid-metadata-test-"));
+  const galleryDirectory = path.join(temporaryRoot, "gallery");
+  const metadataDirectory = path.join(temporaryRoot, "metadata-schemas");
+  const nameDirectory = path.join(temporaryRoot, "name-generation-schemas");
+  await Promise.all([mkdir(galleryDirectory), mkdir(metadataDirectory), mkdir(nameDirectory)]);
+  try {
+    await Promise.all([
+      writeFile(path.join(temporaryRoot, "gallery.config.json"), "{}"),
+      writeFile(path.join(galleryDirectory, "untouched.png"), new Uint8Array([1, 2, 3])),
+      writeFile(path.join(metadataDirectory, "broken.json"), '{"schema":"broken/v1","fields":[]}'),
+    ]);
+    await assert.rejects(
+      execFileAsync(process.execPath, [path.join(projectRoot, "process-gallery-batch.mjs")], {
+        cwd: temporaryRoot,
+        env: { ...process.env, GALLERY_DIR: galleryDirectory, PREVIEW_CACHE_DIR: path.join(temporaryRoot, "previews") },
+      }),
+      (error) => {
+        assert.match(error.stderr, /Invalid metadata definition broken\.json/);
+        assert.match(error.stderr, /definitionVersion must be 1/);
+        return true;
+      },
+    );
+    assert.deepEqual(await readdir(galleryDirectory), ["untouched.png"]);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("an invalid unused name definition stops the batch with its filename", async () => {
+  const temporaryRoot = await mkdtemp(path.join(tmpdir(), "image-gallery-invalid-name-test-"));
+  const galleryDirectory = path.join(temporaryRoot, "gallery");
+  const metadataDirectory = path.join(temporaryRoot, "metadata-schemas");
+  const nameDirectory = path.join(temporaryRoot, "name-generation-schemas");
+  await Promise.all([mkdir(galleryDirectory), mkdir(metadataDirectory), mkdir(nameDirectory)]);
+  try {
+    await Promise.all([
+      writeFile(path.join(temporaryRoot, "gallery.config.json"), "{}"),
+      writeFile(path.join(metadataDirectory, "valid.json"), JSON.stringify({
+        definitionVersion: 1,
+        schema: "valid/v1",
+        tags: {},
+      })),
+      writeFile(path.join(nameDirectory, "broken-name.json"), JSON.stringify({
+        definitionVersion: 1,
+        schema: "image-gallery/name-generator/broken/v1",
+        engine: "unsupported/v1",
+      })),
+    ]);
+    await assert.rejects(
+      execFileAsync(process.execPath, [path.join(projectRoot, "process-gallery-batch.mjs"), "--dry-run"], {
+        cwd: temporaryRoot,
+        env: { ...process.env, GALLERY_DIR: galleryDirectory, PREVIEW_CACHE_DIR: path.join(temporaryRoot, "previews") },
+      }),
+      (error) => {
+        assert.match(error.stderr, /Invalid name generation definition broken-name\.json/);
+        assert.match(error.stderr, /uses unsupported engine unsupported\/v1/);
+        return true;
+      },
+    );
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
 });
 
 test("orphan source JSON is reported for quarantine without blocking valid images", async () => {

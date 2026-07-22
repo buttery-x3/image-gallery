@@ -24,6 +24,15 @@
           "pipeline": "contextual/v1",
           "shortNames": ["en", "ja"]
         }
+      },
+      "anime_husbandai_lite/v1": {
+        "enabled": true,
+        "category": "men",
+        "typeLabel": "Husbandais",
+        "nameGeneration": {
+          "definition": "image-gallery/name-generator/husbandai-japanese-fantasy/v1",
+          "shortNames": ["en", "ja"]
+        }
       }
     }
   },

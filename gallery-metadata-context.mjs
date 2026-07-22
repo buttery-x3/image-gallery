@@ -5,6 +5,85 @@ function isRecord(value) {
   return value && typeof value === "object" && !Array.isArray(value);
 }
 
+function nonEmptyString(value, label) {
+  if (typeof value !== "string" || !value.trim()) throw new Error(`${label} must be a non-empty string.`);
+  return value.trim();
+}
+
+function validateCondition(value, label) {
+  if (!isRecord(value)) throw new Error(`${label} must be an object.`);
+  const equals = value.equals;
+  if (equals !== null && !["string", "number", "boolean"].includes(typeof equals)) {
+    throw new Error(`${label}.equals must be a scalar value.`);
+  }
+  return { path: nonEmptyString(value.path, `${label}.path`), equals };
+}
+
+function validateMapping(value, label) {
+  if (!isRecord(value)) throw new Error(`${label} must be an object.`);
+  if ("path" in value) {
+    return {
+      path: nonEmptyString(value.path, `${label}.path`),
+      ...(value.excludeWhen === undefined ? {} : { excludeWhen: validateCondition(value.excludeWhen, `${label}.excludeWhen`) }),
+    };
+  }
+  if (isRecord(value.select)) {
+    if (!isRecord(value.select.cases) || Object.keys(value.select.cases).length === 0) {
+      throw new Error(`${label}.select.cases must contain at least one mapping.`);
+    }
+    const cases = {};
+    for (const [key, mappedPath] of Object.entries(value.select.cases)) {
+      cases[key] = nonEmptyString(mappedPath, `${label}.select.cases.${key}`);
+    }
+    return { select: { path: nonEmptyString(value.select.path, `${label}.select.path`), cases } };
+  }
+  throw new Error(`${label} must define path or select.`);
+}
+
+export function validateMetadataContextDefinition(value, source = "Metadata definition") {
+  if (!isRecord(value)) throw new Error(`${source} must contain a JSON object.`);
+  if (value.definitionVersion !== 1) throw new Error(`${source}.definitionVersion must be 1.`);
+  if (value.draft !== undefined && typeof value.draft !== "boolean") {
+    throw new Error(`${source}.draft must be true or false.`);
+  }
+  const schema = nonEmptyString(value.schema, `${source}.schema`);
+  if (!isRecord(value.tags)) throw new Error(`${source}.tags must be an object.`);
+  const tags = {};
+  for (const [tag, mapping] of Object.entries(value.tags)) {
+    if (!/^[a-z][a-z0-9_]*$/.test(tag)) throw new Error(`${source}.tags.${tag} is not a canonical tag name.`);
+    tags[tag] = validateMapping(mapping, `${source}.tags.${tag}`);
+  }
+  let resolvedPrompt;
+  if (value.resolvedPrompt !== undefined) {
+    resolvedPrompt = validateMapping(value.resolvedPrompt, `${source}.resolvedPrompt`);
+    if (!("path" in resolvedPrompt)) throw new Error(`${source}.resolvedPrompt must use a path mapping.`);
+  }
+  let valueRules;
+  if (value.valueRules !== undefined) {
+    if (!isRecord(value.valueRules)) throw new Error(`${source}.valueRules must be an object.`);
+    if (value.valueRules.omitContaining !== undefined && (
+      !Array.isArray(value.valueRules.omitContaining) || value.valueRules.omitContaining.some((item) => typeof item !== "string")
+    )) throw new Error(`${source}.valueRules.omitContaining must be an array of strings.`);
+    valueRules = {
+      trim: value.valueRules.trim === true,
+      omitEmpty: value.valueRules.omitEmpty === true,
+      ...(value.valueRules.omitContaining ? { omitContaining: [...value.valueRules.omitContaining] } : {}),
+    };
+  }
+  return {
+    definitionVersion: 1,
+    ...(value.draft === true ? { draft: true } : {}),
+    schema,
+    ...(value.recordPath === undefined ? {} : { recordPath: nonEmptyString(value.recordPath, `${source}.recordPath`) }),
+    ...(resolvedPrompt ? { resolvedPrompt } : {}),
+    tags,
+    ...(value.searchTokensPath === undefined ? {} : {
+      searchTokensPath: nonEmptyString(value.searchTokensPath, `${source}.searchTokensPath`),
+    }),
+    ...(valueRules ? { valueRules } : {}),
+  };
+}
+
 function valueAtPath(value, dottedPath) {
   let current = value;
   for (const segment of dottedPath.split(".")) {
@@ -52,8 +131,8 @@ export function extractMetadataContext(parsed, definition) {
   return context;
 }
 
-export async function loadMetadataContextDefinitions(directory, requestedSchemas) {
-  if (requestedSchemas.size === 0) return new Map();
+export async function loadMetadataContextDefinitions(directory, requestedSchemas, options = {}) {
+  if (requestedSchemas.size === 0 && options.validateAll !== true) return new Map();
   const definitions = new Map();
   const parseErrors = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -65,18 +144,27 @@ export async function loadMetadataContextDefinitions(directory, requestedSchemas
       parseErrors.push(`${entry.name}: ${error instanceof Error ? error.message : String(error)}`);
       continue;
     }
-    const schema = isRecord(parsed) && typeof parsed.schema === "string" ? parsed.schema.trim() : "";
-    if (!requestedSchemas.has(schema)) continue;
-    if (definitions.has(schema)) throw new Error(`Metadata schema ${schema} is defined more than once.`);
-    if (parsed.definitionVersion !== 1 || !isRecord(parsed.tags)) {
-      throw new Error(`Metadata definition ${entry.name} cannot provide contextual name-generation tags.`);
+    const rawSchema = isRecord(parsed) && typeof parsed.schema === "string" ? parsed.schema.trim() : "";
+    if (options.validateAll !== true && !requestedSchemas.has(rawSchema)) continue;
+    let definition;
+    try {
+      definition = validateMetadataContextDefinition(parsed, entry.name);
+    } catch (error) {
+      throw new Error(`Invalid metadata definition ${entry.name}: ${error instanceof Error ? error.message : String(error)}`);
     }
-    definitions.set(schema, parsed);
+    if (definition.draft) continue;
+    if (definitions.has(definition.schema)) throw new Error(`Metadata schema ${definition.schema} is defined more than once.`);
+    definitions.set(definition.schema, definition);
+  }
+  if (options.validateAll === true && parseErrors.length > 0) {
+    throw new Error(`Invalid metadata definition JSON: ${parseErrors.join("; ")}`);
   }
   for (const schema of requestedSchemas) {
     if (definitions.has(schema)) continue;
     const hint = parseErrors.length > 0 ? ` Unreadable definitions: ${parseErrors.join("; ")}` : "";
-    throw new Error(`Contextual name generation requires metadata definition ${schema}.${hint}`);
+    throw new Error(options.validateAll === true
+      ? `Configured metadata schema ${schema} does not have a valid definition in ${directory}.${hint}`
+      : `Contextual name generation requires metadata definition ${schema}.${hint}`);
   }
   return definitions;
 }

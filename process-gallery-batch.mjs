@@ -91,6 +91,8 @@ const galleryRoot = path.resolve(process.env.GALLERY_DIR ?? "gallery");
 const previewCacheRoot = path.resolve(process.env.PREVIEW_CACHE_DIR ?? ".cache/previews");
 const nameGenerationDefinitionsRoot = path.resolve("name-generation-schemas");
 const metadataDefinitionsRoot = path.resolve("metadata-schemas");
+let validatedNameDefinitions = new Map();
+let validatedMetadataDefinitions = new Map();
 
 function sourceMetadataSchema(parsed) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
@@ -432,22 +434,10 @@ function nameGenerationPolicy(record) {
 }
 
 async function nameDefinitionsFor(records) {
-  const requestedBySchema = new Map();
   for (const record of records) {
     const policy = nameGenerationPolicy(record);
     if (!policy) continue;
-    const requested = requestedBySchema.get(policy.definition) ?? new Set();
-    for (const representation of policy.shortNames) requested.add(representation);
-    requestedBySchema.set(policy.definition, requested);
-  }
-  const definitions = await loadNameGenerationDefinitions(
-    nameGenerationDefinitionsRoot,
-    new Map([...requestedBySchema].map(([schema, representations]) => [schema, [...representations]])),
-  );
-  for (const record of records) {
-    const policy = nameGenerationPolicy(record);
-    if (!policy) continue;
-    const definition = definitions.get(policy.definition);
+    const definition = validatedNameDefinitions.get(policy.definition);
     if (policy.pipeline === "contextual/v1" && definition?.engine !== "pipeline/v1") {
       throw new Error(`${policy.definition} must use engine pipeline/v1 when pipeline contextual/v1 is configured.`);
     }
@@ -455,7 +445,7 @@ async function nameDefinitionsFor(records) {
       throw new Error(`${policy.definition} requires nameGeneration.pipeline: contextual/v1.`);
     }
   }
-  return definitions;
+  return validatedNameDefinitions;
 }
 
 function pipelineContextKeys(definition) {
@@ -468,17 +458,56 @@ function pipelineContextKeys(definition) {
   }));
 }
 
+async function validateBatchSchemas() {
+  const enabledMetadataSchemas = new Set(
+    [...metadataSchemaPolicies].filter(([, policy]) => policy.enabled).map(([schema]) => schema),
+  );
+  validatedMetadataDefinitions = await loadMetadataContextDefinitions(
+    metadataDefinitionsRoot,
+    enabledMetadataSchemas,
+    { validateAll: true },
+  );
+
+  const requestedByNameSchema = new Map();
+  for (const policy of metadataSchemaPolicies.values()) {
+    if (!policy.nameGeneration) continue;
+    const requested = requestedByNameSchema.get(policy.nameGeneration.definition) ?? new Set();
+    for (const representation of policy.nameGeneration.shortNames) requested.add(representation);
+    requestedByNameSchema.set(policy.nameGeneration.definition, requested);
+  }
+  validatedNameDefinitions = await loadNameGenerationDefinitions(
+    nameGenerationDefinitionsRoot,
+    new Map([...requestedByNameSchema].map(([schema, representations]) => [schema, [...representations]])),
+    { validateAll: true },
+  );
+
+  for (const [sourceSchema, policy] of metadataSchemaPolicies) {
+    const naming = policy.nameGeneration;
+    if (!naming) continue;
+    const nameDefinition = validatedNameDefinitions.get(naming.definition);
+    if (naming.pipeline === "contextual/v1" && nameDefinition.engine !== "pipeline/v1") {
+      throw new Error(`${naming.definition} must use engine pipeline/v1 when pipeline contextual/v1 is configured.`);
+    }
+    if (!naming.pipeline && nameDefinition.engine === "pipeline/v1") {
+      throw new Error(`${naming.definition} requires nameGeneration.pipeline: contextual/v1.`);
+    }
+    if (naming.pipeline !== "contextual/v1") continue;
+    const metadataDefinition = validatedMetadataDefinitions.get(sourceSchema);
+    const missingTags = [...pipelineContextKeys(nameDefinition)].filter((tag) => !(tag in metadataDefinition.tags));
+    if (missingTags.length > 0) {
+      throw new Error(
+        `${naming.definition} requests canonical context tag${missingTags.length === 1 ? "" : "s"} not provided by ` +
+        `${sourceSchema}: ${missingTags.join(", ")}`,
+      );
+    }
+  }
+}
+
 async function addGenerationContexts(records, nameDefinitions) {
-  const requestedSchemas = new Set(records.flatMap((record) =>
-    nameGenerationPolicy(record)?.pipeline === "contextual/v1" && record.sourceMetadataSchema
-      ? [record.sourceMetadataSchema]
-      : []
-  ));
-  const definitions = await loadMetadataContextDefinitions(metadataDefinitionsRoot, requestedSchemas);
   for (const record of records) {
     const policy = nameGenerationPolicy(record);
     if (policy?.pipeline !== "contextual/v1" || !record.sourceMetadataSchema) continue;
-    const metadataDefinition = definitions.get(record.sourceMetadataSchema);
+    const metadataDefinition = validatedMetadataDefinitions.get(record.sourceMetadataSchema);
     const nameDefinition = nameDefinitions.get(policy.definition);
     const missingTags = [...pipelineContextKeys(nameDefinition)].filter((tag) => !(tag in metadataDefinition.tags));
     if (missingTags.length > 0) {
@@ -1063,6 +1092,8 @@ if (
 ) {
   throw new Error("PREVIEW_CACHE_DIR must be outside GALLERY_DIR.");
 }
+
+await validateBatchSchemas();
 
 if (renameExisting) await renameExistingBatches();
 else if (backfillNameMetadata) await backfillGeneratedNameMetadata();
