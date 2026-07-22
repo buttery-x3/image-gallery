@@ -330,7 +330,7 @@
 
 <svelte:head><title>{siteName}</title></svelte:head>
 
-<header class="site-header">
+<header class="site-header" class:header-sticky={appearance.stickyHeader}>
   <div class="header-title">
     <h1>{siteName}</h1>
     <button class="shuffle-button" type="button" disabled={images.length < 2} onclick={() => { images = shuffle(images); }}><Icon name="shuffle" /><span>{copy[language].shuffle}</span></button>
@@ -346,19 +346,18 @@
   </div>
   <div class="header-controls">
     <label class="search-field"><span class="visually-hidden">{copy[language].search}</span><input type="search" bind:value={search} placeholder={copy[language].search} autocomplete="off" /></label>
-    <label class="toggle"><input type="checkbox" bind:checked={favoritesOnly} /><span class="toggle-track" aria-hidden="true"><span></span></span><span>{copy[language].favorites}</span></label>
+    <button class="header-icon-button favorites-button" class:is-active={favoritesOnly} type="button" aria-label={copy[language].favorites} title={copy[language].favorites} aria-pressed={favoritesOnly} onclick={() => { favoritesOnly = !favoritesOnly; }}><Icon name="favorite" /></button>
     {#if showLanguageToggle}
       <fieldset class="name-language" aria-label="Display name language">
         <label><input type="radio" name="name-language" value="en" bind:group={language} onchange={() => setLanguage("en")} /><span>EN</span></label>
         <label><input type="radio" name="name-language" value="ja" bind:group={language} onchange={() => setLanguage("ja")} /><span>JP</span></label>
       </fieldset>
     {/if}
-    {#if searchMetadata}<button class="advanced-button" type="button" onclick={() => { draftFilters = { ...activeFilters }; filterDialog?.showModal(); }}>{copy[language].filters}{Object.keys(activeFilters).length ? ` (${Object.keys(activeFilters).length})` : ""}</button>{/if}
+    {#if searchMetadata}<button class="header-icon-button advanced-button" class:is-active={Object.keys(activeFilters).length > 0} type="button" aria-label={copy[language].filters} title={copy[language].filters} onclick={() => { draftFilters = { ...activeFilters }; filterDialog?.showModal(); }}><Icon name="filter-list" />{#if Object.keys(activeFilters).length}<span class="control-badge">{Object.keys(activeFilters).length}</span>{/if}</button>{/if}
   </div>
   <div class="header-meta">
     <p class="image-count" aria-live="polite">{loading ? copy[language].loading : imageCountText}</p>
-    <button type="button" onclick={() => appearanceDialog?.showModal()}>{copy[language].appearance}</button>
-    <select aria-label="Visual style" value={theme} onchange={(event) => setTheme(event.currentTarget.value as Theme)}>{#each themes as value}<option {value}>{themeLabels[value]}</option>{/each}</select>
+    <button class="header-icon-button" type="button" aria-label={copy[language].appearance} title={copy[language].appearance} onclick={() => appearanceDialog?.showModal()}><Icon name="palette" /></button>
   </div>
 </header>
 
@@ -375,7 +374,7 @@
   <Lightbox image={activeImage} displayName={displayName(activeImage)} favorite={favorites.has(activeImage.path)} {showNames} {namePosition} {nameVisible} {watermark} {watermarkPosition} colors={colorsFor(activeImage)} hasPrevious={activeIndex > 0} hasNext={activeIndex < filteredImages.length - 1} onclose={() => { activePath = undefined; }} onnavigate={navigateLightbox} onfavorite={() => toggleFavorite(activeImage)} oninfo={() => void showDetails(activeImage)} onreport={reportingEnabled ? () => void reportImage(activeImage) : undefined} ontogglename={() => { nameVisible = !nameVisible; }} onposition={() => { namePosition = corners[(corners.indexOf(namePosition) + 1) % corners.length]!; }} onreturn={() => void returnToTile()} />
 {/if}
 
-{#if slideshowImages}<Slideshow images={slideshowImages} {displayName} {showNames} {watermark} {watermarkPosition} {colorsFor} onclose={closeSlideshow} />{/if}
+{#if slideshowImages}<Slideshow images={slideshowImages} {displayName} {showNames} {watermark} {watermarkPosition} {colorsFor} onclose={closeSlideshow} onreport={reportingEnabled ? (image) => void reportImage(image) : undefined} />{/if}
 
 <dialog bind:this={appearanceDialog} class="settings-dialog" aria-labelledby="appearance-title">
   <form method="dialog"><header><h2 id="appearance-title">Gallery appearance</h2><button value="close" aria-label="Close">×</button></header>
@@ -385,8 +384,10 @@
       <label>Fixed-ratio fit<select value={appearance.tileFit} disabled={appearance.tileRatio === "natural"} onchange={(e) => updateAppearance("tileFit", e.currentTarget.value as GalleryAppearancePreferencesV1["tileFit"])}>{#each tileFits as value}<option {value}>{value}</option>{/each}</select></label>
       <label>Hover zoom<select value={appearance.tileZoom} onchange={(e) => updateAppearance("tileZoom", e.currentTarget.value as GalleryAppearancePreferencesV1["tileZoom"])}>{#each tileZooms as value}<option {value}>{value}</option>{/each}</select></label>
       <label>Tile actions<select value={appearance.tileActions} onchange={(e) => updateAppearance("tileActions", e.currentTarget.value as GalleryAppearancePreferencesV1["tileActions"])}>{#each tileActions as value}<option {value}>{value}</option>{/each}</select></label>
+      <label>Visual style<select aria-label="Visual style" value={theme} onchange={(event) => setTheme(event.currentTarget.value as Theme)}>{#each themes as value}<option {value}>{themeLabels[value]}</option>{/each}</select></label>
+      <label class="settings-toggle"><input type="checkbox" checked={appearance.stickyHeader} onchange={(event) => updateAppearance("stickyHeader", event.currentTarget.checked)} /> Keep header visible while scrolling</label>
     </div>
-    <footer><button type="button" onclick={() => { appearance = resetAppearance(); }}>Reset appearance</button><button value="close">Done</button></footer>
+    <footer><button type="button" onclick={() => { appearance = resetAppearance(); setTheme("editorial"); }}>Reset appearance</button><button value="close">Done</button></footer>
   </form>
 </dialog>
 

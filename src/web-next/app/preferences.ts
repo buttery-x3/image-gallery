@@ -17,6 +17,7 @@ export interface GalleryAppearancePreferencesV1 {
   tileFit: TileFit;
   tileZoom: TileZoom;
   tileActions: TileActions;
+  stickyHeader: boolean;
 }
 
 export const defaultAppearancePreferences: GalleryAppearancePreferencesV1 = {
@@ -26,6 +27,7 @@ export const defaultAppearancePreferences: GalleryAppearancePreferencesV1 = {
   tileFit: "cover",
   tileZoom: "off",
   tileActions: "hover",
+  stickyHeader: false,
 };
 
 function isMember<T extends string>(value: unknown, choices: readonly T[]): value is T {
@@ -42,9 +44,10 @@ export function parseAppearancePreferences(value: string | null): GalleryAppeara
       !isMember(parsed.tileRatio, tileRatios) ||
       !isMember(parsed.tileFit, tileFits) ||
       !isMember(parsed.tileZoom, tileZooms) ||
-      !isMember(parsed.tileActions, tileActions)
+      !isMember(parsed.tileActions, tileActions) ||
+      (parsed.stickyHeader !== undefined && typeof parsed.stickyHeader !== "boolean")
     ) return { ...defaultAppearancePreferences };
-    return parsed as GalleryAppearancePreferencesV1;
+    return { ...(parsed as Omit<GalleryAppearancePreferencesV1, "stickyHeader">), stickyHeader: parsed.stickyHeader ?? false };
   } catch {
     return { ...defaultAppearancePreferences };
   }

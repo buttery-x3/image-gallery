@@ -1,5 +1,5 @@
 <script lang="ts">
-  type IconName = "copy-image" | "copy-link" | "favorite" | "info" | "menu" | "shuffle" | "slideshow";
+  type IconName = "copy-image" | "copy-link" | "favorite" | "filter-list" | "info" | "menu" | "palette" | "shuffle" | "slideshow";
   let { name }: { name: IconName } = $props();
 </script>
 
@@ -14,6 +14,10 @@
     <path d="M10 14a4 4 0 0 0 5.66 0l2.83-2.83a4 4 0 0 0-5.66-5.66l-1.42 1.42M14 10a4 4 0 0 0-5.66 0l-2.83 2.83a4 4 0 1 0 5.66 5.66l1.42-1.42" />
   {:else if name === "menu"}
     <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
+  {:else if name === "filter-list"}
+    <path d="M4 6h16M4 12h11M4 18h7" /><circle cx="18" cy="12" r="1.5" /><circle cx="14" cy="18" r="1.5" />
+  {:else if name === "palette"}
+    <path d="M12 3a9 9 0 1 0 0 18h1.2a2 2 0 0 0 1.5-3.3 1.6 1.6 0 0 1 1.2-2.7H18a3 3 0 0 0 3-3 9 9 0 0 0-9-9Z" /><circle cx="7.5" cy="10" r="1" fill="currentColor" stroke="none" /><circle cx="10" cy="6.8" r="1" fill="currentColor" stroke="none" /><circle cx="14.2" cy="6.6" r="1" fill="currentColor" stroke="none" /><circle cx="17" cy="9.5" r="1" fill="currentColor" stroke="none" />
   {:else if name === "shuffle"}
     <path d="M16 3h5v5M21 3l-6.5 6.5a4 4 0 0 1-5.7 0L3 3.7M16 21h5v-5M21 21l-6.5-6.5a4 4 0 0 0-5.7 0L3 20.3" />
   {:else if name === "slideshow"}

@@ -8,6 +8,15 @@ describe("appearance preferences", () => {
       tileZoom: "subtle", tileActions: "always",
     }));
     expect(parsed.tileWidth).toBe("large");
+    expect(parsed.stickyHeader).toBe(false);
+  });
+
+  it("loads the opt-in sticky header preference", () => {
+    const parsed = parseAppearancePreferences(JSON.stringify({
+      version: 1, tileWidth: "standard", tileRatio: "natural", tileFit: "cover",
+      tileZoom: "off", tileActions: "hover", stickyHeader: true,
+    }));
+    expect(parsed.stickyHeader).toBe(true);
   });
 
   it("falls back atomically for invalid state", () => {
