@@ -48,7 +48,7 @@ body.consent-pending > .support-card { visibility: hidden; }
   backdrop-filter: var(--header-blur);
 }
 .header-title { grid-area: title; display: flex; align-items: center; min-width: 0; gap: 8px; white-space: nowrap; }
-.header-title h1 { margin: 0; overflow: hidden; font-size: clamp(1rem, 2vw, 1.35rem); text-overflow: ellipsis; white-space: nowrap; }
+.header-title h1 { flex: 0 0 auto; margin: 0; overflow: visible; font-size: clamp(1rem, 2vw, 1.35rem); text-overflow: clip; white-space: nowrap; }
 .header-controls { grid-area: controls; display: flex; align-items: center; justify-content: center; min-width: 0; gap: 8px; }
 .search-field { flex: 1 1 220px; min-width: 0; }
 .search-field input { width: 100%; min-width: 0; padding: 9px 12px; }
@@ -71,15 +71,22 @@ body.consent-pending > .support-card { visibility: hidden; }
 .name-language input:checked + span { color: var(--accent-ink); background: var(--accent); }
 .name-language input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .support-button-host { position: relative; display: flex; align-items: center; justify-content: center; width: 137px; min-height: 38px; padding-block: 4px; line-height: 0; }
+.site-header button { min-height: 34px; padding: 5px 8px; font-size: .82rem; }
+.site-header select { height: 34px; padding: 4px 7px; font-size: .82rem; }
+.site-header .support-button-host { min-height: 34px; }
 
 @container gallery-app (max-width: 1280px) {
   .site-header { grid-template-areas: "title meta" "controls controls"; grid-template-columns: minmax(0, 1fr) auto; }
   .header-controls { width: min(100%, 760px); justify-self: center; }
 }
-@container gallery-app (max-width: 620px) {
+@container gallery-app (max-width: 1050px) {
   .site-header { grid-template-areas: "title" "controls" "meta"; grid-template-columns: minmax(0, 1fr); }
+  .header-title, .header-controls, .header-meta { justify-content: start; }
+  .header-controls { width: 100%; max-width: none; }
+  .header-meta { justify-content: end; }
+}
+@container gallery-app (max-width: 620px) {
   .header-title, .header-controls, .header-meta { flex-wrap: wrap; justify-content: start; }
-  .header-title { overflow-x: auto; }
   .search-field { flex-basis: 100%; }
   .header-meta { justify-content: space-between; }
   .image-count { display: none; }

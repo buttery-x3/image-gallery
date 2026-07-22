@@ -10,6 +10,7 @@
   interface Props {
     image: GalleryImage;
     rect: MasonryRect;
+    loadPriority: number;
     appearance: GalleryAppearancePreferencesV1;
     scheduler: MediaLoadScheduler;
     favorite: boolean;
@@ -23,27 +24,32 @@
     onreport?: () => void;
   }
 
-  let { image, rect, appearance, scheduler, favorite, displayName, showName, onopen, onfavorite, oncopyimage, oncopylink, oninfo, onreport }: Props = $props();
+  let { image, rect, loadPriority, appearance, scheduler, favorite, displayName, showName, onopen, onfavorite, oncopyimage, oncopylink, oninfo, onreport }: Props = $props();
   let src = $state<string>();
   let settle: ((completed: boolean) => void) | undefined;
+  let loadTimeout: number | undefined;
 
   onMount(() => {
     if (scheduler.hasStarted(image.path)) {
       src = tileMediaUrl(image);
       return;
     }
-    scheduler.enqueue(image.path, rect.y, () => new Promise<boolean>((resolve) => {
+    scheduler.enqueue(image.path, loadPriority, () => new Promise<boolean>((resolve) => {
       settle = resolve;
+      loadTimeout = window.setTimeout(() => loaded(false), 30_000);
       src = tileMediaUrl(image);
     }));
   });
 
   onDestroy(() => {
     scheduler.cancel(image.path);
+    if (loadTimeout !== undefined) window.clearTimeout(loadTimeout);
     settle?.(false);
   });
 
   function loaded(completed = true): void {
+    if (loadTimeout !== undefined) window.clearTimeout(loadTimeout);
+    loadTimeout = undefined;
     settle?.(completed);
     settle = undefined;
     if (!completed) src = undefined;

@@ -6,6 +6,7 @@ import express from "express";
 import { config } from "./config.js";
 import { GalleryDirectoryError, imageKindFor, readGalleryImageDetails, readGalleryImages, resolveSafeMediaPath } from "./gallery.js";
 import { imagePreviewPath } from "./previews.js";
+import { injectSpaBase } from "./spa-base.js";
 import type {
   ErrorResponse,
   GalleryResponse,
@@ -251,9 +252,14 @@ app.use(express.static(config.publicDir, {
   },
 }));
 
-app.get(/.*/, (_request, response) => {
+app.get(/.*/, async (request, response, next) => {
   response.setHeader("Cache-Control", "no-cache");
-  response.sendFile(path.join(config.publicDir, "index.html"));
+  try {
+    const html = await fs.promises.readFile(path.join(config.publicDir, "index.html"), "utf8");
+    response.type("html").send(injectSpaBase(html, request.path));
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {

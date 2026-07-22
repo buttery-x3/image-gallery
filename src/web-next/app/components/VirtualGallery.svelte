@@ -47,6 +47,7 @@
 
   onMount(() => {
     let frame: number | undefined;
+    let restorationTimer: number | undefined;
     const scheduleMeasure = (): void => {
       if (frame !== undefined) return;
       frame = requestAnimationFrame(() => { frame = undefined; measureViewport(); });
@@ -58,39 +59,47 @@
     resizeObserver.observe(host!);
     window.addEventListener("scroll", scheduleMeasure, { passive: true });
     window.addEventListener("resize", scheduleMeasure);
+    window.addEventListener("pageshow", scheduleMeasure);
     measureViewport();
     let backgroundFrame: number | undefined;
     void tick().then(() => {
       backgroundFrame = requestAnimationFrame(() => {
-        for (const [index, image] of backgroundImages.entries()) {
-          scheduler.enqueue(image.path, 1_000_000 + index, () => new Promise<boolean>((resolve) => {
-            const preload = new Image();
-            backgroundPreloads.set(image.path, preload);
-            const timeout = window.setTimeout(() => {
-              preload.src = "";
-              backgroundPreloads.delete(image.path);
-              resolve(false);
-            }, 30_000);
-            const finish = (completed: boolean): void => {
-              window.clearTimeout(timeout);
-              backgroundPreloads.delete(image.path);
-              resolve(completed);
-            };
-            preload.onload = () => finish(true);
-            preload.onerror = () => finish(false);
-            preload.src = tileMediaUrl(image);
-          }));
-        }
+        measureViewport();
+        backgroundFrame = requestAnimationFrame(() => {
+          measureViewport();
+          for (const [index, image] of backgroundImages.entries()) {
+            scheduler.enqueue(image.path, 1_000_000 + index, () => new Promise<boolean>((resolve) => {
+              const preload = new Image();
+              backgroundPreloads.set(image.path, preload);
+              const timeout = window.setTimeout(() => {
+                preload.src = "";
+                backgroundPreloads.delete(image.path);
+                resolve(false);
+              }, 30_000);
+              const finish = (completed: boolean): void => {
+                window.clearTimeout(timeout);
+                backgroundPreloads.delete(image.path);
+                resolve(completed);
+              };
+              preload.onload = () => finish(true);
+              preload.onerror = () => finish(false);
+              preload.src = tileMediaUrl(image);
+            }));
+          }
+        });
       });
     });
+    restorationTimer = window.setTimeout(scheduleMeasure, 250);
     return () => {
       if (frame !== undefined) cancelAnimationFrame(frame);
       if (backgroundFrame !== undefined) cancelAnimationFrame(backgroundFrame);
+      if (restorationTimer !== undefined) window.clearTimeout(restorationTimer);
       for (const preload of backgroundPreloads.values()) preload.src = "";
       backgroundPreloads.clear();
       resizeObserver.disconnect();
       window.removeEventListener("scroll", scheduleMeasure);
       window.removeEventListener("resize", scheduleMeasure);
+      window.removeEventListener("pageshow", scheduleMeasure);
     };
   });
 
@@ -119,6 +128,7 @@
     <GalleryTile
       {image}
       rect={layout.rects[imageIndex]!}
+      loadPriority={Math.abs(layout.rects[imageIndex]!.y - viewportTop)}
       {appearance}
       {scheduler}
       favorite={favorites.has(image.path)}
