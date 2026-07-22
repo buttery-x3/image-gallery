@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { GalleryImage } from "../../../shared/types";
-  import { absoluteMediaUrl } from "../api/gallery-api";
+  import { absoluteMediaUrl, tileMediaUrl } from "../api/gallery-api";
   import type { OverlayColors } from "../overlay-colors";
   import Icon from "./Icon.svelte";
 
   interface Props {
     image: GalleryImage;
+    previousImage?: GalleryImage;
+    nextImage?: GalleryImage;
     displayName: string;
     favorite: boolean;
     showNames: boolean;
@@ -16,8 +18,6 @@
     watermarkHref: string;
     watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
     colors: OverlayColors;
-    hasPrevious: boolean;
-    hasNext: boolean;
     onclose: () => void;
     onnavigate: (offset: -1 | 1) => void;
     onfavorite: () => void;
@@ -27,13 +27,39 @@
     onposition: () => void;
     onreturn: () => void;
   }
-  let { image, displayName, favorite, showNames, namePosition, nameVisible, watermark, watermarkHref, watermarkPosition, colors, hasPrevious, hasNext, onclose, onnavigate, onfavorite, oninfo, onreport, ontogglename, onposition, onreturn }: Props = $props();
+  let { image, previousImage, nextImage, displayName, favorite, showNames, namePosition, nameVisible, watermark, watermarkHref, watermarkPosition, colors, onclose, onnavigate, onfavorite, oninfo, onreport, ontogglename, onposition, onreturn }: Props = $props();
   let dialog = $state<HTMLDialogElement>();
   let imageElement = $state<HTMLImageElement>();
   let englishNameSize = $state(40);
+  let loadedOriginalPath = $state<string>();
   let touchStart: { x: number; y: number; at: number } | undefined;
+  const originalPreloads = new Map<string, Promise<void>>();
   const oppositePositions = { "top-left": "bottom-right", "top-right": "bottom-left", "bottom-left": "top-right", "bottom-right": "top-left" } as const;
   let effectiveWatermarkPosition = $derived(showNames ? oppositePositions[namePosition] : watermarkPosition);
+
+  function preloadOriginal(candidate: GalleryImage | undefined): Promise<void> | undefined {
+    if (!candidate) return undefined;
+    const existing = originalPreloads.get(candidate.path);
+    if (existing) return existing;
+    const preload = new Image();
+    const ready = new Promise<void>((resolve) => {
+      const finish = async (): Promise<void> => {
+        try { await preload.decode(); } catch { /* The visible image can retry decoding if necessary. */ }
+        resolve();
+      };
+      preload.onload = () => { void finish(); };
+      preload.onerror = () => resolve();
+      preload.src = absoluteMediaUrl(candidate);
+    });
+    originalPreloads.set(candidate.path, ready);
+    return ready;
+  }
+
+  $effect(() => {
+    image.path;
+    void preloadOriginal(previousImage);
+    void preloadOriginal(nextImage);
+  });
 
   onMount(() => {
     dialog?.showModal();
@@ -80,9 +106,12 @@
   <button class="lightbox-close" type="button" aria-label="Close preview" onclick={onclose}><Icon name="close" /></button>
   <div class="lightbox-grid">
     <section class="lightbox-content">
-      <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!hasPrevious} onclick={() => onnavigate(-1)}><Icon name="chevron-left" /></button>
+      <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!previousImage} onclick={() => onnavigate(-1)}><Icon name="chevron-left" /></button>
       <div class="lightbox-media" data-name-position={namePosition} data-watermark-position={effectiveWatermarkPosition} style={`--lightbox-name-fill:${colors.fill};--lightbox-name-outline:${colors.outline};--lightbox-name-en-size:${englishNameSize}px;--lightbox-name-ja-size:${englishNameSize / 2}px;`}>
-        <img bind:this={imageElement} src={absoluteMediaUrl(image)} alt={displayName} />
+        <div class="lightbox-image-stack" class:has-preview={Boolean(image.previewUrl)}>
+          {#if image.previewUrl}<img class="lightbox-preview" src={tileMediaUrl(image)} alt="" aria-hidden="true" />{/if}
+          <img bind:this={imageElement} class="lightbox-original" class:is-loaded={loadedOriginalPath === image.path} src={absoluteMediaUrl(image)} alt={displayName} onload={() => { loadedOriginalPath = image.path; }} />
+        </div>
         {#if showNames && nameVisible && (image.shortName?.en || image.shortName?.ja)}
           <button class="lightbox-name-overlay" type="button" onclick={onreturn}>
             {#if image.shortName?.en}<span class="lightbox-short-name-en">{image.shortName.en}</span>{/if}
@@ -91,7 +120,7 @@
         {/if}
         {#if watermark}<a class="lightbox-watermark" href={watermarkHref} aria-label="Back to gallery">{watermark}</a>{/if}
       </div>
-      <button class="lightbox-nav next" type="button" aria-label="Next image" disabled={!hasNext} onclick={() => onnavigate(1)}><Icon name="chevron-right" /></button>
+      <button class="lightbox-nav next" type="button" aria-label="Next image" disabled={!nextImage} onclick={() => onnavigate(1)}><Icon name="chevron-right" /></button>
       <nav class="lightbox-actions" aria-label="Image actions">
         <button type="button" onclick={oninfo}><Icon name="info" /> <span>Information</span></button>
         <button class:is-favorite={favorite} type="button" aria-pressed={favorite} onclick={onfavorite}><Icon name="favorite" /> <span>{favorite ? "Remove favorite" : "Add favorite"}</span></button>

@@ -89,6 +89,7 @@ if (
 const requestedBaseUrl = positionalArguments[0];
 const galleryRoot = path.resolve(process.env.GALLERY_DIR ?? "gallery");
 const previewCacheRoot = path.resolve(process.env.PREVIEW_CACHE_DIR ?? ".cache/previews");
+const previewCacheProfile = "v2-600-q86";
 const nameGenerationDefinitionsRoot = path.resolve("name-generation-schemas");
 const metadataDefinitionsRoot = path.resolve("metadata-schemas");
 let validatedNameDefinitions = new Map();
@@ -533,6 +534,8 @@ function generateNameForRecord(record, definitions, usedNames, usedShortNames) {
 
 function previewCacheKey(identifier, size, modifiedAt) {
   return createHash("sha256")
+    .update(previewCacheProfile)
+    .update("\0")
     .update(identifier)
     .update("\0")
     .update(String(size))

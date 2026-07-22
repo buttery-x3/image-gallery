@@ -3,7 +3,8 @@ import { access, mkdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
-const previewWidth = 300;
+export const imagePreviewProfile = "v2-600-q86";
+const previewWidth = 600;
 const maximumConcurrentPreviewGenerations = 2;
 const pendingPreviews = new Map<string, Promise<string>>();
 const previewGenerationWaiters: Array<() => void> = [];
@@ -24,6 +25,8 @@ async function withPreviewGenerationSlot<T>(operation: () => Promise<T>): Promis
 
 function cacheKey(identifier: string, size: number, modifiedAt: number): string {
   return createHash("sha256")
+    .update(imagePreviewProfile)
+    .update("\0")
     .update(identifier)
     .update("\0")
     .update(String(size))
@@ -92,7 +95,7 @@ async function generatePreview(sourcePath: string, outputPath: string): Promise<
   try {
     await sharp(sourcePath, { animated: true })
       .resize({ width: previewWidth })
-      .webp({ quality: 78, effort: 4 })
+      .webp({ quality: 86, alphaQuality: 92, smartSubsample: true, effort: 5 })
       .toFile(temporaryPath);
     await rename(temporaryPath, outputPath);
     return outputPath;

@@ -118,9 +118,20 @@ Refresh the gallery page to see additions or removals. The application never mod
 
 Supported formats are JPEG, PNG, GIF, WebP, and AVIF. Hidden files, hidden directories, symbolic links, and other formats are ignored.
 
-GIF and PNG gallery tiles use automatically generated 300px-wide WebP previews. GIF previews remain animated,
+GIF and PNG gallery tiles use automatically generated 600px-wide high-quality WebP previews. GIF previews remain animated,
 and WebP preserves PNG transparency. The previews are cached in `PREVIEW_CACHE_DIR`; the original file is served
 unchanged when its tile is opened or its link is copied.
+
+After an upgrade changes the preview profile, stop the service and rebuild the derived cache, then restart it:
+
+```sh
+sudo systemctl stop image-gallery
+sudo -u image-gallery npm run rebuild-previews
+sudo -u image-gallery npm run rebuild-previews -- --apply
+sudo systemctl start image-gallery
+```
+
+The first rebuild command is a dry run. Applying it removes only `PREVIEW_CACHE_DIR` and recreates previews from unchanged gallery media.
 
 For regular uploads, place the new images and any same-name JSON sidecars directly in `/srv/image-gallery/images`, then run:
 

@@ -84,7 +84,16 @@ The included configuration labels `anime_waifu_lite/v1` as **Waifus** and `anime
 
 When configured short-name representations are requested, generated names also receive a `<long-name>.gallery-name.json` sidecar using the `image-gallery/name/v2` schema. It records the source metadata schema, generator schema, and whichever of `en` and `ja` were requested. Legacy `image-gallery/name/v1` sidecars remain readable. When `showNames` is enabled, available names appear in tiles and lightbox overlays; if the selected language is absent, the gallery falls back to the other representation and then the filename. Generated names become searchable when `searchMetadata` is enabled.
 
-GIF and PNG tiles use automatically generated 300px-wide lossy WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. Previews are created on first view and cached outside the gallery; the original file is still used in the lightbox and by the desktop Copy image/Copy link controls.
+GIF and PNG tiles use automatically generated 600px-wide, high-quality WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. Previews are created on first view and cached outside the gallery; the lightbox displays the cached preview immediately while loading the original. It also preloads the adjacent originals. Copy image and Copy link continue to use the original media.
+
+After upgrading an installation that has older previews, stop the gallery service and rebuild the derived preview cache directly from the unchanged source media:
+
+```sh
+npm run rebuild-previews
+npm run rebuild-previews -- --apply
+```
+
+The first command is a dry run. The second removes only `PREVIEW_CACHE_DIR` and regenerates every PNG/GIF preview; it does not modify anything in `GALLERY_DIR`. Restart the service afterward. The preview profile is included in browser-facing URLs so previously cached low-resolution responses are not reused.
 
 To organize every root-level image into a timestamped batch and cache only that batch's missing previews, run this while the server is running:
 
@@ -161,6 +170,7 @@ The command does not prompt. It validates the URL and gallery path, then removes
 | `npm run process-new-schema` | Scaffold, validate, and optionally enable a declarative metadata schema |
 | `npm run process-new-name-schema` | Validate, preview, and optionally attach a declarative name generator |
 | `npm run clear-generated-artifacts` | Dry-run removal of generated-name sidecars and preview cache; add `-- --apply` to confirm interactively |
+| `npm run rebuild-previews` | Dry-run regeneration of all PNG/GIF previews; add `-- --apply` to replace the derived cache |
 | `npm run clear-gallery` | Dry-run permanent removal of all gallery content and preview cache; add `-- --apply` to confirm interactively |
 | `bash ./remove-image.sh '<url>'` | Permanently remove an image, its sidecars, and generated preview |
 | `npm run scan-for-duplicates` / `bash ./scan-for-duplicates.sh` | SHA-256 scan all batched images and report exact duplicates |

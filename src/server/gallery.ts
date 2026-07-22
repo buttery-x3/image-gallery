@@ -2,7 +2,7 @@ import { lstat, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { GalleryImage, ImageDetailsResponse, ImageKind } from "../shared/types.js";
 import { readImageMetadataResult, readImageNameMetadata } from "./metadata.js";
-import { imagePreviewIsCached } from "./previews.js";
+import { imagePreviewIsCached, imagePreviewProfile } from "./previews.js";
 import { ImageDimensionCache } from "./dimensions.js";
 
 const supportedExtensions = new Map<string, ImageKind>([
@@ -86,7 +86,7 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
       const dimensions = await dimensionCache?.dimensions(absolutePath, relativePath, stats.size, stats.mtimeMs);
       const relativeDirectory = path.posix.dirname(relativePath);
       const previewUrl = type === "gif" || type === "png"
-        ? `previews/${toUrlPath(relativePath)}?v=${Math.trunc(stats.mtimeMs)}-${stats.size}`
+        ? `previews/${toUrlPath(relativePath)}?v=${Math.trunc(stats.mtimeMs)}-${stats.size}-${imagePreviewProfile}`
         : undefined;
       let metadata;
       let category;

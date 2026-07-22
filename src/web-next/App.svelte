@@ -104,6 +104,8 @@
   });
   const activeIndex = $derived(activePath ? filteredImages.findIndex((image) => image.path === activePath) : -1);
   const activeImage = $derived(activeIndex >= 0 ? filteredImages[activeIndex] : undefined);
+  const previousActiveImage = $derived(activeIndex > 0 ? filteredImages[activeIndex - 1] : undefined);
+  const nextActiveImage = $derived(activeIndex >= 0 && activeIndex < filteredImages.length - 1 ? filteredImages[activeIndex + 1] : undefined);
   const imageCountText = $derived(language === "ja"
     ? (filteredImages.length === images.length ? `${images.length}枚` : `${images.length}枚中${filteredImages.length}枚`)
     : (filteredImages.length === images.length
@@ -409,7 +411,7 @@
 </main>
 
 {#if activeImage}
-  <Lightbox image={activeImage} displayName={displayName(activeImage)} favorite={favorites.has(activeImage.path)} {showNames} {namePosition} {nameVisible} {watermark} watermarkHref={galleryPageHref()} {watermarkPosition} colors={colorsFor(activeImage)} hasPrevious={activeIndex > 0} hasNext={activeIndex < filteredImages.length - 1} onclose={() => { activePath = undefined; }} onnavigate={navigateLightbox} onfavorite={() => toggleFavorite(activeImage)} oninfo={() => void showDetails(activeImage)} onreport={reportingEnabled ? () => void reportImage(activeImage) : undefined} ontogglename={() => { nameVisible = !nameVisible; }} onposition={() => { namePosition = corners[(corners.indexOf(namePosition) + 1) % corners.length]!; }} onreturn={() => void returnToTile()} />
+  <Lightbox image={activeImage} previousImage={previousActiveImage} nextImage={nextActiveImage} displayName={displayName(activeImage)} favorite={favorites.has(activeImage.path)} {showNames} {namePosition} {nameVisible} {watermark} watermarkHref={galleryPageHref()} {watermarkPosition} colors={colorsFor(activeImage)} onclose={() => { activePath = undefined; }} onnavigate={navigateLightbox} onfavorite={() => toggleFavorite(activeImage)} oninfo={() => void showDetails(activeImage)} onreport={reportingEnabled ? () => void reportImage(activeImage) : undefined} ontogglename={() => { nameVisible = !nameVisible; }} onposition={() => { namePosition = corners[(corners.indexOf(namePosition) + 1) % corners.length]!; }} onreturn={() => void returnToTile()} />
 {/if}
 
 {#if slideshowImages}<Slideshow images={slideshowImages} {displayName} {showNames} {watermark} watermarkHref={galleryPageHref()} {watermarkPosition} {colorsFor} onclose={closeSlideshow} onreturn={(image) => void returnFromSlideshow(image)} />{/if}

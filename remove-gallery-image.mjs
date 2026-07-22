@@ -7,6 +7,7 @@ const supportedExtensions = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", "
 const previewExtensions = new Set([".png", ".gif"]);
 const galleryRoot = path.resolve(process.env.GALLERY_DIR ?? "gallery");
 const previewCacheRoot = path.resolve(process.env.PREVIEW_CACHE_DIR ?? ".cache/previews");
+const previewCacheProfile = "v2-600-q86";
 
 function fail(message) {
   throw new Error(message);
@@ -16,8 +17,10 @@ function relativeGalleryPath(absolutePath) {
   return path.relative(galleryRoot, absolutePath).split(path.sep).join("/");
 }
 
-function previewCacheKey(identifier, size, modifiedAt) {
-  return createHash("sha256")
+function previewCacheKey(identifier, size, modifiedAt, profile = previewCacheProfile) {
+  const hash = createHash("sha256");
+  if (profile) hash.update(profile).update("\0");
+  return hash
     .update(identifier)
     .update("\0")
     .update(String(size))
@@ -26,8 +29,8 @@ function previewCacheKey(identifier, size, modifiedAt) {
     .digest("hex");
 }
 
-function previewCachePath(identifier, size, modifiedAt) {
-  const key = previewCacheKey(identifier, size, modifiedAt);
+function previewCachePath(identifier, size, modifiedAt, profile = previewCacheProfile) {
+  const key = previewCacheKey(identifier, size, modifiedAt, profile);
   return path.join(previewCacheRoot, key.slice(0, 2), `${key}.webp`);
 }
 
@@ -140,6 +143,8 @@ async function main() {
   if (previewExtensions.has(extension)) {
     previewPaths.add(previewCachePath(path.posix.basename(relativePath), imageStats.size, imageStats.mtimeMs));
     previewPaths.add(previewCachePath(relativePath, imageStats.size, imageStats.mtimeMs));
+    previewPaths.add(previewCachePath(path.posix.basename(relativePath), imageStats.size, imageStats.mtimeMs, ""));
+    previewPaths.add(previewCachePath(relativePath, imageStats.size, imageStats.mtimeMs, ""));
   }
 
   // Remove the source first so it becomes unavailable even if later cleanup fails.
