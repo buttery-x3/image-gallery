@@ -1,5 +1,5 @@
 <script lang="ts">
-  type IconName = "copy-image" | "copy-link" | "favorite" | "info" | "menu" | "report" | "shuffle" | "slideshow";
+  type IconName = "copy-image" | "copy-link" | "favorite" | "info" | "menu" | "shuffle" | "slideshow";
   let { name }: { name: IconName } = $props();
 </script>
 
@@ -14,8 +14,6 @@
     <path d="M10 14a4 4 0 0 0 5.66 0l2.83-2.83a4 4 0 0 0-5.66-5.66l-1.42 1.42M14 10a4 4 0 0 0-5.66 0l-2.83 2.83a4 4 0 1 0 5.66 5.66l1.42-1.42" />
   {:else if name === "menu"}
     <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
-  {:else if name === "report"}
-    <path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5M12 17.25h.01" />
   {:else if name === "shuffle"}
     <path d="M16 3h5v5M21 3l-6.5 6.5a4 4 0 0 1-5.7 0L3 3.7M16 21h5v-5M21 21l-6.5-6.5a4 4 0 0 0-5.7 0L3 20.3" />
   {:else if name === "slideshow"}

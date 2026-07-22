@@ -12,6 +12,7 @@
   } from "./app/preferences";
   import { copyImage, copyText } from "./app/services/clipboard";
   import { appearanceStorageKey, loadAppearance, resetAppearance, saveAppearance } from "./app/storage";
+  import { overlayColors, type OverlayColors } from "./app/overlay-colors";
 
   type Language = "en" | "ja";
   type Theme = "editorial" | "glass" | "studio" | "classic" | "daylight" | "neon" | "accessible";
@@ -151,6 +152,10 @@
     if (!showNames) return image.displayName;
     const shortName = image.shortName ?? indexByPath.get(image.path)?.shortName;
     return (language === "ja" ? shortName?.ja ?? shortName?.en : shortName?.en ?? shortName?.ja) ?? image.displayName;
+  }
+
+  function colorsFor(image: GalleryImage): OverlayColors {
+    return overlayColors(image, indexByPath.get(image.path)?.tags);
   }
 
   function notify(message: string): void {
@@ -367,10 +372,10 @@
 </main>
 
 {#if activeImage}
-  <Lightbox image={activeImage} displayName={displayName(activeImage)} favorite={favorites.has(activeImage.path)} {showNames} {namePosition} {nameVisible} {watermark} {watermarkPosition} hasPrevious={activeIndex > 0} hasNext={activeIndex < filteredImages.length - 1} onclose={() => { activePath = undefined; }} onnavigate={navigateLightbox} onfavorite={() => toggleFavorite(activeImage)} oninfo={() => void showDetails(activeImage)} onreport={reportingEnabled ? () => void reportImage(activeImage) : undefined} ontogglename={() => { nameVisible = !nameVisible; }} onposition={() => { namePosition = corners[(corners.indexOf(namePosition) + 1) % corners.length]!; }} onreturn={() => void returnToTile()} />
+  <Lightbox image={activeImage} displayName={displayName(activeImage)} favorite={favorites.has(activeImage.path)} {showNames} {namePosition} {nameVisible} {watermark} {watermarkPosition} colors={colorsFor(activeImage)} hasPrevious={activeIndex > 0} hasNext={activeIndex < filteredImages.length - 1} onclose={() => { activePath = undefined; }} onnavigate={navigateLightbox} onfavorite={() => toggleFavorite(activeImage)} oninfo={() => void showDetails(activeImage)} onreport={reportingEnabled ? () => void reportImage(activeImage) : undefined} ontogglename={() => { nameVisible = !nameVisible; }} onposition={() => { namePosition = corners[(corners.indexOf(namePosition) + 1) % corners.length]!; }} onreturn={() => void returnToTile()} />
 {/if}
 
-{#if slideshowImages}<Slideshow images={slideshowImages} {displayName} {showNames} {watermark} onclose={closeSlideshow} />{/if}
+{#if slideshowImages}<Slideshow images={slideshowImages} {displayName} {showNames} {watermark} {watermarkPosition} {colorsFor} onclose={closeSlideshow} />{/if}
 
 <dialog bind:this={appearanceDialog} class="settings-dialog" aria-labelledby="appearance-title">
   <form method="dialog"><header><h2 id="appearance-title">Gallery appearance</h2><button value="close" aria-label="Close">×</button></header>

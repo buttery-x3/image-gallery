@@ -36,7 +36,7 @@
       }
     }
   },
-  "enableReporting": false,
+  "enableReporting": true,
   "enableSupportEmbed": false,
   "showWatermark": true,
   "watermarkText": "waiaifu.lol",

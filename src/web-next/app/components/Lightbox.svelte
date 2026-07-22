@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import type { GalleryImage } from "../../../shared/types";
   import { absoluteMediaUrl } from "../api/gallery-api";
+  import type { OverlayColors } from "../overlay-colors";
+  import Icon from "./Icon.svelte";
 
   interface Props {
     image: GalleryImage;
@@ -12,6 +14,7 @@
     nameVisible: boolean;
     watermark?: string;
     watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+    colors: OverlayColors;
     hasPrevious: boolean;
     hasNext: boolean;
     onclose: () => void;
@@ -23,14 +26,28 @@
     onposition: () => void;
     onreturn: () => void;
   }
-  let { image, displayName, favorite, showNames, namePosition, nameVisible, watermark, watermarkPosition, hasPrevious, hasNext, onclose, onnavigate, onfavorite, oninfo, onreport, ontogglename, onposition, onreturn }: Props = $props();
+  let { image, displayName, favorite, showNames, namePosition, nameVisible, watermark, watermarkPosition, colors, hasPrevious, hasNext, onclose, onnavigate, onfavorite, oninfo, onreport, ontogglename, onposition, onreturn }: Props = $props();
   let dialog = $state<HTMLDialogElement>();
+  let imageElement = $state<HTMLImageElement>();
+  let englishNameSize = $state(40);
   let touchStart: { x: number; y: number; at: number } | undefined;
+  const oppositePositions = { "top-left": "bottom-right", "top-right": "bottom-left", "bottom-left": "top-right", "bottom-right": "top-left" } as const;
+  let effectiveWatermarkPosition = $derived(showNames ? oppositePositions[namePosition] : watermarkPosition);
 
   onMount(() => {
     dialog?.showModal();
     document.body.classList.add("lightbox-open");
-    return () => document.body.classList.remove("lightbox-open");
+    const syncNameScale = (): void => {
+      const imageWidth = imageElement?.getBoundingClientRect().width ?? 0;
+      if (imageWidth > 0) englishNameSize = Math.min(72, Math.max(22, imageWidth * .09));
+    };
+    const observer = new ResizeObserver(syncNameScale);
+    if (imageElement) observer.observe(imageElement);
+    syncNameScale();
+    return () => {
+      observer.disconnect();
+      document.body.classList.remove("lightbox-open");
+    };
   });
 
   function keydown(event: KeyboardEvent): void {
@@ -63,23 +80,25 @@
   <div class="lightbox-grid">
     <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!hasPrevious} onclick={() => onnavigate(-1)}>‹</button>
     <section class="lightbox-content">
-      <button class="lightbox-title" type="button" onclick={onreturn}>{displayName}</button>
-      <div class="lightbox-media" data-name-position={namePosition} data-watermark-position={watermarkPosition}>
-        <img src={absoluteMediaUrl(image)} alt={displayName} />
+      <div class="lightbox-heading">
+        <button class="lightbox-title" type="button" onclick={onreturn}>{displayName}</button>
+        {#if onreport}<button class="report-button lightbox-report" type="button" aria-label="Report image" title="Report image" onclick={onreport}>!</button>{/if}
+      </div>
+      <div class="lightbox-media" data-name-position={namePosition} data-watermark-position={effectiveWatermarkPosition} style={`--lightbox-name-fill:${colors.fill};--lightbox-name-outline:${colors.outline};--lightbox-name-en-size:${englishNameSize}px;--lightbox-name-ja-size:${englishNameSize / 2}px;`}>
+        <img bind:this={imageElement} src={absoluteMediaUrl(image)} alt={displayName} />
         {#if showNames && nameVisible && (image.shortName?.en || image.shortName?.ja)}
           <button class="lightbox-name-overlay" type="button" onclick={onreturn}>
-            {#if image.shortName?.en}<span>{image.shortName.en}</span>{/if}
-            {#if image.shortName?.ja}<small lang="ja">{image.shortName.ja}</small>{/if}
+            {#if image.shortName?.en}<span class="lightbox-short-name-en">{image.shortName.en}</span>{/if}
+            {#if image.shortName?.ja}<span class="lightbox-short-name-ja" lang="ja">{image.shortName.ja}</span>{/if}
           </button>
         {/if}
         {#if watermark}<button class="lightbox-watermark" type="button" onclick={onreturn}>{watermark}</button>{/if}
       </div>
       <nav class="lightbox-actions" aria-label="Image actions">
-        <button type="button" onclick={oninfo}>ⓘ <span>Information</span></button>
-        <button class:is-favorite={favorite} type="button" aria-pressed={favorite} onclick={onfavorite}>★ <span>{favorite ? "Remove favorite" : "Add favorite"}</span></button>
+        <button type="button" onclick={oninfo}><Icon name="info" /> <span>Information</span></button>
+        <button class:is-favorite={favorite} type="button" aria-pressed={favorite} onclick={onfavorite}><Icon name="favorite" /> <span>{favorite ? "Remove favorite" : "Add favorite"}</span></button>
         {#if showNames}<button type="button" aria-pressed={nameVisible} onclick={ontogglename}>Aa <span>{nameVisible ? "Hide name" : "Show name"}</span></button>{/if}
         {#if showNames}<button type="button" onclick={onposition}>⌖ <span>Move name</span></button>{/if}
-        {#if onreport}<button type="button" onclick={onreport}>! <span>Report</span></button>{/if}
       </nav>
     </section>
     <button class="lightbox-nav next" type="button" aria-label="Next image" disabled={!hasNext} onclick={() => onnavigate(1)}>›</button>
