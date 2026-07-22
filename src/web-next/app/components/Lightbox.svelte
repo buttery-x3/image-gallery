@@ -13,6 +13,7 @@
     namePosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
     nameVisible: boolean;
     watermark?: string;
+    watermarkHref: string;
     watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
     colors: OverlayColors;
     hasPrevious: boolean;
@@ -26,7 +27,7 @@
     onposition: () => void;
     onreturn: () => void;
   }
-  let { image, displayName, favorite, showNames, namePosition, nameVisible, watermark, watermarkPosition, colors, hasPrevious, hasNext, onclose, onnavigate, onfavorite, oninfo, onreport, ontogglename, onposition, onreturn }: Props = $props();
+  let { image, displayName, favorite, showNames, namePosition, nameVisible, watermark, watermarkHref, watermarkPosition, colors, hasPrevious, hasNext, onclose, onnavigate, onfavorite, oninfo, onreport, ontogglename, onposition, onreturn }: Props = $props();
   let dialog = $state<HTMLDialogElement>();
   let imageElement = $state<HTMLImageElement>();
   let englishNameSize = $state(40);
@@ -89,7 +90,7 @@
             {#if image.shortName?.ja}<span class="lightbox-short-name-ja" lang="ja">{image.shortName.ja}</span>{/if}
           </button>
         {/if}
-        {#if watermark}<button class="lightbox-watermark" type="button" onclick={onreturn}>{watermark}</button>{/if}
+        {#if watermark}<a class="lightbox-watermark" href={watermarkHref} aria-label="Back to gallery">{watermark}</a>{/if}
       </div>
       <nav class="lightbox-actions" aria-label="Image actions">
         <button type="button" onclick={oninfo}><Icon name="info" /> <span>Information</span></button>

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import type { GalleryImage, GalleryIndexItem, ImageDetailsResponse } from "../shared/types";
-  import { absoluteMediaUrl, applicationUrl, configureApplicationBase, loadGalleryIndex, loadImageDetails, loadImages } from "./app/api/gallery-api";
+  import { absoluteMediaUrl, applicationUrl, configureApplicationBase, galleryPageUrlFor, loadGalleryIndex, loadImageDetails, loadImages } from "./app/api/gallery-api";
   import Icon from "./app/components/Icon.svelte";
   import Lightbox from "./app/components/Lightbox.svelte";
   import Slideshow from "./app/components/Slideshow.svelte";
@@ -157,6 +157,10 @@
 
   function colorsFor(image: GalleryImage): OverlayColors {
     return overlayColors(image, indexByPath.get(image.path)?.tags);
+  }
+
+  function galleryPageHref(): string {
+    return galleryPageUrlFor(window.location.href).href;
   }
 
   function notify(message: string): void {
@@ -402,10 +406,10 @@
 </main>
 
 {#if activeImage}
-  <Lightbox image={activeImage} displayName={displayName(activeImage)} favorite={favorites.has(activeImage.path)} {showNames} {namePosition} {nameVisible} {watermark} {watermarkPosition} colors={colorsFor(activeImage)} hasPrevious={activeIndex > 0} hasNext={activeIndex < filteredImages.length - 1} onclose={() => { activePath = undefined; }} onnavigate={navigateLightbox} onfavorite={() => toggleFavorite(activeImage)} oninfo={() => void showDetails(activeImage)} onreport={reportingEnabled ? () => void reportImage(activeImage) : undefined} ontogglename={() => { nameVisible = !nameVisible; }} onposition={() => { namePosition = corners[(corners.indexOf(namePosition) + 1) % corners.length]!; }} onreturn={() => void returnToTile()} />
+  <Lightbox image={activeImage} displayName={displayName(activeImage)} favorite={favorites.has(activeImage.path)} {showNames} {namePosition} {nameVisible} {watermark} watermarkHref={galleryPageHref()} {watermarkPosition} colors={colorsFor(activeImage)} hasPrevious={activeIndex > 0} hasNext={activeIndex < filteredImages.length - 1} onclose={() => { activePath = undefined; }} onnavigate={navigateLightbox} onfavorite={() => toggleFavorite(activeImage)} oninfo={() => void showDetails(activeImage)} onreport={reportingEnabled ? () => void reportImage(activeImage) : undefined} ontogglename={() => { nameVisible = !nameVisible; }} onposition={() => { namePosition = corners[(corners.indexOf(namePosition) + 1) % corners.length]!; }} onreturn={() => void returnToTile()} />
 {/if}
 
-{#if slideshowImages}<Slideshow images={slideshowImages} {displayName} {showNames} {watermark} {watermarkPosition} {colorsFor} onclose={closeSlideshow} onreturn={(image) => void returnFromSlideshow(image)} />{/if}
+{#if slideshowImages}<Slideshow images={slideshowImages} {displayName} {showNames} {watermark} watermarkHref={galleryPageHref()} {watermarkPosition} {colorsFor} onclose={closeSlideshow} onreturn={(image) => void returnFromSlideshow(image)} />{/if}
 
 <dialog bind:this={appearanceDialog} class="settings-dialog" aria-labelledby="appearance-title">
   <form method="dialog"><header><h2 id="appearance-title">Gallery appearance</h2><button value="close" aria-label="Close">×</button></header>

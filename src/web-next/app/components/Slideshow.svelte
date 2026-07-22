@@ -9,12 +9,13 @@
     displayName: (image: GalleryImage) => string;
     showNames: boolean;
     watermark?: string;
+    watermarkHref: string;
     watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
     colorsFor: (image: GalleryImage) => OverlayColors;
     onclose: () => void;
     onreturn: (image: GalleryImage) => void;
   }
-  let { images, displayName, showNames, watermark, watermarkPosition, colorsFor, onclose, onreturn }: Props = $props();
+  let { images, displayName, showNames, watermark, watermarkHref, watermarkPosition, colorsFor, onclose, onreturn }: Props = $props();
   let dialog = $state<HTMLDialogElement>();
   let index = $state(0);
   let image = $derived(images[index]!);
@@ -56,6 +57,6 @@
         {#if image.shortName?.ja}<span class="slideshow-short-name-ja" lang="ja">{image.shortName.ja}</span>{/if}
       </button>
     {/if}
-    {#if watermark}<span class="slideshow-watermark">{watermark}</span>{/if}
+    {#if watermark}<a class="slideshow-watermark" href={watermarkHref} aria-label="Back to gallery">{watermark}</a>{/if}
   </figure>
 </dialog>

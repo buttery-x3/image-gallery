@@ -2,6 +2,16 @@ import type { ErrorResponse, GalleryImage, GalleryIndexItem, GalleryIndexRespons
 
 let applicationBaseUrl = new URL("./", typeof document === "undefined" ? "http://localhost/" : document.baseURI);
 
+export function galleryPageUrlFor(currentHref: string): URL {
+  const url = new URL(currentHref);
+  const segments = url.pathname.split("/").filter(Boolean);
+  if (segments.at(-1)?.toLocaleLowerCase() === "slideshow") segments.pop();
+  url.pathname = `/${segments.join("/")}${segments.length ? "/" : ""}`;
+  url.search = "";
+  url.hash = "";
+  return url;
+}
+
 export function applicationBaseFor(baseUri: string, routeSlugs: readonly string[]): URL {
   const url = new URL(baseUri);
   const segments = url.pathname.split("/").filter(Boolean);
