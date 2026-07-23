@@ -29,6 +29,7 @@
 
   const root = document.documentElement;
   const siteName = document.title;
+  const adminEntryRequested = new URL(window.location.href).searchParams.has("admin");
   const searchMetadata = root.dataset.gallerySearchMetadata === "true";
   const showTypeToggle = root.dataset.galleryTypeToggle === "true";
   const showLanguageToggle = root.dataset.galleryLanguageToggle === "true";
@@ -419,10 +420,12 @@
       if (event.key === favoritesKey) favorites = readStringSet(favoritesKey);
     };
     window.addEventListener("storage", handleStorage);
-    void loadAdminSession().then((session) => {
-      adminEnabled = session.enabled;
-      adminAuthenticated = session.authenticated;
-    }).catch(() => { /* Admin access is optional. */ });
+    if (adminEntryRequested) {
+      void loadAdminSession().then((session) => {
+        adminEnabled = session.enabled;
+        adminAuthenticated = session.authenticated;
+      }).catch(() => { /* Admin access is optional. */ });
+    }
     const supportControls = document.querySelector<HTMLElement>("#support-controls");
     const supportButton = document.querySelector<HTMLElement>("#support-button");
     const supportVisibilityToggle = document.querySelector<HTMLButtonElement>("#support-visibility-toggle");
@@ -563,7 +566,7 @@
     <p class="image-count" aria-live="polite">{loading ? copy[language].loading : imageCountText}</p>
     <button class="header-icon-button header-labeled-button disclaimer-button" type="button" aria-label={contentNotice.headerButtonLabel} title={contentNotice.headerButtonLabel} onclick={() => consentDialog?.showModal()}><Icon name="info" /><span class="header-button-label">{contentNotice.headerButtonLabel}</span></button>
     <button class="header-icon-button header-labeled-button" type="button" aria-label={copy[language].appearance} title={copy[language].appearance} onclick={() => appearanceDialog?.showModal()}><Icon name="palette" /><span class="header-button-label">{copy[language].appearance}</span></button>
-    {#if adminEnabled}
+    {#if adminEntryRequested && adminEnabled}
       <button class="header-labeled-button admin-button" class:is-active={adminAuthenticated} type="button" onclick={() => adminAuthenticated ? void endAdminSession() : adminDialog?.showModal()}>{adminAuthenticated ? "Log out" : "Admin"}</button>
     {/if}
     {#if showGitHubLink}<a class="header-icon-button github-link" href="https://github.com/buttery-x3/image-gallery" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" title="GitHub repository"><Icon name="github" /></a>{/if}
@@ -575,7 +578,7 @@
   {:else if loading}<section class="empty-state"><div class="spinner"></div><p>{copy[language].loading}</p></section>
   {:else if filteredImages.length === 0}<section class="empty-state"><p>{copy[language].empty}</p></section>
   {:else}
-    <VirtualGallery bind:this={galleryComponent} images={filteredImages} backgroundImages={images} {appearance} {favorites} {displayName} {showNames} {deletingPaths} onopen={openLightbox} onfavorite={toggleFavorite} oncopyimage={(image) => void performCopyImage(image)} oncopylink={(image) => void performCopyLink(image)} oninfo={(image) => void showDetails(image)} onreport={reportingEnabled ? (image) => void reportImage(image) : undefined} ondelete={adminAuthenticated ? (image) => void deleteImage(image) : undefined} />
+    <VirtualGallery bind:this={galleryComponent} images={filteredImages} backgroundImages={images} {appearance} {favorites} {displayName} {showNames} {deletingPaths} onopen={openLightbox} onfavorite={toggleFavorite} oncopyimage={(image) => void performCopyImage(image)} oncopylink={(image) => void performCopyLink(image)} oninfo={(image) => void showDetails(image)} onreport={reportingEnabled ? (image) => void reportImage(image) : undefined} ondelete={adminEntryRequested && adminAuthenticated ? (image) => void deleteImage(image) : undefined} />
   {/if}
 </main>
 
