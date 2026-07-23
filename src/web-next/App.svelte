@@ -24,6 +24,7 @@
   const showTypeToggle = root.dataset.galleryTypeToggle === "true";
   const showLanguageToggle = root.dataset.galleryLanguageToggle === "true";
   const showNames = root.dataset.galleryShowNames === "true";
+  const showGitHubLink = root.dataset.galleryGithubLink === "true";
   const reportingEnabled = root.dataset.galleryEnableReporting === "true";
   const watermark = root.dataset.galleryShowWatermark === "true" ? root.dataset.galleryWatermarkText : undefined;
   const watermarkPosition = (root.dataset.galleryWatermarkPosition ?? "bottom-right") as Corner;
@@ -456,11 +457,12 @@
         <label><input type="radio" name="name-language" value="ja" bind:group={language} onchange={() => setLanguage("ja")} /><span>JP</span></label>
       </fieldset>
     {/if}
-    {#if searchMetadata}<button class="header-icon-button advanced-button" class:is-active={Object.keys(activeFilters).length > 0} type="button" aria-label={copy[language].filters} title={copy[language].filters} onclick={() => { draftFilters = { ...activeFilters }; filterDialog?.showModal(); }}><Icon name="filter-list" />{#if Object.keys(activeFilters).length}<span class="control-badge">{Object.keys(activeFilters).length}</span>{/if}</button>{/if}
+    {#if searchMetadata}<button class="header-icon-button header-labeled-button advanced-button" class:is-active={Object.keys(activeFilters).length > 0} type="button" aria-label={copy[language].filters} title={copy[language].filters} onclick={() => { draftFilters = { ...activeFilters }; filterDialog?.showModal(); }}><Icon name="filter-list" /><span class="header-button-label">{copy[language].filters}</span>{#if Object.keys(activeFilters).length}<span class="control-badge">{Object.keys(activeFilters).length}</span>{/if}</button>{/if}
   </div>
   <div class="header-meta">
     <p class="image-count" aria-live="polite">{loading ? copy[language].loading : imageCountText}</p>
-    <button class="header-icon-button" type="button" aria-label={copy[language].appearance} title={copy[language].appearance} onclick={() => appearanceDialog?.showModal()}><Icon name="palette" /></button>
+    <button class="header-icon-button header-labeled-button" type="button" aria-label={copy[language].appearance} title={copy[language].appearance} onclick={() => appearanceDialog?.showModal()}><Icon name="palette" /><span class="header-button-label">{copy[language].appearance}</span></button>
+    {#if showGitHubLink}<a class="header-icon-button github-link" href="https://github.com/buttery-x3/image-gallery" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" title="GitHub repository"><Icon name="github" /></a>{/if}
   </div>
 </header>
 

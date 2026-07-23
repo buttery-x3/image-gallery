@@ -36,6 +36,7 @@
       }
     }
   },
+  "showGitHubLink": true,
   "enableReporting": true,
   "enableSupportEmbed": false,
   "showWatermark": true,

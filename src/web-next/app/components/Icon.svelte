@@ -1,5 +1,5 @@
 <script lang="ts">
-  type IconName = "chevron-left" | "chevron-right" | "close" | "copy-image" | "copy-link" | "favorite" | "filter-list" | "info" | "menu" | "palette" | "report" | "shuffle" | "slideshow";
+  type IconName = "chevron-left" | "chevron-right" | "close" | "copy-image" | "copy-link" | "favorite" | "filter-list" | "github" | "info" | "menu" | "palette" | "report" | "shuffle" | "slideshow";
   let { name }: { name: IconName } = $props();
 </script>
 
@@ -24,6 +24,8 @@
     <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
   {:else if name === "filter-list"}
     <path d="M4 6h16M4 12h11M4 18h7" /><circle cx="18" cy="12" r="1.5" /><circle cx="14" cy="18" r="1.5" />
+  {:else if name === "github"}
+    <path d="M15.5 21v-3.6c0-1 .1-1.5-.5-2 2.9-.3 6-1.4 6-6.5 0-1.4-.5-2.6-1.3-3.5.1-.3.6-1.7-.1-3.4 0 0-1.1-.3-3.6 1.3a12.4 12.4 0 0 0-6.5 0C7 1.7 5.9 2 5.9 2c-.7 1.7-.2 3.1-.1 3.4A5 5 0 0 0 4.5 9c0 5 3 6.1 5.9 6.5-.4.3-.7.8-.8 1.5-.7.3-2.6.9-3.7-1.1-.7-1.2-1.8-1.3-1.8-1.3-1.1 0-.1.7-.1.7.8.4 1.3 1.8 1.3 1.8.7 2 2.5 1.4 3.1 1.1V21" />
   {:else if name === "palette"}
     <path d="M12 3a9 9 0 1 0 0 18h1.2a2 2 0 0 0 1.5-3.3 1.6 1.6 0 0 1 1.2-2.7H18a3 3 0 0 0 3-3 9 9 0 0 0-9-9Z" /><circle cx="7.5" cy="10" r="1" fill="currentColor" stroke="none" /><circle cx="10" cy="6.8" r="1" fill="currentColor" stroke="none" /><circle cx="14.2" cy="6.6" r="1" fill="currentColor" stroke="none" /><circle cx="17" cy="9.5" r="1" fill="currentColor" stroke="none" />
   {:else if name === "shuffle"}

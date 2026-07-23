@@ -33,6 +33,7 @@ Edit [`gallery.config.json`](gallery.config.json) before building or starting th
 | `showTypeToggle` | `false` | Show the schema-driven gallery type selector when at least two configured types are present |
 | `showLanguageToggle` | `false` | Show the EN / JP interface-language control |
 | `showNames` | `false` | Show image names in tiles and the lightbox |
+| `showGitHubLink` | `false` | Show the `buttery-x3/image-gallery` GitHub button in the header |
 | `metadata.schemas` | configured per schema | Enables source schemas and optionally assigns a display type, category, and name generator |
 | `enableReporting` | `true` | Show controls for reporting an image as explicit content |
 | `enableSupportEmbed` | `false` | Allow a locally configured support/donation embed; an `.env` override and private HTML file can enable it for one deployment |

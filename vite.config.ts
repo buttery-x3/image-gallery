@@ -12,6 +12,7 @@ type GalleryConfig = {
   showTypeToggle: boolean;
   showLanguageToggle: boolean;
   showNames: boolean;
+  showGitHubLink: boolean;
   enableReporting: boolean;
   enableSupportEmbed: boolean;
   showWatermark: boolean;
@@ -40,6 +41,9 @@ function readGalleryConfig(): GalleryConfig {
   }
   if (record.showTypeToggle !== undefined && typeof record.showTypeToggle !== "boolean") {
     throw new Error("gallery.config.json showTypeToggle must be true or false when configured.");
+  }
+  if (record.showGitHubLink !== undefined && typeof record.showGitHubLink !== "boolean") {
+    throw new Error("gallery.config.json showGitHubLink must be true or false when configured.");
   }
   if (record.enableSupportEmbed !== undefined && typeof record.enableSupportEmbed !== "boolean") {
     throw new Error("gallery.config.json enableSupportEmbed must be true or false when configured.");
@@ -82,6 +86,7 @@ function readGalleryConfig(): GalleryConfig {
     showTypeToggle: record.showTypeToggle === true,
     showLanguageToggle: record.showLanguageToggle as boolean,
     showNames: record.showNames as boolean,
+    showGitHubLink: record.showGitHubLink === true,
     enableReporting: record.enableReporting as boolean,
     enableSupportEmbed: record.enableSupportEmbed === true,
     showWatermark: record.showWatermark as boolean,
@@ -179,6 +184,7 @@ function galleryHtml(
         .replace("__GALLERY_TYPE_LABELS__", escapeHtml(JSON.stringify(config.typeLabels)))
         .replace("__GALLERY_LANGUAGE_TOGGLE__", String(config.showLanguageToggle))
         .replace("__GALLERY_SHOW_NAMES__", String(config.showNames))
+        .replace("__GALLERY_GITHUB_LINK__", String(config.showGitHubLink))
         .replace("__GALLERY_ENABLE_REPORTING__", String(config.enableReporting))
         .replace("__GALLERY_SHOW_WATERMARK__", String(config.showWatermark))
         .replace("__GALLERY_WATERMARK_TEXT__", escapeHtml(config.watermarkText))

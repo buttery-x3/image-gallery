@@ -66,6 +66,9 @@ body.consent-pending > .support-card { visibility: hidden; }
 .advanced-button { white-space: nowrap; }
 .header-icon-button { position: relative; display: inline-grid; flex: 0 0 auto; width: 34px; padding: 0 !important; place-items: center; }
 .header-icon-button .icon { width: 18px; height: 18px; }
+.header-labeled-button { display:inline-flex; width:auto; padding-inline:8px !important; gap:6px; white-space:nowrap; }
+.github-link { min-height:34px; border:1px solid var(--line); border-radius:var(--control-radius); color:inherit; background:var(--control); text-decoration:none; }
+.github-link:hover { background:var(--control-hover); }
 .header-icon-button.is-active { border-color: var(--accent); color: var(--accent); background: var(--control-hover); }
 .favorites-button.is-active .icon { fill: currentColor; }
 .control-badge { position: absolute; top: -5px; right: -5px; display: grid; min-width: 16px; height: 16px; padding-inline: 4px; place-items: center; border-radius: 999px; color: var(--accent-ink); background: var(--accent); font-size: .62rem; font-weight: 800; }
@@ -86,6 +89,11 @@ body.consent-pending > .support-card { visibility: hidden; }
 .site-header button { min-height: 34px; padding: 5px 8px; font-size: .82rem; }
 .site-header select { height: 34px; padding: 4px 7px; font-size: .82rem; }
 .site-header .support-button-host { min-height: 34px; }
+
+@container gallery-app (max-width: 1650px) {
+  .header-labeled-button { display:inline-grid; width:34px; padding:0 !important; }
+  .header-button-label { display:none; }
+}
 
 @container gallery-app (max-width: 1500px) {
   .site-header { grid-template-areas: "title type meta" "controls controls controls"; grid-template-columns:auto minmax(0,1fr) auto; }
