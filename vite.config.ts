@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 
@@ -8,6 +9,7 @@ const fallbackDescription = "A simple private image gallery.";
 
 type GalleryConfig = {
   siteName: string;
+  siteDescription: string;
   searchMetadata: boolean;
   showTypeToggle: boolean;
   showLanguageToggle: boolean;
@@ -115,6 +117,9 @@ function readGalleryConfig(): GalleryConfig {
   const record = parsed as Record<string, unknown>;
   const siteName = typeof record.siteName === "string" ? record.siteName.trim() : "";
   if (!siteName) throw new Error("gallery.config.json siteName must be a non-empty string.");
+  const siteDescription = record.siteDescription === undefined
+    ? fallbackDescription
+    : requiredText(record, "siteDescription", "gallery.config.json");
   for (const key of ["searchMetadata", "showLanguageToggle", "showNames", "enableReporting", "showWatermark"] as const) {
     if (typeof record[key] !== "boolean") throw new Error(`gallery.config.json ${key} must be true or false.`);
   }
@@ -199,6 +204,7 @@ function readGalleryConfig(): GalleryConfig {
   }
   return {
     siteName,
+    siteDescription,
     searchMetadata: record.searchMetadata as boolean,
     showTypeToggle: record.showTypeToggle === true,
     showLanguageToggle: record.showLanguageToggle as boolean,
@@ -260,12 +266,26 @@ function publicSiteUrl(value: string | undefined): URL | undefined {
   return siteUrl;
 }
 
+function versionedPublicAsset(fileName: string): string {
+  const assetPath = path.resolve(process.cwd(), "src/web/public", fileName);
+  let contents: Buffer;
+  try {
+    contents = fs.readFileSync(assetPath);
+  } catch (error) {
+    throw new Error(`Could not read public asset ${assetPath}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const version = createHash("sha256").update(contents).digest("hex").slice(0, 12);
+  return `./${fileName}?v=${version}`;
+}
+
 function galleryHtml(
   title: string,
   description: string,
   siteUrl: URL | undefined,
   config: GalleryConfig,
   supportEmbed: string | undefined,
+  faviconUrl: string,
+  socialPreviewUrl: string,
 ): Plugin {
   return {
     name: "gallery-html-metadata",
@@ -282,14 +302,12 @@ function galleryHtml(
       ];
 
       if (siteUrl) {
-        const socialImageUrl = new URL("social-preview.png", siteUrl).href;
+        const socialImageUrl = new URL(socialPreviewUrl.replace(/^\.\//, ""), siteUrl).href;
         metadata.push(
           `<link rel="canonical" href="${escapeHtml(siteUrl.href)}" />`,
           `<meta property="og:url" content="${escapeHtml(siteUrl.href)}" />`,
           `<meta property="og:image" content="${escapeHtml(socialImageUrl)}" />`,
           '<meta property="og:image:type" content="image/png" />',
-          '<meta property="og:image:width" content="256" />',
-          '<meta property="og:image:height" content="256" />',
           `<meta property="og:image:alt" content="${escapeHtml(`${title} icon`)}" />`,
           `<meta name="twitter:image" content="${escapeHtml(socialImageUrl)}" />`,
           `<meta name="twitter:image:alt" content="${escapeHtml(`${title} icon`)}" />`,
@@ -298,6 +316,8 @@ function galleryHtml(
 
       return html
         .replaceAll("__GALLERY_TITLE__", escapeHtml(title))
+        .replaceAll("__GALLERY_FAVICON_URL__", escapeHtml(faviconUrl))
+        .replaceAll("__GALLERY_SOCIAL_PREVIEW_URL__", escapeHtml(socialPreviewUrl))
         .replace("__GALLERY_SEARCH_METADATA__", String(config.searchMetadata))
         .replace("__GALLERY_TYPE_TOGGLE__", String(config.showTypeToggle))
         .replace("__GALLERY_TYPE_LABELS__", escapeHtml(JSON.stringify(config.typeLabels)))
@@ -337,10 +357,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const config = readGalleryConfig();
   const title = config.siteName || fallbackTitle;
-  const description = env.GALLERY_DESCRIPTION?.trim() || fallbackDescription;
+  const description = config.siteDescription;
   const siteUrl = publicSiteUrl(env.SITE_URL);
   const supportEnabled = optionalBoolean(env.ENABLE_SUPPORT_EMBED, "ENABLE_SUPPORT_EMBED") ?? config.enableSupportEmbed;
   const supportEmbed = readSupportEmbed(supportEnabled, env.SUPPORT_EMBED_FILE);
+  const faviconUrl = versionedPublicAsset("favicon.ico");
+  const socialPreviewUrl = versionedPublicAsset("social-preview.png");
 
   const legacyFrontend = mode === "legacy";
   return {
@@ -349,7 +371,7 @@ export default defineConfig(({ mode }) => {
     base: "./",
     plugins: [
       ...(!legacyFrontend ? [svelte()] : []),
-      galleryHtml(title, description, siteUrl, config, supportEmbed),
+      galleryHtml(title, description, siteUrl, config, supportEmbed, faviconUrl, socialPreviewUrl),
     ],
     build: {
       outDir: legacyFrontend ? "../../dist/public-legacy" : "../../dist/public",

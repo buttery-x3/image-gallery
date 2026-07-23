@@ -29,6 +29,7 @@ Edit [`gallery.config.json`](gallery.config.json) before building or starting th
 | Setting | Default | Description |
 | --- | --- | --- |
 | `siteName` | `Image Gallery` | Page heading, browser title, and social-preview title |
+| `siteDescription` | `A simple private image gallery.` | Browser description and social-embed description |
 | `searchMetadata` | `false` | When enabled, search also indexes cached JSON metadata and generated names; otherwise it searches filenames only |
 | `showTypeToggle` | `false` | Show the schema-driven gallery type selector when at least two configured types are present |
 | `showLanguageToggle` | `false` | Show the EN / JP interface-language control |
@@ -45,7 +46,7 @@ Edit [`gallery.config.json`](gallery.config.json) before building or starting th
 
 Each configured `typeLabel` also provides a direct gallery path using its lowercase URL slug. For example, `Waifus` is available at `/waifus` and `Beastais` at `/beastais`. Opening one of these paths selects that type immediately; changing the type selector updates the path, and selecting **All** returns to the gallery root. Direct paths continue to work behind a stripped reverse-proxy prefix.
 
-The file is intentionally conservative for a fresh clone: metadata search, the language toggle, and image names are disabled. Set `showLanguageToggle` to `true` or `false` to control whether the EN/JP selector is shown. `defaultAppearance` controls the first-visit and Reset Appearance values; a visitor's valid browser-saved choices continue to take precedence until reset. Rebuild after changing browser-facing settings and restart the server after changing metadata schema policies. Runtime and deployment settings such as `GALLERY_DIR`, `PORT`, and SMTP credentials remain in `.env` or the service environment.
+The file is intentionally conservative for a fresh clone: metadata search, the language toggle, and image names are disabled. Set `showLanguageToggle` to `true` or `false` to control whether the EN/JP selector is shown. `defaultAppearance` controls the first-visit and Reset Appearance values; a visitor's valid browser-saved choices continue to take precedence until reset. Replace `src/web/public/favicon.ico` and `src/web/public/social-preview.png`, then rebuild; generated URLs include a content version so replacements are not served under the previous cache key. Rebuild after changing browser-facing settings and restart the server after changing metadata schema policies. Runtime and deployment settings such as `GALLERY_DIR` and `PORT` remain in `.env` or the service environment.
 
 The content notice is edited entirely in the `contentNotice` block. `title`, `buttonLabel`, `headerButtonLabel`, and `expansionLabel` are plain text. `headerButtonLabel` defaults to `Disclaimer` when omitted and labels the persistent header control that reopens the notice. `initialHtml` and `expansionHtml` accept either one HTML string or an array of HTML fragments, which makes paragraph-by-paragraph editing easier. These fields support trusted local HTML such as `<a href="...">`, `<strong>`, `<em>`, and lists. Because this markup is inserted without sanitizing it, do not populate it from visitor input or another untrusted source. Rebuild the web application after changing the notice.
 
@@ -71,7 +72,6 @@ The Svelte 5 interface in `src/web-next/` is the default development and product
 | `GALLERY_DIR` | `./gallery` | Directory scanned recursively for media |
 | `PREVIEW_CACHE_DIR` | `./.cache/previews` | Directory outside the gallery for generated WebP previews and GIF first-frame posters |
 | `DIMENSION_CACHE_PATH` | `./.cache/catalog-dimensions.json` | File outside the gallery that caches intrinsic media dimensions for masonry layout |
-| `GALLERY_DESCRIPTION` | `A simple private image gallery.` | Description used in browser and social metadata (applied at build time) |
 | `SITE_URL` | unset | Full public gallery URL used for canonical and absolute social-preview URLs (applied at build time) |
 | `ENABLE_SUPPORT_EMBED` | value from `gallery.config.json` | Optional `true`/`false` deployment override for the support embed (applied at build and runtime) |
 | `SUPPORT_EMBED_FILE` | `.private/support-embed.html` | Ignored, trusted HTML fragment inserted when the support embed is enabled (applied at build time) |

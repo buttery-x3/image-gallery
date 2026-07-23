@@ -1,5 +1,6 @@
 {
   "siteName": "test",
+  "siteDescription": "A simple private image gallery.",
   "searchMetadata": true,
   "showTypeToggle": true,
   "showLanguageToggle": true,
