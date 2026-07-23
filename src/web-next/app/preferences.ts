@@ -22,11 +22,11 @@ export interface GalleryAppearancePreferencesV1 {
 
 export const defaultAppearancePreferences: GalleryAppearancePreferencesV1 = {
   version: 1,
-  tileWidth: "standard",
-  tileRatio: "natural",
+  tileWidth: "compact",
+  tileRatio: "portrait",
   tileFit: "cover",
-  tileZoom: "off",
-  tileActions: "hover",
+  tileZoom: "moderate",
+  tileActions: "minimal",
   stickyHeader: false,
 };
 

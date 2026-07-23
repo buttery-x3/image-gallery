@@ -60,7 +60,7 @@
   let activeFilters = $state<Record<string, string>>({});
   let draftFilters = $state<Record<string, string>>({});
   let language = $state<Language>("en");
-  let theme = $state<Theme>("editorial");
+  let theme = $state<Theme>("classic");
   let appearance = $state<GalleryAppearancePreferencesV1>({ ...defaultAppearancePreferences });
   let activePath = $state<string>();
   let slideshowImages = $state<GalleryImage[]>();
@@ -309,7 +309,7 @@
     reported = readStringSet(reportedKey);
     language = localStorage.getItem(languageKey) === "ja" ? "ja" : "en";
     const storedTheme = localStorage.getItem(themeKey) as Theme | null;
-    theme = storedTheme && themes.includes(storedTheme) ? storedTheme : "editorial";
+    theme = storedTheme && themes.includes(storedTheme) ? storedTheme : "classic";
     root.dataset.theme = theme;
     root.lang = language;
     try {
@@ -492,7 +492,7 @@
       <label>Visual style<select aria-label="Visual style" value={theme} onchange={(event) => setTheme(event.currentTarget.value as Theme)}>{#each themes as value}<option {value}>{themeLabels[value]}</option>{/each}</select></label>
       <label class="settings-toggle"><input type="checkbox" checked={appearance.stickyHeader} onchange={(event) => updateAppearance("stickyHeader", event.currentTarget.checked)} /> Keep header visible while scrolling</label>
     </div>
-    <footer><button type="button" onclick={() => { appearance = resetAppearance(); setTheme("editorial"); }}>Reset appearance</button><button value="close">Done</button></footer>
+    <footer><button type="button" onclick={() => { appearance = resetAppearance(); setTheme("classic"); }}>Reset appearance</button><button value="close">Done</button></footer>
   </form>
 </dialog>
 

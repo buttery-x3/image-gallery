@@ -46,7 +46,7 @@ body.consent-pending > .support-card { visibility: hidden; }
   background: var(--header);
   backdrop-filter: var(--header-blur);
 }
-.site-header.header-sticky { position: sticky; top: 0; }
+.site-header.header-sticky { position:sticky; top:0; isolation:isolate; background:var(--surface); backdrop-filter:none; box-shadow:0 8px 18px rgba(0,0,0,.24); }
 .header-title { grid-area: title; display: flex; align-items: center; min-width: 0; gap: 8px; white-space: nowrap; }
 .header-title h1 { flex: 0 0 auto; margin: 0; overflow: visible; font-size: clamp(1rem, 2vw, 1.35rem); text-overflow: clip; white-space: nowrap; }
 .header-controls { grid-area: controls; display: flex; align-items: center; justify-content: center; min-width: 0; gap: 8px; }

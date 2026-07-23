@@ -25,7 +25,7 @@ The header uses CSS grid, flexbox, and container queries for its responsive rows
 
 ## Browser state
 
-Existing favorites, theme, language, consent, report, and overlay storage keys remain compatible. Appearance settings use the versioned `image-gallery:appearance:v1` key and are validated atomically before use. Malformed or unknown versions fall back to Standard + Natural defaults.
+Existing favorites, theme, language, consent, report, and overlay storage keys remain compatible. Appearance settings use the versioned `image-gallery:appearance:v1` key and are validated atomically before use. Malformed or unknown versions fall back to the Compact + Portrait defaults.
 
 ## Extension rules
 

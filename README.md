@@ -2,7 +2,7 @@
 
 A small, private, self-hosted image gallery. Copy images and GIFs into a folder, refresh the page, and they are displayed in a virtualized full-width masonry gallery. Search defaults to filenames; metadata search and filters can be enabled in `gallery.config.json`.
 
-Gallery media defaults to exactly 300px wide with its natural height. The Appearance control can select compact, large, or adaptive tiles; natural, square, portrait, or landscape ratios; crop or contain behavior for fixed ratios; optional hover zoom; and alternative tile-action layouts. These browser-local settings never alter source media. Clicking an image opens the original against a dark lightbox. The Slideshow button plays the currently filtered images in a randomized loop, changing every five seconds with a fade; press Escape or click the black margin to close it. Tile actions can copy either the image itself or its absolute direct public URL.
+Gallery media defaults to compact portrait tiles using cover crop, moderate hover zoom, minimal actions, and the Classic visual style. The Appearance control can select standard, large, or adaptive tiles; natural, square, portrait, or landscape ratios; crop or contain behavior for fixed ratios; optional hover zoom; and alternative tile-action layouts. These browser-local settings never alter source media. Clicking an image opens the original against a dark lightbox. The Slideshow button plays the currently filtered images in a randomized loop, changing every five seconds with a fade; press Escape or click the black margin to close it. Tile actions can copy either the image itself or its absolute direct public URL.
 
 ## Requirements
 

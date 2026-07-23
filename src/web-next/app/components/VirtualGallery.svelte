@@ -118,7 +118,8 @@
     const rect = layout.rects[index];
     if (!rect) return;
     const documentTop = host.getBoundingClientRect().top + window.scrollY;
-    window.scrollTo({ top: documentTop + rect.y, behavior: "smooth" });
+    const stickyHeaderHeight = document.querySelector<HTMLElement>(".site-header.header-sticky")?.getBoundingClientRect().height ?? 0;
+    window.scrollTo({ top: Math.max(0, documentTop + rect.y - stickyHeaderHeight - 12), behavior: "smooth" });
   }
 </script>
 

@@ -2,6 +2,18 @@ import { describe, expect, it } from "vitest";
 import { defaultAppearancePreferences, parseAppearancePreferences } from "./preferences";
 
 describe("appearance preferences", () => {
+  it("uses the compact portrait gallery defaults", () => {
+    expect(parseAppearancePreferences(null)).toEqual({
+      version: 1,
+      tileWidth: "compact",
+      tileRatio: "portrait",
+      tileFit: "cover",
+      tileZoom: "moderate",
+      tileActions: "minimal",
+      stickyHeader: false,
+    });
+  });
+
   it("accepts a complete v1 value", () => {
     const parsed = parseAppearancePreferences(JSON.stringify({
       version: 1, tileWidth: "large", tileRatio: "portrait", tileFit: "contain",
