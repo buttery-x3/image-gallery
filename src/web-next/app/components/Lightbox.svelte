@@ -31,35 +31,28 @@
   let dialog = $state<HTMLDialogElement>();
   let imageElement = $state<HTMLImageElement>();
   let englishNameSize = $state(40);
+  let previewRequestedPath = $state<string>();
+  let previewLoadedPath = $state<string>();
+  let originalRequestedPath = $state<string>();
   let loadedOriginalPath = $state<string>();
   let touchStart: { x: number; y: number; at: number } | undefined;
-  const originalPreloads = new Map<string, Promise<void>>();
   const oppositePositions = { "top-left": "bottom-right", "top-right": "bottom-left", "bottom-left": "top-right", "bottom-right": "top-left" } as const;
   let effectiveWatermarkPosition = $derived(showNames ? oppositePositions[namePosition] : watermarkPosition);
   let imageAspectRatio = $derived(image.width && image.height && image.width > 0 && image.height > 0 ? image.width / image.height : 1);
 
-  function preloadOriginal(candidate: GalleryImage | undefined): Promise<void> | undefined {
-    if (!candidate) return undefined;
-    const existing = originalPreloads.get(candidate.path);
-    if (existing) return existing;
-    const preload = new Image();
-    const ready = new Promise<void>((resolve) => {
-      const finish = async (): Promise<void> => {
-        try { await preload.decode(); } catch { /* The visible image can retry decoding if necessary. */ }
-        resolve();
-      };
-      preload.onload = () => { void finish(); };
-      preload.onerror = () => resolve();
-      preload.src = absoluteMediaUrl(candidate);
-    });
-    originalPreloads.set(candidate.path, ready);
-    return ready;
+  function requestPreviewOrOriginal(path: string): void {
+    if (path !== image.path) return;
+    if (image.previewUrl) previewRequestedPath = path;
+    else originalRequestedPath = path;
   }
 
   $effect(() => {
-    image.path;
-    void preloadOriginal(previousImage);
-    void preloadOriginal(nextImage);
+    const path = image.path;
+    previewRequestedPath = undefined;
+    previewLoadedPath = undefined;
+    originalRequestedPath = undefined;
+    loadedOriginalPath = undefined;
+    if (!image.posterUrl) requestPreviewOrOriginal(path);
   });
 
   onMount(() => {
@@ -116,10 +109,10 @@
     <section class="lightbox-content">
       <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!previousImage} onclick={() => onnavigate(-1)}><Icon name="chevron-left" /></button>
       <div class="lightbox-media" data-name-position={namePosition} data-watermark-position={effectiveWatermarkPosition} style={`--lightbox-name-fill:${colors.fill};--lightbox-name-outline:${colors.outline};--lightbox-name-en-size:${englishNameSize}px;--lightbox-name-ja-size:${englishNameSize / 2}px;`}>
-        <div class="lightbox-image-stack" class:has-preview={Boolean(image.previewUrl || image.posterUrl)} style={`--lightbox-image-aspect:${imageAspectRatio};`}>
-          {#if image.posterUrl}<img class="lightbox-poster" src={posterMediaUrl(image)} alt="" aria-hidden="true" width={image.width} height={image.height} />{/if}
-          {#if image.previewUrl}<img class="lightbox-preview" src={tileMediaUrl(image)} alt="" aria-hidden="true" width={image.width} height={image.height} />{/if}
-          <img bind:this={imageElement} class="lightbox-original" class:is-loaded={loadedOriginalPath === image.path} src={absoluteMediaUrl(image)} alt={displayName} width={image.width} height={image.height} onload={() => { loadedOriginalPath = image.path; }} />
+        <div class="lightbox-image-stack" style={`--lightbox-image-aspect:${imageAspectRatio};`}>
+          {#if image.posterUrl}<img class="lightbox-poster" src={posterMediaUrl(image)} alt="" aria-hidden="true" width={image.width} height={image.height} onload={() => requestPreviewOrOriginal(image.path)} onerror={() => requestPreviewOrOriginal(image.path)} />{/if}
+          {#if image.previewUrl}<img class="lightbox-preview" class:is-loaded={previewLoadedPath === image.path} src={previewRequestedPath === image.path ? tileMediaUrl(image) : undefined} alt="" aria-hidden="true" width={image.width} height={image.height} onload={() => { previewLoadedPath = image.path; originalRequestedPath = image.path; }} onerror={() => { originalRequestedPath = image.path; }} />{/if}
+          <img bind:this={imageElement} class="lightbox-original" class:is-loaded={loadedOriginalPath === image.path} src={originalRequestedPath === image.path ? absoluteMediaUrl(image) : undefined} alt={displayName} width={image.width} height={image.height} onload={() => { loadedOriginalPath = image.path; }} />
         </div>
         {#if showNames && nameVisible && image.metadataDisplay}
           <div class="lightbox-name-overlay">

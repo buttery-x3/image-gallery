@@ -55,7 +55,6 @@
   const reportedKey = "image-gallery:reported-images:v1";
   const languageKey = "image-gallery:name-language:v1";
   const themeKey = "image-gallery:theme:v1";
-  const consentKey = "image-gallery:content-consent:v1";
   const overlayKey = "image-gallery:overlay-preferences:v1";
   const supportHiddenKey = "image-gallery:support-hidden:v1";
   const supportSessionStartedKey = "image-gallery:support-session-started:v1";
@@ -413,8 +412,6 @@
       nameVisible = overlay.nameVisible !== false;
       if (corners.includes(overlay.namePosition as Corner)) namePosition = overlay.namePosition as Corner;
     } catch { /* Defaults remain active. */ }
-    if (localStorage.getItem(consentKey) !== "agreed") consentDialog?.showModal();
-    else document.body.classList.remove("consent-pending");
     const handleStorage = (event: StorageEvent): void => {
       if (event.key === appearanceStorageKey) appearance = loadAppearance(window.localStorage, defaultAppearancePreferences);
       if (event.key === favoritesKey) favorites = readStringSet(favoritesKey);
@@ -628,13 +625,13 @@
   </form>
 </dialog>
 
-<dialog bind:this={consentDialog} class="consent-dialog" aria-labelledby="consent-title" aria-describedby="consent-message" oncancel={(event) => event.preventDefault()}>
+<dialog bind:this={consentDialog} class="consent-dialog" aria-labelledby="consent-title" aria-describedby="consent-message">
   <div class="consent-card">
     <h2 id="consent-title">{contentNotice.title}</h2>
     <div id="consent-message" class="consent-message">
       {@html contentNotice.initialHtml}
     </div>
-    <button class="consent-agree" type="button" onclick={() => { localStorage.setItem(consentKey, "agreed"); consentDialog?.close(); document.body.classList.remove("consent-pending"); }}>{contentNotice.buttonLabel}</button>
+    <button class="consent-agree" type="button" onclick={() => consentDialog?.close()}>{contentNotice.buttonLabel}</button>
     <details class="consent-more">
       <summary>{contentNotice.expansionLabel}</summary>
       <div class="consent-more-content">
