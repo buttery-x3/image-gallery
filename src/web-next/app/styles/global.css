@@ -110,6 +110,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .image-count { display: none; }
   .disclaimer-button { display:inline-grid; width:34px; padding:0 !important; }
   .disclaimer-button .header-button-label { display:none; }
+  .tile-report-button { display:none; }
 }
 @container gallery-app (max-width: 400px) {
   .search-field { min-width:100px; }
