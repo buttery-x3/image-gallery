@@ -249,7 +249,7 @@ body.lightbox-open, body.slideshow-open { overflow: hidden; }
 .consent-more { margin-top: 16px; color: var(--muted); }
 .consent-more summary { cursor: pointer; }
 .consent-more-content { padding-top: 12px; }
-.consent-more-content a { color: var(--text); }
+.consent-message a, .consent-more-content a { color: var(--text); }
 .toast { position: fixed; z-index: 100; right: 16px; bottom: 16px; max-width: min(380px, calc(100vw - 32px)); padding: 11px 15px; border: 1px solid var(--line); border-radius: 9px; color: inherit; background: var(--surface-raised); box-shadow: 0 8px 30px rgba(0,0,0,.35); }
 .support-card { display: none; margin: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); background: var(--surface); text-align: center; }
 .support-card .support-controls { margin-top:10px; }

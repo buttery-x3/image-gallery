@@ -37,6 +37,7 @@ Edit [`gallery.config.json`](gallery.config.json) before building or starting th
 | `metadata.schemas` | configured per schema | Enables source schemas and optionally assigns a display type, category, and name generator |
 | `enableReporting` | `true` | Show controls for reporting an image as explicit content |
 | `enableSupportEmbed` | `false` | Allow a locally configured support/donation embed; an `.env` override and private HTML file can enable it for one deployment |
+| `contentNotice` | built-in notice | Notice title, initial HTML, agreement-button label, expansion label, and expanded HTML |
 | `showWatermark` | `true` | Show the watermark in the lightbox |
 | `watermarkText` | `waiaifu.lol` | Text shown in the lightbox watermark |
 | `watermarkPosition` | `bottom-right` | Watermark corner: `top-left`, `top-right`, `bottom-left`, or `bottom-right` |
@@ -44,6 +45,8 @@ Edit [`gallery.config.json`](gallery.config.json) before building or starting th
 Each configured `typeLabel` also provides a direct gallery path using its lowercase URL slug. For example, `Waifus` is available at `/waifus` and `Beastais` at `/beastais`. Opening one of these paths selects that type immediately; changing the type selector updates the path, and selecting **All** returns to the gallery root. Direct paths continue to work behind a stripped reverse-proxy prefix.
 
 The file is intentionally conservative for a fresh clone: metadata search, the language toggle, and image names are disabled. Rebuild after changing browser-facing settings and restart the server after changing metadata schema policies. Runtime and deployment settings such as `GALLERY_DIR`, `PORT`, and SMTP credentials remain in `.env` or the service environment.
+
+The content notice is edited entirely in the `contentNotice` block. `title`, `buttonLabel`, and `expansionLabel` are plain text. `initialHtml` and `expansionHtml` accept either one HTML string or an array of HTML fragments, which makes paragraph-by-paragraph editing easier. These fields support trusted local HTML such as `<a href="...">`, `<strong>`, `<em>`, and lists. Because this markup is inserted without sanitizing it, do not populate it from visitor input or another untrusted source. Rebuild the web application after changing the notice.
 
 Support embeds are also private and disabled for fresh clones. To enable one deployment without committing account-specific markup, set `ENABLE_SUPPORT_EMBED=true`, keep the fragment at `.private/support-embed.html`, and rebuild. The fragment is inserted into the existing responsive header/card placement and may contain trusted third-party embed markup. It appears after ten minutes in the current browser tab; visitors can permanently hide it in that browser and restore it from the remaining coffee control. If it loads scripts from another origin, list each origin in `SUPPORT_SCRIPT_ORIGINS` so the server can add it to the Content Security Policy. The entire `.private/` directory is ignored by Git; the build fails if support is enabled but its fragment is missing or empty.
 

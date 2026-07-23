@@ -52,6 +52,26 @@
   "showGitHubLink": true,
   "enableReporting": true,
   "enableSupportEmbed": false,
+  "contentNotice": {
+    "title": "Content notice",
+    "initialHtml": [
+      "<p>This website is intended not to show any sexually explicit content such as nudity.</p>",
+      "<p>Due to the AI generated content some images may bypass initial review.</p>",
+      "<p>This site is considered not safe for work despite not being explicit.</p>",
+      "<p>Ecchi is considered okay -- Porn is not intended.</p>",
+      "<p>Do you agree you will report any images using the red button which you find sexually explicit?</p>"
+    ],
+    "buttonLabel": "I agree",
+    "expansionLabel": "more information (disclaimer)",
+    "expansionHtml": [
+      "<p>The reason for this is to gain clearer understanding.</p>",
+      "<p>Sheared clothing exposing breasts is common in fashion shows for example as fully unrestricted and viewable by all ages.</p>",
+      "<p>The content on this site is similarly tasteful and artistic despite being AI generated as an artistic tool use.</p>",
+      "<p>Complaints and questions are welcomed via e-mail at <a href=\"mailto:admin@flamehorn.com\">admin@flamehorn.com</a>.</p>",
+      "<p>This site is produced under good faith as an artistic/personal endeavor.</p>",
+      "<p>I would also like to take this opportunity to pay my respects to the elders and traditional land owners of the Bunurong people on who's land this was thankfully developed.</p>"
+    ]
+  },
   "showWatermark": true,
   "watermarkText": "waiaifu.lol",
   "watermarkPosition": "bottom-right"

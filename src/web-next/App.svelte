@@ -17,6 +17,13 @@
   type Language = "en" | "ja";
   type Theme = "editorial" | "glass" | "studio" | "classic" | "daylight" | "neon" | "accessible";
   type Corner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  type ContentNotice = {
+    title: string;
+    initialHtml: string;
+    buttonLabel: string;
+    expansionLabel: string;
+    expansionHtml: string;
+  };
 
   const root = document.documentElement;
   const siteName = document.title;
@@ -28,6 +35,7 @@
   const reportingEnabled = root.dataset.galleryEnableReporting === "true";
   const watermark = root.dataset.galleryShowWatermark === "true" ? root.dataset.galleryWatermarkText : undefined;
   const watermarkPosition = (root.dataset.galleryWatermarkPosition ?? "bottom-right") as Corner;
+  const contentNotice = JSON.parse(root.dataset.galleryContentNotice ?? "{}") as ContentNotice;
   const typeLabels = new Map<string, string>(Object.entries(JSON.parse(root.dataset.galleryTypeLabels ?? "{}") as Record<string, string>));
   configureApplicationBase([...typeLabels.values()].map((label) => label.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")));
   const favoritesKey = "image-gallery:favorites:v1";
@@ -529,24 +537,15 @@
 
 <dialog bind:this={consentDialog} class="consent-dialog" aria-labelledby="consent-title" aria-describedby="consent-message" oncancel={(event) => event.preventDefault()}>
   <div class="consent-card">
-    <h2 id="consent-title">Content notice</h2>
+    <h2 id="consent-title">{contentNotice.title}</h2>
     <div id="consent-message" class="consent-message">
-      <p>This website is intended not to show any sexually explicit content such as nudity.</p>
-      <p>Due to the AI generated content some images may bypass initial review.</p>
-      <p>This site is considered not safe for work despite not being explicit.</p>
-      <p>Ecchi is considered okay -- Porn is not intended.</p>
-      <p>Do you agree you will report any images using the red button which you find sexually explicit?</p>
+      {@html contentNotice.initialHtml}
     </div>
-    <button class="consent-agree" type="button" onclick={() => { localStorage.setItem(consentKey, "agreed"); consentDialog?.close(); document.body.classList.remove("consent-pending"); }}>I agree</button>
+    <button class="consent-agree" type="button" onclick={() => { localStorage.setItem(consentKey, "agreed"); consentDialog?.close(); document.body.classList.remove("consent-pending"); }}>{contentNotice.buttonLabel}</button>
     <details class="consent-more">
-      <summary>more information (disclaimer)</summary>
+      <summary>{contentNotice.expansionLabel}</summary>
       <div class="consent-more-content">
-        <p>The reason for this is to gain clearer understanding.</p>
-        <p>Sheared clothing exposing breasts is common in fashion shows for example as fully unrestricted and viewable by all ages.</p>
-        <p>The content on this site is similarly tasteful and artistic despite being AI generated as an artistic tool use.</p>
-        <p>Complaints and questions are welcomed via e-mail at <a href="mailto:admin@flamehorn.com">admin@flamehorn.com</a>.</p>
-        <p>This site is produced under good faith as an artistic/personal endeavor.</p>
-        <p>I would also like to take this opportunity to pay my respects to the elders and traditional land owners of the Bunurong people on who's land this was thankfully developed.</p>
+        {@html contentNotice.expansionHtml}
       </div>
     </details>
   </div>

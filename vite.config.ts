@@ -18,9 +18,54 @@ type GalleryConfig = {
   showWatermark: boolean;
   watermarkText: string;
   watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  contentNotice: {
+    title: string;
+    initialHtml: string;
+    buttonLabel: string;
+    expansionLabel: string;
+    expansionHtml: string;
+  };
   metadata?: { schemas?: Record<string, unknown> };
   typeLabels: Record<string, string>;
 };
+
+const defaultContentNotice: GalleryConfig["contentNotice"] = {
+  title: "Content notice",
+  initialHtml: [
+    "<p>This website is intended not to show any sexually explicit content such as nudity.</p>",
+    "<p>Due to the AI generated content some images may bypass initial review.</p>",
+    "<p>This site is considered not safe for work despite not being explicit.</p>",
+    "<p>Ecchi is considered okay -- Porn is not intended.</p>",
+    "<p>Do you agree you will report any images using the red button which you find sexually explicit?</p>",
+  ].join("\n"),
+  buttonLabel: "I agree",
+  expansionLabel: "more information (disclaimer)",
+  expansionHtml: [
+    "<p>The reason for this is to gain clearer understanding.</p>",
+    "<p>Sheared clothing exposing breasts is common in fashion shows for example as fully unrestricted and viewable by all ages.</p>",
+    "<p>The content on this site is similarly tasteful and artistic despite being AI generated as an artistic tool use.</p>",
+    '<p>Complaints and questions are welcomed via e-mail at <a href="mailto:admin@flamehorn.com">admin@flamehorn.com</a>.</p>',
+    "<p>This site is produced under good faith as an artistic/personal endeavor.</p>",
+    "<p>I would also like to take this opportunity to pay my respects to the elders and traditional land owners of the Bunurong people on who's land this was thankfully developed.</p>",
+  ].join("\n"),
+};
+
+function requiredText(record: Record<string, unknown>, key: string, prefix: string): string {
+  const value = record[key];
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${prefix}.${key} must be a non-empty string.`);
+  }
+  return value.trim();
+}
+
+function requiredHtml(record: Record<string, unknown>, key: string, prefix: string): string {
+  const value = record[key];
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (Array.isArray(value) && value.length > 0 && value.every((fragment) => typeof fragment === "string" && fragment.trim())) {
+    return value.map((fragment) => fragment.trim()).join("\n");
+  }
+  throw new Error(`${prefix}.${key} must be non-empty HTML or an array of non-empty HTML fragments.`);
+}
 
 function readGalleryConfig(): GalleryConfig {
   const configPath = path.resolve(process.cwd(), "gallery.config.json");
@@ -53,6 +98,21 @@ function readGalleryConfig(): GalleryConfig {
   const watermarkPosition = record.watermarkPosition;
   if (!(["top-left", "top-right", "bottom-left", "bottom-right"] as const).includes(watermarkPosition as never)) {
     throw new Error("gallery.config.json watermarkPosition must be a corner name.");
+  }
+  let contentNotice = defaultContentNotice;
+  if (record.contentNotice !== undefined) {
+    if (!record.contentNotice || typeof record.contentNotice !== "object" || Array.isArray(record.contentNotice)) {
+      throw new Error("gallery.config.json contentNotice must be an object.");
+    }
+    const notice = record.contentNotice as Record<string, unknown>;
+    const prefix = "gallery.config.json contentNotice";
+    contentNotice = {
+      title: requiredText(notice, "title", prefix),
+      initialHtml: requiredHtml(notice, "initialHtml", prefix),
+      buttonLabel: requiredText(notice, "buttonLabel", prefix),
+      expansionLabel: requiredText(notice, "expansionLabel", prefix),
+      expansionHtml: requiredHtml(notice, "expansionHtml", prefix),
+    };
   }
   let metadata: GalleryConfig["metadata"];
   const typeLabels: Record<string, string> = {};
@@ -92,6 +152,7 @@ function readGalleryConfig(): GalleryConfig {
     showWatermark: record.showWatermark as boolean,
     watermarkText,
     watermarkPosition: watermarkPosition as GalleryConfig["watermarkPosition"],
+    contentNotice,
     typeLabels,
     ...(metadata ? { metadata } : {}),
   };
@@ -189,6 +250,7 @@ function galleryHtml(
         .replace("__GALLERY_SHOW_WATERMARK__", String(config.showWatermark))
         .replace("__GALLERY_WATERMARK_TEXT__", escapeHtml(config.watermarkText))
         .replace("__GALLERY_WATERMARK_POSITION__", config.watermarkPosition)
+        .replace("__GALLERY_CONTENT_NOTICE__", escapeHtml(JSON.stringify(config.contentNotice)))
         .replace(
           "<!-- gallery-support-button -->",
           supportEmbed
