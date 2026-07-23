@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.web-next.json",
     "typecheck:next": "tsc --noEmit -p tsconfig.web-next.json && vite build --mode next",
     "test:web-next": "vitest run",
-    "test:metadata": "tsx --test src/server/metadata-definitions.test.ts src/server/metadata-name.test.ts src/server/dimensions.test.ts src/server/previews.test.ts",
+    "test:metadata": "tsx --test src/server/metadata-definitions.test.ts src/server/metadata-name.test.ts src/server/dimensions.test.ts src/server/previews.test.ts src/server/admin.test.ts",
     "test:name-generation": "node --test gallery-name-generator.test.mjs gallery-metadata-context.test.mjs",
     "test:batch": "node --test process-gallery-batch.test.mjs",
     "test:cleanup": "node --test clear-gallery-data.test.mjs",
@@ -37,6 +37,7 @@
     "start": "node dist/server/server/server.js"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "sharp": "^0.35.3"

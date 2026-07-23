@@ -20,9 +20,11 @@
     oncopylink: (image: GalleryImage) => void;
     oninfo: (image: GalleryImage) => void;
     onreport?: (image: GalleryImage) => void;
+    ondelete?: (image: GalleryImage) => void;
+    deletingPaths?: Set<string>;
   }
 
-  let { images, backgroundImages, appearance, favorites, displayName, showNames, onopen, onfavorite, oncopyimage, oncopylink, oninfo, onreport }: Props = $props();
+  let { images, backgroundImages, appearance, favorites, displayName, showNames, onopen, onfavorite, oncopyimage, oncopylink, oninfo, onreport, ondelete, deletingPaths = new Set() }: Props = $props();
   let host = $state<HTMLElement>();
   let hostWidth = $state(1);
   let viewportTop = $state(0);
@@ -151,6 +153,8 @@
       oncopylink={() => oncopylink(image)}
       oninfo={() => oninfo(image)}
       onreport={onreport ? () => onreport(image) : undefined}
+      ondelete={ondelete ? () => ondelete(image) : undefined}
+      deleting={deletingPaths.has(image.path)}
     />
   {/each}
 </section>

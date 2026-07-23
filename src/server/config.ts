@@ -219,6 +219,10 @@ function supportScriptOrigins(value: string | undefined): string[] {
 
 const supportEmbedEnabled = optionalBoolean(process.env.ENABLE_SUPPORT_EMBED, "ENABLE_SUPPORT_EMBED")
   ?? runtimeConfig.supportEmbedEnabled;
+const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH?.trim();
+if (adminPasswordHash && !adminPasswordHash.startsWith("$argon2id$")) {
+  throw new Error("ADMIN_PASSWORD_HASH must be an Argon2id encoded hash.");
+}
 
 export const config = {
   galleryDir,
@@ -234,4 +238,5 @@ export const config = {
   reportingEnabled: runtimeConfig.reportingEnabled,
   supportEmbedEnabled,
   supportScriptOrigins: supportEmbedEnabled ? supportScriptOrigins(process.env.SUPPORT_SCRIPT_ORIGINS) : [],
+  adminPasswordHash,
 };

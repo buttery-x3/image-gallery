@@ -1,4 +1,4 @@
-import type { ErrorResponse, GalleryImage, GalleryIndexItem, GalleryIndexResponse, GalleryResponse, ImageDetailsResponse } from "../../../shared/types";
+import type { AdminDeleteResponse, AdminSessionResponse, ErrorResponse, GalleryImage, GalleryIndexItem, GalleryIndexResponse, GalleryResponse, ImageDetailsResponse } from "../../../shared/types";
 
 let applicationBaseUrl = new URL("./", typeof document === "undefined" ? "http://localhost/" : document.baseURI);
 
@@ -31,8 +31,8 @@ export function applicationUrl(relativeUrl: string): URL {
   return new URL(relativeUrl, applicationBaseUrl);
 }
 
-async function jsonRequest<T>(relativeUrl: string): Promise<T> {
-  const response = await fetch(applicationUrl(relativeUrl));
+async function jsonRequest<T>(relativeUrl: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(applicationUrl(relativeUrl), init);
   const payload = await response.json() as T | ErrorResponse;
   if (!response.ok || (payload && typeof payload === "object" && "error" in payload)) {
     throw new Error("error" in (payload as ErrorResponse) ? (payload as ErrorResponse).error : `Request failed (${response.status})`);
@@ -53,6 +53,30 @@ export function loadImageDetails(path: string): Promise<ImageDetailsResponse> {
   const url = applicationUrl("api/image-details");
   url.searchParams.set("path", path);
   return jsonRequest<ImageDetailsResponse>(url.href);
+}
+
+export function loadAdminSession(): Promise<AdminSessionResponse> {
+  return jsonRequest<AdminSessionResponse>("api/admin/session", { cache: "no-store" });
+}
+
+export function loginAdmin(password: string): Promise<AdminSessionResponse> {
+  return jsonRequest<AdminSessionResponse>("api/admin/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+}
+
+export function logoutAdmin(): Promise<AdminSessionResponse> {
+  return jsonRequest<AdminSessionResponse>("api/admin/logout", { method: "POST" });
+}
+
+export function deleteAdminImage(imagePath: string): Promise<AdminDeleteResponse> {
+  return jsonRequest<AdminDeleteResponse>("api/admin/images", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imagePath }),
+  });
 }
 
 export function absoluteMediaUrl(image: GalleryImage): string {

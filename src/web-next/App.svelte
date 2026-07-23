@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import type { GalleryImage, GalleryIndexItem, ImageDetailsResponse } from "../shared/types";
-  import { absoluteMediaUrl, applicationUrl, configureApplicationBase, galleryPageUrlFor, loadGalleryIndex, loadImageDetails, loadImages } from "./app/api/gallery-api";
+  import { absoluteMediaUrl, applicationUrl, configureApplicationBase, deleteAdminImage, galleryPageUrlFor, loadAdminSession, loadGalleryIndex, loadImageDetails, loadImages, loginAdmin, logoutAdmin } from "./app/api/gallery-api";
   import Icon from "./app/components/Icon.svelte";
   import Lightbox from "./app/components/Lightbox.svelte";
   import Slideshow from "./app/components/Slideshow.svelte";
@@ -88,6 +88,12 @@
   let details = $state<ImageDetailsResponse>();
   let detailsImage = $state<GalleryImage>();
   let detailsLoading = $state(false);
+  let adminEnabled = $state(false);
+  let adminAuthenticated = $state(false);
+  let adminPassword = $state("");
+  let adminSubmitting = $state(false);
+  let adminError = $state("");
+  let deletingPaths = $state(new Set<string>());
   let nameVisible = $state(true);
   let namePosition = $state<Corner>("bottom-right");
   let toast = $state("");
@@ -95,6 +101,7 @@
   let appearanceDialog = $state<HTMLDialogElement>();
   let filterDialog = $state<HTMLDialogElement>();
   let detailsDialog = $state<HTMLDialogElement>();
+  let adminDialog = $state<HTMLDialogElement>();
   let consentDialog = $state<HTMLDialogElement>();
   let galleryComponent = $state<VirtualGallery>();
 
@@ -290,6 +297,51 @@
     if (path) await scrollGalleryToPath(path);
   }
 
+  async function submitAdminLogin(): Promise<void> {
+    adminSubmitting = true;
+    adminError = "";
+    try {
+      const session = await loginAdmin(adminPassword);
+      adminAuthenticated = session.authenticated;
+      adminPassword = "";
+      adminDialog?.close();
+      notify("Admin mode enabled");
+    } catch (reason) {
+      adminError = reason instanceof Error ? reason.message : "Admin login failed.";
+    } finally {
+      adminSubmitting = false;
+    }
+  }
+
+  async function endAdminSession(): Promise<void> {
+    try {
+      await logoutAdmin();
+      adminAuthenticated = false;
+      notify("Admin mode disabled");
+    } catch { notify("Could not log out"); }
+  }
+
+  async function deleteImage(image: GalleryImage): Promise<void> {
+    if (deletingPaths.has(image.path)) return;
+    deletingPaths = new Set([...deletingPaths, image.path]);
+    try {
+      await deleteAdminImage(image.path);
+      images = images.filter((candidate) => candidate.path !== image.path);
+      const nextIndex = new Map(indexByPath);
+      nextIndex.delete(image.path);
+      indexByPath = nextIndex;
+      if (activePath === image.path) activePath = undefined;
+      notify("Image deleted");
+    } catch (reason) {
+      if (reason instanceof Error && reason.message === "Admin login required.") adminAuthenticated = false;
+      notify(reason instanceof Error ? reason.message : "The image could not be deleted");
+    } finally {
+      const next = new Set(deletingPaths);
+      next.delete(image.path);
+      deletingPaths = next;
+    }
+  }
+
   function resetSiteAppearance(): void {
     appearance = resetAppearance(window.localStorage, defaultAppearancePreferences);
     localStorage.removeItem(themeKey);
@@ -367,6 +419,10 @@
       if (event.key === favoritesKey) favorites = readStringSet(favoritesKey);
     };
     window.addEventListener("storage", handleStorage);
+    void loadAdminSession().then((session) => {
+      adminEnabled = session.enabled;
+      adminAuthenticated = session.authenticated;
+    }).catch(() => { /* Admin access is optional. */ });
     const supportControls = document.querySelector<HTMLElement>("#support-controls");
     const supportButton = document.querySelector<HTMLElement>("#support-button");
     const supportVisibilityToggle = document.querySelector<HTMLButtonElement>("#support-visibility-toggle");
@@ -507,6 +563,9 @@
     <p class="image-count" aria-live="polite">{loading ? copy[language].loading : imageCountText}</p>
     <button class="header-icon-button header-labeled-button disclaimer-button" type="button" aria-label={contentNotice.headerButtonLabel} title={contentNotice.headerButtonLabel} onclick={() => consentDialog?.showModal()}><Icon name="info" /><span class="header-button-label">{contentNotice.headerButtonLabel}</span></button>
     <button class="header-icon-button header-labeled-button" type="button" aria-label={copy[language].appearance} title={copy[language].appearance} onclick={() => appearanceDialog?.showModal()}><Icon name="palette" /><span class="header-button-label">{copy[language].appearance}</span></button>
+    {#if adminEnabled}
+      <button class="header-labeled-button admin-button" class:is-active={adminAuthenticated} type="button" onclick={() => adminAuthenticated ? void endAdminSession() : adminDialog?.showModal()}>{adminAuthenticated ? "Log out" : "Admin"}</button>
+    {/if}
     {#if showGitHubLink}<a class="header-icon-button github-link" href="https://github.com/buttery-x3/image-gallery" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" title="GitHub repository"><Icon name="github" /></a>{/if}
   </div>
 </header>
@@ -516,7 +575,7 @@
   {:else if loading}<section class="empty-state"><div class="spinner"></div><p>{copy[language].loading}</p></section>
   {:else if filteredImages.length === 0}<section class="empty-state"><p>{copy[language].empty}</p></section>
   {:else}
-    <VirtualGallery bind:this={galleryComponent} images={filteredImages} backgroundImages={images} {appearance} {favorites} {displayName} {showNames} onopen={openLightbox} onfavorite={toggleFavorite} oncopyimage={(image) => void performCopyImage(image)} oncopylink={(image) => void performCopyLink(image)} oninfo={(image) => void showDetails(image)} onreport={reportingEnabled ? (image) => void reportImage(image) : undefined} />
+    <VirtualGallery bind:this={galleryComponent} images={filteredImages} backgroundImages={images} {appearance} {favorites} {displayName} {showNames} {deletingPaths} onopen={openLightbox} onfavorite={toggleFavorite} oncopyimage={(image) => void performCopyImage(image)} oncopylink={(image) => void performCopyLink(image)} oninfo={(image) => void showDetails(image)} onreport={reportingEnabled ? (image) => void reportImage(image) : undefined} ondelete={adminAuthenticated ? (image) => void deleteImage(image) : undefined} />
   {/if}
 </main>
 
@@ -552,6 +611,17 @@
   <form method="dialog"><header><h2 id="details-title">{copy[language].information}</h2><button value="close" aria-label="Close">×</button></header>
     <div class="metadata-content">{#if detailsLoading}<p>Loading…</p>{:else if detailsImage && details}<dl><dt>File</dt><dd>{detailsImage.name}</dd><dt>Path</dt><dd>{detailsImage.path}</dd><dt>Type</dt><dd>{detailsImage.type}</dd>{#if detailsImage.width && detailsImage.height}<dt>Dimensions</dt><dd>{detailsImage.width} × {detailsImage.height}</dd>{/if}{#if details.metadata?.schema}<dt>Schema</dt><dd>{details.metadata.schema}</dd>{/if}{#each Object.entries(details.metadata?.tags ?? {}) as [key, value]}<dt>{key.replaceAll("_", " ")}</dt><dd>{#if externalHttpUrl(value)}<a href={externalHttpUrl(value)} target="_blank" rel="noopener noreferrer">{value}</a>{:else}{value}{/if}</dd>{/each}{#each Object.entries(details.metadata?.facets ?? {}) as [key, values]}<dt>{key.replaceAll("_", " ")}</dt><dd>{values.join(", ")}</dd>{/each}{#if details.metadata?.resolvedPrompt}<dt>Resolved prompt</dt><dd>{details.metadata.resolvedPrompt}</dd>{/if}</dl>{:else}<p>No metadata is available.</p>{/if}</div>
     <footer><button value="close">Close</button></footer>
+  </form>
+</dialog>
+
+<dialog bind:this={adminDialog} class="settings-dialog admin-dialog" aria-labelledby="admin-title" onclick={(event) => { if (event.target === adminDialog) adminDialog?.close(); }}>
+  <form onsubmit={(event) => { event.preventDefault(); void submitAdminLogin(); }}>
+    <header><h2 id="admin-title">Admin login</h2><button type="button" aria-label="Close" onclick={() => adminDialog?.close()}>×</button></header>
+    <div class="admin-login-content">
+      <label>Password<input type="password" bind:value={adminPassword} autocomplete="current-password" required /></label>
+      {#if adminError}<p class="form-error" role="alert">{adminError}</p>{/if}
+    </div>
+    <footer><button type="submit" disabled={adminSubmitting}>{adminSubmitting ? "Logging in…" : "Log in"}</button></footer>
   </form>
 </dialog>
 

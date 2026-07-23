@@ -88,6 +88,15 @@ export interface ImageReportResponse {
   message: string;
 }
 
+export interface AdminSessionResponse {
+  enabled: boolean;
+  authenticated: boolean;
+}
+
+export interface AdminDeleteResponse {
+  deleted: string;
+}
+
 export interface ErrorResponse {
   error: string;
 }

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import express from "express";
+import { deleteGalleryImage, isAdmin, isSameOrigin, loginAdmin, logoutAdmin } from "./admin.js";
 import { config } from "./config.js";
 import { GalleryDirectoryError, imageKindFor, readGalleryImageDetails, readGalleryImages, resolveSafeMediaPath } from "./gallery.js";
 import { imagePosterPath, imagePreviewPath } from "./previews.js";
@@ -13,6 +14,7 @@ import type {
   GalleryIndexResponse,
   ImageReportRequest,
   ImageReportResponse,
+  AdminSessionResponse,
 } from "../shared/types.js";
 
 const app = express();
@@ -80,6 +82,70 @@ app.use((_request, response, next) => {
 });
 
 app.get("/healthz", (_request, response) => response.type("text/plain").send("ok"));
+
+app.get("/api/admin/session", (request, response) => {
+  response.setHeader("Cache-Control", "no-store");
+  response.json({
+    enabled: Boolean(config.adminPasswordHash),
+    authenticated: Boolean(config.adminPasswordHash) && isAdmin(request),
+  } satisfies AdminSessionResponse);
+});
+
+app.post("/api/admin/login", express.json({ limit: "2kb", type: "application/json" }), async (request, response) => {
+  response.setHeader("Cache-Control", "no-store");
+  if (!config.adminPasswordHash) {
+    return void response.status(404).json({ error: "Admin access is not configured." } satisfies ErrorResponse);
+  }
+  if (!isSameOrigin(request)) {
+    return void response.status(403).json({ error: "Admin requests must come from this gallery." } satisfies ErrorResponse);
+  }
+  const password = (request.body as { password?: unknown } | undefined)?.password;
+  if (typeof password !== "string" || password.length === 0 || password.length > 1_024) {
+    return void response.status(400).json({ error: "A valid password is required." } satisfies ErrorResponse);
+  }
+  try {
+    if (!await loginAdmin(request, response, config.adminPasswordHash, password)) {
+      return void response.status(401).json({ error: "Incorrect password." } satisfies ErrorResponse);
+    }
+    response.json({ enabled: true, authenticated: true } satisfies AdminSessionResponse);
+  } catch (error) {
+    console.error("Could not verify the admin password:", error);
+    response.status(500).json({ error: "Admin login is unavailable." } satisfies ErrorResponse);
+  }
+});
+
+app.post("/api/admin/logout", (request, response) => {
+  response.setHeader("Cache-Control", "no-store");
+  if (!isSameOrigin(request)) {
+    return void response.status(403).json({ error: "Admin requests must come from this gallery." } satisfies ErrorResponse);
+  }
+  logoutAdmin(request, response);
+  response.json({ enabled: Boolean(config.adminPasswordHash), authenticated: false } satisfies AdminSessionResponse);
+});
+
+app.delete("/api/admin/images", express.json({ limit: "4kb", type: "application/json" }), async (request, response) => {
+  response.setHeader("Cache-Control", "no-store");
+  if (!config.adminPasswordHash || !isAdmin(request)) {
+    return void response.status(401).json({ error: "Admin login required." } satisfies ErrorResponse);
+  }
+  if (!isSameOrigin(request)) {
+    return void response.status(403).json({ error: "Admin requests must come from this gallery." } satisfies ErrorResponse);
+  }
+  const imagePath = (request.body as { imagePath?: unknown } | undefined)?.imagePath;
+  if (typeof imagePath !== "string" || imagePath.length > 2_048) {
+    return void response.status(400).json({ error: "A valid image path is required." } satisfies ErrorResponse);
+  }
+  try {
+    if (!await deleteGalleryImage(config.galleryDir, imagePath)) {
+      return void response.status(404).json({ error: "The image could not be found." } satisfies ErrorResponse);
+    }
+    galleryCache.clear();
+    response.json({ deleted: imagePath });
+  } catch (error) {
+    console.error("Could not delete gallery image:", error);
+    response.status(500).json({ error: "The image could not be deleted." } satisfies ErrorResponse);
+  }
+});
 
 app.post("/api/reports", express.json({ limit: "4kb", type: "application/json" }), async (request, response) => {
   response.setHeader("Cache-Control", "no-store");

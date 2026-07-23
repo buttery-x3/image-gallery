@@ -22,9 +22,11 @@
     oncopylink: () => void;
     oninfo: () => void;
     onreport?: () => void;
+    ondelete?: () => void;
+    deleting?: boolean;
   }
 
-  let { image, rect, loadPriority, appearance, scheduler, favorite, displayName, showName, onopen, onfavorite, oncopyimage, oncopylink, oninfo, onreport }: Props = $props();
+  let { image, rect, loadPriority, appearance, scheduler, favorite, displayName, showName, onopen, onfavorite, oncopyimage, oncopylink, oninfo, onreport, ondelete, deleting = false }: Props = $props();
   let src = $state<string>();
   let animatedLoaded = $state(false);
   let posterLoaded = $state(false);
@@ -87,6 +89,7 @@
   </button>
   {#if onreport}<button class="tile-report-button" type="button" aria-label="Report image" title="Report image" onclick={onreport}>!</button>{/if}
   <div class="tile-actions" aria-label={`Actions for ${displayName}`}>
+    {#if ondelete}<button class="tile-delete-action" type="button" disabled={deleting} aria-label={`Delete ${displayName}`} title="Delete image" onclick={ondelete}>{deleting ? "…" : "×"}</button>{/if}
     <button class:is-favorite={favorite} type="button" aria-pressed={favorite} aria-label={favorite ? "Remove favorite" : "Add favorite"} title={favorite ? "Remove favorite" : "Add favorite"} onclick={onfavorite}><Icon name="favorite" /></button>
     <button type="button" aria-label="Image information" title="Image information" onclick={oninfo}><Icon name="info" /></button>
     <button class="secondary-action" type="button" aria-label="Copy image" title="Copy image" onclick={oncopyimage}><Icon name="copy-image" /></button>

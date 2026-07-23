@@ -145,6 +145,8 @@ main { padding: 16px clamp(8px, 2vw, 24px) 40px; }
 .tile-actions button { display: grid; width: 34px; min-height: 34px; padding: 0; place-items: center; border-color: rgba(255,255,255,.25); border-radius: 50%; color: #fff; background: rgba(12, 13, 14, 0.78); }
 .tile-actions .icon, .tile-action-menu .icon { width: 19px; height: 19px; }
 .tile-actions button.is-favorite { color: #ffd65a; }
+.tile-actions button.tile-delete-action { border-color: rgba(255,120,110,.62); color: #ffaaa2; background: rgba(74,24,25,.92); font-size: 1.35rem; font-weight: 700; line-height: 1; }
+.tile-actions button.tile-delete-action:hover { border-color: #ffaaa2; color: #fff; background: #8a2828; }
 .tile-action-menu { position: relative; display: none; }
 .tile-action-menu summary { display: grid; width: 34px; height: 34px; list-style: none; place-items: center; border: 1px solid rgba(255,255,255,.25); border-radius: 50%; color: #fff; background: rgba(12,13,14,.78); cursor: pointer; }
 .tile-action-menu summary::-webkit-details-marker { display: none; }
@@ -270,6 +272,11 @@ body.lightbox-open, body.slideshow-open { overflow: hidden; }
 .settings-toggle input { width:17px; height:17px; margin:0; accent-color:var(--accent); }
 .settings-grid label { display: grid; gap: 6px; color: var(--muted); font-size: 0.82rem; }
 .settings-grid select { width: 100%; padding: 8px 10px; color: var(--text); background: var(--surface-raised); }
+.admin-button.is-active { border-color: rgba(255,120,110,.62); color: #ffaaa2; }
+.admin-login-content { padding: 18px; }
+.admin-login-content label { display: grid; gap: 7px; color: var(--muted); font-size: .82rem; }
+.admin-login-content input { width: 100%; padding: 9px 11px; color: var(--text); background: var(--surface-raised); }
+.form-error { margin: 12px 0 0; color: #ffaaa2; font-size: .85rem; }
 select option { color: var(--text); background: var(--surface-raised); }
 @media (max-width: 520px) { .settings-grid { grid-template-columns: 1fr; } }
 
