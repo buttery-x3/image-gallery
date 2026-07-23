@@ -110,7 +110,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .image-count { display: none; }
   .disclaimer-button { display:inline-grid; width:34px; padding:0 !important; }
   .disclaimer-button .header-button-label { display:none; }
-  .tile-report-button { display:none; }
 }
 @container gallery-app (max-width: 400px) {
   .search-field { min-width:100px; }
@@ -157,6 +156,7 @@ main { padding: 16px clamp(8px, 2vw, 24px) 40px; }
 .gallery-item[data-actions="menu"] .tile-action-menu, .gallery-item[data-actions="minimal"] .tile-action-menu { display: block; }
 .gallery-item[data-actions="minimal"] .tile-actions > button:not(:first-child) { display: none; }
 @media (hover: none) { .tile-actions, .tile-report-button { opacity: 1; transform: none; } .gallery-item[data-zoom] .gallery-image { transform: none !important; } }
+@container gallery-app (max-width: 620px) { .tile-report-button { display:none; } }
 
 .empty-state { display: grid; min-height: 50vh; place-content: center; justify-items: center; color: var(--muted); text-align: center; }
 .spinner { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
