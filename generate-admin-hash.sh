@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+cd "$repo_dir"
+
+if ! node --input-type=module -e 'await import("argon2")' >/dev/null 2>&1; then
+  echo "argon2 is not installed in $repo_dir." >&2
+  echo "Run: npm install argon2@^0.44.0 --save" >&2
+  exit 1
+fi
+
 read -r -s -p "Admin password: " admin_password
 printf '\n'
 read -r -s -p "Confirm password: " admin_password_confirm
