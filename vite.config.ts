@@ -185,7 +185,15 @@ function galleryHtml(
         .replace("__GALLERY_WATERMARK_POSITION__", config.watermarkPosition)
         .replace(
           "<!-- gallery-support-button -->",
-          supportEmbed ? `<div id="support-button" class="support-button-host">${supportEmbed}</div>` : "",
+          supportEmbed
+            ? `<div id="support-controls" class="support-controls" data-support-hidden="false" hidden>
+      <div id="support-button" class="support-button-host">${supportEmbed}</div>
+      <button id="support-visibility-toggle" class="support-visibility-toggle" type="button" aria-label="Hide support link" title="Hide support link">
+        <svg class="support-control-icon support-hide-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.75"/></svg>
+        <svg class="support-control-icon support-restore-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h11v5.5A4.5 4.5 0 0 1 11.5 19h-2A4.5 4.5 0 0 1 5 14.5V9Z"/><path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16M7 5.5c0 1 1 1 1 2M11 5.5c0 1 1 1 1 2"/></svg>
+      </button>
+    </div>`
+            : "",
         )
         .replace(
           "<!-- gallery-support-card -->",

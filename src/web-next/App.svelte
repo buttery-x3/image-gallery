@@ -35,6 +35,9 @@
   const themeKey = "image-gallery:theme:v1";
   const consentKey = "image-gallery:content-consent:v1";
   const overlayKey = "image-gallery:overlay-preferences:v1";
+  const supportHiddenKey = "image-gallery:support-hidden:v1";
+  const supportSessionStartedKey = "image-gallery:support-session-started:v1";
+  const supportRevealDelay = 10 * 60 * 1000;
   const themes: Theme[] = ["editorial", "glass", "studio", "classic", "daylight", "neon", "accessible"];
   const themeLabels: Record<Theme, string> = { editorial: "Editorial", glass: "Glass", studio: "Studio", classic: "Classic", daylight: "Daylight", neon: "Neon Grid", accessible: "Accessible" };
   const corners: Corner[] = ["top-left", "bottom-left", "bottom-right", "top-right"];
@@ -320,18 +323,75 @@
       if (event.key === favoritesKey) favorites = readStringSet(favoritesKey);
     };
     window.addEventListener("storage", handleStorage);
+    const supportControls = document.querySelector<HTMLElement>("#support-controls");
     const supportButton = document.querySelector<HTMLElement>("#support-button");
+    const supportVisibilityToggle = document.querySelector<HTMLButtonElement>("#support-visibility-toggle");
     const supportCard = document.querySelector<HTMLElement>("#support-card");
     const headerMeta = document.querySelector<HTMLElement>(".header-meta");
     const compactHeader = window.matchMedia("(max-width: 620px)");
-    const placeSupportButton = (): void => {
-      if (!supportButton || !headerMeta) return;
-      if (compactHeader.matches && supportCard) supportCard.append(supportButton);
-      else headerMeta.append(supportButton);
+    let supportRevealTimer: number | undefined;
+    const placeSupportControls = (): void => {
+      if (!supportControls || !headerMeta) return;
+      if (compactHeader.matches && supportCard) supportCard.append(supportControls);
+      else headerMeta.append(supportControls);
     };
-    placeSupportButton();
-    compactHeader.addEventListener("change", placeSupportButton);
-    if (supportCard) supportCard.hidden = false;
+    const showSupportControls = (embedHidden: boolean): void => {
+      if (!supportControls || !supportButton || !supportVisibilityToggle) return;
+      supportControls.hidden = false;
+      supportControls.dataset.supportHidden = String(embedHidden);
+      supportButton.hidden = embedHidden;
+      const label = embedHidden ? "Show support link" : "Hide support link";
+      supportVisibilityToggle.setAttribute("aria-label", label);
+      supportVisibilityToggle.title = label;
+      if (supportCard) supportCard.hidden = false;
+    };
+    const hideSupportUntilReady = (): void => {
+      if (supportControls) supportControls.hidden = true;
+      if (supportCard) supportCard.hidden = true;
+    };
+    const markSupportSessionReady = (): void => {
+      sessionStorage.setItem(supportSessionStartedKey, String(Date.now() - supportRevealDelay));
+    };
+    const toggleSupportVisibility = (): void => {
+      if (!supportControls) return;
+      const embedHidden = supportControls.dataset.supportHidden !== "true";
+      if (embedHidden) localStorage.setItem(supportHiddenKey, "true");
+      else localStorage.removeItem(supportHiddenKey);
+      markSupportSessionReady();
+      showSupportControls(embedHidden);
+    };
+    const handleSupportStorage = (event: StorageEvent): void => {
+      if (event.key === supportHiddenKey) {
+        if (event.newValue === "true") showSupportControls(true);
+        else {
+          markSupportSessionReady();
+          showSupportControls(false);
+        }
+      }
+    };
+    if (supportControls && supportButton && supportVisibilityToggle) {
+      placeSupportControls();
+      compactHeader.addEventListener("change", placeSupportControls);
+      supportVisibilityToggle.addEventListener("click", toggleSupportVisibility);
+      window.addEventListener("storage", handleSupportStorage);
+      if (localStorage.getItem(supportHiddenKey) === "true") {
+        markSupportSessionReady();
+        showSupportControls(true);
+      }
+      else {
+        const now = Date.now();
+        const storedStartedAt = Number(sessionStorage.getItem(supportSessionStartedKey));
+        const hasStoredStart = Number.isFinite(storedStartedAt) && storedStartedAt > 0;
+        const startedAt = hasStoredStart ? storedStartedAt : now;
+        if (!hasStoredStart) sessionStorage.setItem(supportSessionStartedKey, String(startedAt));
+        const remaining = supportRevealDelay - (now - startedAt);
+        if (remaining <= 0) showSupportControls(false);
+        else {
+          hideSupportUntilReady();
+          supportRevealTimer = window.setTimeout(() => showSupportControls(false), remaining);
+        }
+      }
+    }
     const handlePopState = (): void => {
       if (routeTail() !== "slideshow") {
         slideshowPushedRoute = false;
@@ -359,7 +419,10 @@
     return () => {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("popstate", handlePopState);
-      compactHeader.removeEventListener("change", placeSupportButton);
+      window.clearTimeout(supportRevealTimer);
+      window.removeEventListener("storage", handleSupportStorage);
+      supportVisibilityToggle?.removeEventListener("click", toggleSupportVisibility);
+      compactHeader.removeEventListener("change", placeSupportControls);
     };
   });
 
