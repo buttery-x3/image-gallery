@@ -96,6 +96,36 @@ test("schema-less Tenor GIF metadata is preserved without invoking name generati
   }
 });
 
+test("Tenor titles without an ASCII filename value fall back to the incoming stem", async () => {
+  const temporaryRoot = await mkdtemp(path.join(tmpdir(), "image-gallery-tenor-title-fallback-test-"));
+  const galleryDirectory = path.join(temporaryRoot, "gallery");
+  const previewDirectory = path.join(temporaryRoot, "previews");
+  await mkdir(galleryDirectory);
+  try {
+    const sourceStem = "17807261701061605374_今日も生き抜こう-なめくじ";
+    await Promise.all([
+      writeFile(path.join(galleryDirectory, `${sourceStem}.gif`), new Uint8Array([1, 2, 3, 4])),
+      writeFile(path.join(galleryDirectory, `${sourceStem}.json`), JSON.stringify({
+        id: "17807261701061605374",
+        title: "今日も生き抜こう",
+        username: "なめくじ",
+        user_url: "https://tenor.com/users/example",
+        tenor_url: "https://tenor.com/view/example",
+      })),
+    ]);
+
+    const { stdout } = await execFileAsync(process.execPath, ["process-gallery-batch.mjs", "--dry-run"], {
+      cwd: projectRoot,
+      env: { ...process.env, GALLERY_DIR: galleryDirectory, PREVIEW_CACHE_DIR: previewDirectory },
+    });
+
+    assert.match(stdout, new RegExp(`${sourceStem}\\.gif -> 17807261701061605374\\.gif`));
+    assert.match(stdout, new RegExp(`${sourceStem}\\.json -> 17807261701061605374\\.json`));
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
 test("duplicate Tenor titles use their ids as deterministic filename collision suffixes", async () => {
   const temporaryRoot = await mkdtemp(path.join(tmpdir(), "image-gallery-tenor-collision-test-"));
   const galleryDirectory = path.join(temporaryRoot, "gallery");

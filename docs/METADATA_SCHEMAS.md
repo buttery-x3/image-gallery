@@ -40,7 +40,7 @@ Category remains a separate product-level policy independent of reusable tag map
 
 `display` optionally sources the image-overlay name, subtitle, and subtitle link from normalized canonical tags. It does not rename media or generate a `.gallery-name.json` sidecar. `subtitleUrlTag` is rendered as a link only when its value is an HTTP or HTTPS URL.
 
-`filename` directly derives a lowercase, hyphenated media filename from a canonical metadata tag without invoking a name-generation definition. When multiple records produce the same filename, `collisionTag` supplies a deterministic suffix. Existing batched files change only through the explicit `--rename-existing` maintenance mode; use `--dry-run` first.
+`filename` directly derives a lowercase, hyphenated media filename from a canonical metadata tag without invoking a name-generation definition. When multiple records produce the same filename, `collisionTag` supplies a deterministic suffix. If the configured value is empty or contains no usable ASCII filename characters, the batcher falls back to the sanitized incoming filename stem; if that is also empty, it uses a stable hash-based stem. Existing batched files change only through the explicit `--rename-existing` maintenance mode; use `--dry-run` first.
 
 ## Add a schema
 

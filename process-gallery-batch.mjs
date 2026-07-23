@@ -520,7 +520,15 @@ function filenameSlug(value) {
 function directFilenameBase(record) {
   const policy = filenamePolicy(record);
   if (!policy) return undefined;
-  return filenameSlug(record.generationContext?.[policy.tag] ?? "");
+  const configuredBase = filenameSlug(record.generationContext?.[policy.tag] ?? "");
+  if (configuredBase) return configuredBase;
+
+  const sourceStem = path.basename(record.imageName, path.extname(record.imageName));
+  const sourceBase = filenameSlug(sourceStem);
+  if (sourceBase) return sourceBase;
+
+  const stableSuffix = createHash("sha256").update(record.imageName).digest("hex").slice(0, 12);
+  return `media-${stableSuffix}`;
 }
 
 function directFilenameBaseCounts(records) {
@@ -614,7 +622,6 @@ function generateNameForRecord(record, definitions, usedNames, usedShortNames, b
   const directPolicy = filenamePolicy(record);
   if (directPolicy) {
     const base = directFilenameBase(record);
-    if (!base) throw new Error(`${record.metadataName} does not provide a usable ${directPolicy.tag} filename value.`);
     let fileStem = base;
     if ((baseCounts.get(base) ?? 0) > 1 || usedNames.has(fileStem)) {
       const collisionValue = directPolicy.collisionTag
