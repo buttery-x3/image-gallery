@@ -115,6 +115,7 @@ const registry: MetadataDefinitionRegistry = {
   definitions: new Map([[definition.schema, definition]]),
   enabledSchemas: new Set([definition.schema]),
   categories: new Map(category ? [[definition.schema, category]] : []),
+  displays: new Map(),
 };
 const files = samplePath ? [path.resolve(samplePath)] : await sampleFiles(path.resolve(sampleDirectory!));
 if (files.length === 0) throw new Error("No JSON samples were found.");

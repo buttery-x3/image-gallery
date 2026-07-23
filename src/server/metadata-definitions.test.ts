@@ -22,6 +22,7 @@ function registryFor(fileName: string, enabled = true, category?: "women" | "cre
     definitions: new Map([[selected.schema, selected]]),
     enabledSchemas: new Set(enabled ? [selected.schema] : []),
     categories: new Map(category ? [[selected.schema, category]] : []),
+    displays: new Map(),
   };
 }
 
@@ -86,7 +87,46 @@ test("preserves status for unsupported and disabled schemas", () => {
   assert.equal(disabled.metadata, undefined);
 });
 
+test("detects schema-less Tenor metadata and derives configured display fields", () => {
+  const selected = definition("tenor-v1.json");
+  const registry: MetadataDefinitionRegistry = {
+    definitions: new Map([[selected.schema, selected]]),
+    enabledSchemas: new Set([selected.schema]),
+    categories: new Map(),
+    displays: new Map([["tenor/v1", {
+      nameTag: "title",
+      subtitleTag: "username",
+      subtitleUrlTag: "username_url",
+    }]]),
+  };
+  const result = normalizeParsedMetadata({
+    id: "85887463331712354",
+    title: " Reaching Stare ",
+    username: "strangerthings",
+    user_url: "https://tenor.com/users/strangerthings",
+    tenor_url: "https://tenor.com/view/reaching-stare-gif-14538912",
+    tags: ["reaching", "stare"],
+  }, registry);
+
+  assert.equal(result.schema, "tenor/v1");
+  assert.deepEqual(result.metadata?.searchTokens, {});
+  assert.deepEqual(result.metadata?.facets, { tags: ["reaching", "stare"] });
+  assert.deepEqual(result.metadata?.tags, {
+    tenor_id: "85887463331712354",
+    title: "Reaching Stare",
+    username: "strangerthings",
+    username_url: "https://tenor.com/users/strangerthings",
+    tenor_url: "https://tenor.com/view/reaching-stare-gif-14538912",
+  });
+  assert.deepEqual(result.metadataDisplay, {
+    name: "Reaching Stare",
+    subtitle: "strangerthings",
+    subtitleUrl: "https://tenor.com/users/strangerthings",
+  });
+});
+
 test("rejects invalid definitions", () => {
   assert.throws(() => validateMetadataDefinition({ definitionVersion: 1, draft: "yes", schema: "x/v1", tags: {} }));
   assert.throws(() => validateMetadataDefinition({ definitionVersion: 1, schema: "x/v1", tags: { "Bad Tag": { path: "x" } } }));
+  assert.throws(() => validateMetadataDefinition({ definitionVersion: 1, schema: "x/v1", detect: { requiredPaths: [] }, tags: {} }));
 });

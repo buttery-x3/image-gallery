@@ -120,7 +120,20 @@
           {#if image.previewUrl}<img class="lightbox-preview" src={tileMediaUrl(image)} alt="" aria-hidden="true" width={image.width} height={image.height} />{/if}
           <img bind:this={imageElement} class="lightbox-original" class:is-loaded={loadedOriginalPath === image.path} src={absoluteMediaUrl(image)} alt={displayName} width={image.width} height={image.height} onload={() => { loadedOriginalPath = image.path; }} />
         </div>
-        {#if showNames && nameVisible && (image.shortName?.en || image.shortName?.ja)}
+        {#if showNames && nameVisible && image.metadataDisplay}
+          <div class="lightbox-name-overlay">
+            <button class="overlay-name-return" type="button" onclick={onreturn}>
+              <span class="lightbox-short-name-en">{image.metadataDisplay.name}</span>
+            </button>
+            {#if image.metadataDisplay.subtitle}
+              {#if image.metadataDisplay.subtitleUrl}
+                <a class="lightbox-short-name-ja overlay-subtitle-link" href={image.metadataDisplay.subtitleUrl} target="_blank" rel="noopener noreferrer">{image.metadataDisplay.subtitle}</a>
+              {:else}
+                <button class="lightbox-short-name-ja overlay-name-return" type="button" onclick={onreturn}>{image.metadataDisplay.subtitle}</button>
+              {/if}
+            {/if}
+          </div>
+        {:else if showNames && nameVisible && (image.shortName?.en || image.shortName?.ja)}
           <button class="lightbox-name-overlay" type="button" onclick={onreturn}>
             {#if image.shortName?.en}<span class="lightbox-short-name-en">{image.shortName.en}</span>{/if}
             {#if image.shortName?.ja}<span class="lightbox-short-name-ja" lang="ja">{image.shortName.ja}</span>{/if}

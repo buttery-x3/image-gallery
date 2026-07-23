@@ -33,6 +33,19 @@
           "definition": "image-gallery/name-generator/husbandai-japanese-fantasy/v1",
           "shortNames": ["en", "ja"]
         }
+      },
+      "tenor/v1": {
+        "enabled": true,
+        "typeLabel": "GIFs",
+        "filename": {
+          "tag": "title",
+          "collisionTag": "tenor_id"
+        },
+        "display": {
+          "nameTag": "title",
+          "subtitleTag": "username",
+          "subtitleUrlTag": "username_url"
+        }
       }
     }
   },

@@ -12,11 +12,18 @@ export interface GalleryMetadata {
   resolvedPrompt: string;
   tags: Record<string, string>;
   searchTokens: Record<string, string[]>;
+  facets: Record<string, string[]>;
 }
 
 export interface GalleryShortName {
   en?: string;
   ja?: string;
+}
+
+export interface GalleryMetadataDisplay {
+  name: string;
+  subtitle?: string;
+  subtitleUrl?: string;
 }
 
 export interface GalleryImage {
@@ -38,6 +45,7 @@ export interface GalleryImage {
   metadataSupported?: boolean;
   metadataEnabled?: boolean;
   metadata?: GalleryMetadata;
+  metadataDisplay?: GalleryMetadataDisplay;
   shortName?: GalleryShortName;
 }
 
@@ -49,6 +57,8 @@ export interface GalleryIndexItem {
   path: string;
   searchText: string;
   tags: Record<string, string>;
+  facets?: Record<string, string[]>;
+  metadataDisplay?: GalleryMetadataDisplay;
   shortName?: GalleryShortName;
 }
 
@@ -64,6 +74,7 @@ export interface ImageDetailsResponse {
   metadataSupported?: boolean;
   metadataEnabled?: boolean;
   metadata?: GalleryMetadata;
+  metadataDisplay?: GalleryMetadataDisplay;
   shortName?: GalleryShortName;
 }
 

@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { GalleryCategory, GalleryMetadata } from "../shared/types.js";
+import type { GalleryCategory, GalleryMetadata, GalleryMetadataDisplay } from "../shared/types.js";
 
 type Scalar = string | number | boolean | null;
 
@@ -27,10 +27,14 @@ export interface MetadataDefinition {
   definitionVersion: 1;
   draft?: boolean;
   schema: string;
+  detect?: {
+    requiredPaths: string[];
+  };
   recordPath?: string;
   resolvedPrompt?: PathMapping;
   tags: Record<string, ValueMapping>;
   searchTokensPath?: string;
+  facetsPath?: string;
   valueRules?: {
     trim?: boolean;
     omitEmpty?: boolean;
@@ -42,6 +46,11 @@ export interface MetadataDefinitionRegistry {
   definitions: ReadonlyMap<string, MetadataDefinition>;
   enabledSchemas: ReadonlySet<string>;
   categories: ReadonlyMap<string, GalleryCategory>;
+  displays: ReadonlyMap<string, {
+    nameTag: string;
+    subtitleTag?: string;
+    subtitleUrlTag?: string;
+  }>;
 }
 
 export interface NormalizedMetadataResult {
@@ -50,6 +59,7 @@ export interface NormalizedMetadataResult {
   enabled: boolean;
   category?: GalleryCategory;
   metadata?: GalleryMetadata;
+  metadataDisplay?: GalleryMetadataDisplay;
 }
 
 export interface LocatedMetadataRecord {
@@ -104,6 +114,21 @@ export function validateMetadataDefinition(value: unknown, source = "metadata de
   const schema = nonEmptyString(value.schema, `${source}.schema`);
   if (!isRecord(value.tags)) throw new Error(`${source}.tags must be an object.`);
 
+  let detect: MetadataDefinition["detect"];
+  if (value.detect !== undefined) {
+    if (!isRecord(value.detect) || !Array.isArray(value.detect.requiredPaths) || value.detect.requiredPaths.length === 0) {
+      throw new Error(`${source}.detect.requiredPaths must be a non-empty array.`);
+    }
+    detect = {
+      requiredPaths: value.detect.requiredPaths.map((entry, index) =>
+        nonEmptyString(entry, `${source}.detect.requiredPaths.${index}`)
+      ),
+    };
+    if (new Set(detect.requiredPaths).size !== detect.requiredPaths.length) {
+      throw new Error(`${source}.detect.requiredPaths must not contain duplicates.`);
+    }
+  }
+
   const tags: Record<string, ValueMapping> = {};
   for (const [tag, mapping] of Object.entries(value.tags)) {
     if (!/^[a-z][a-z0-9_]*$/.test(tag)) throw new Error(`${source}.tags.${tag} is not a canonical tag name.`);
@@ -135,11 +160,15 @@ export function validateMetadataDefinition(value: unknown, source = "metadata de
     definitionVersion: 1,
     ...(value.draft === true ? { draft: true } : {}),
     schema,
+    ...(detect ? { detect } : {}),
     ...(value.recordPath === undefined ? {} : { recordPath: nonEmptyString(value.recordPath, `${source}.recordPath`) }),
     ...(resolvedPrompt ? { resolvedPrompt } : {}),
     tags,
     ...(value.searchTokensPath === undefined ? {} : {
       searchTokensPath: nonEmptyString(value.searchTokensPath, `${source}.searchTokensPath`),
+    }),
+    ...(value.facetsPath === undefined ? {} : {
+      facetsPath: nonEmptyString(value.facetsPath, `${source}.facetsPath`),
     }),
     ...(valueRules ? { valueRules } : {}),
   };
@@ -147,7 +176,15 @@ export function validateMetadataDefinition(value: unknown, source = "metadata de
 
 export function loadMetadataDefinitions(
   directory: string,
-  configuredSchemas?: Readonly<Record<string, { enabled: boolean; category?: GalleryCategory }>>,
+  configuredSchemas?: Readonly<Record<string, {
+    enabled: boolean;
+    category?: GalleryCategory;
+    display?: {
+      nameTag: string;
+      subtitleTag?: string;
+      subtitleUrlTag?: string;
+    };
+  }>>,
 ): MetadataDefinitionRegistry {
   const definitions = new Map<string, MetadataDefinition>();
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -170,13 +207,28 @@ export function loadMetadataDefinitions(
     ? new Set(definitions.keys())
     : new Set(Object.entries(configuredSchemas).filter(([, schema]) => schema.enabled).map(([sourceSchema]) => sourceSchema));
   const categories = new Map<string, GalleryCategory>();
+  const displays = new Map<string, {
+    nameTag: string;
+    subtitleTag?: string;
+    subtitleUrlTag?: string;
+  }>();
   for (const [sourceSchema, schemaConfig] of Object.entries(configuredSchemas ?? {})) {
     if (schemaConfig.category) categories.set(sourceSchema, schemaConfig.category);
+    if (schemaConfig.display) displays.set(sourceSchema, schemaConfig.display);
   }
   for (const schema of enabledSchemas) {
     if (!definitions.has(schema)) throw new Error(`Enabled metadata schema ${schema} does not have a definition.`);
+    const display = displays.get(schema);
+    const definition = definitions.get(schema);
+    if (display && definition) {
+      for (const [field, tag] of Object.entries(display)) {
+        if (!(tag in definition.tags)) {
+          throw new Error(`Metadata schema ${schema} display.${field} references undeclared tag ${tag}.`);
+        }
+      }
+    }
   }
-  return { definitions, enabledSchemas, categories };
+  return { definitions, enabledSchemas, categories, displays };
 }
 
 function valueAtPath(value: unknown, dottedPath: string): unknown {
@@ -232,7 +284,17 @@ export function normalizeParsedMetadata(
   parsed: unknown,
   registry: MetadataDefinitionRegistry,
 ): NormalizedMetadataResult {
-  const located = locateMetadataRecord(parsed);
+  let located = locateMetadataRecord(parsed);
+  let detectedWithoutMarker = false;
+  if (!located.schema && isRecord(parsed)) {
+    const detected = [...registry.definitions.values()].filter((definition) =>
+      definition.detect?.requiredPaths.every((requiredPath) => valueAtPath(parsed, requiredPath) !== undefined)
+    );
+    if (detected.length === 1) {
+      located = { schema: detected[0]!.schema, record: parsed };
+      detectedWithoutMarker = true;
+    }
+  }
   if (!located.schema || !located.record) return { supported: false, enabled: false };
   const definition = registry.definitions.get(located.schema);
   if (!definition) return { schema: located.schema, supported: false, enabled: false };
@@ -243,7 +305,7 @@ export function normalizeParsedMetadata(
   const record = definition.recordPath
     ? valueAtPath(parsed, definition.recordPath)
     : located.record;
-  if (!isRecord(record) || record.schema !== definition.schema) {
+  if (!isRecord(record) || (!detectedWithoutMarker && record.schema !== definition.schema)) {
     return { schema: located.schema, supported: true, enabled: true };
   }
 
@@ -256,7 +318,15 @@ export function normalizeParsedMetadata(
   const searchTokens: Record<string, string[]> = {};
   if (definition.searchTokensPath) {
     const tokenRecord = valueAtPath(record, definition.searchTokensPath);
-    if (isRecord(tokenRecord)) {
+    if (Array.isArray(tokenRecord)) {
+      const tokens = tokenRecord.flatMap((value) => {
+        const normalized = normalizedString(value, definition);
+        return normalized === undefined ? [] : [normalized];
+      });
+      if (tokens.length > 0) {
+        searchTokens[definition.searchTokensPath.split(".").at(-1)!] = tokens;
+      }
+    } else if (isRecord(tokenRecord)) {
       for (const [field, values] of Object.entries(tokenRecord)) {
         if (!Array.isArray(values)) continue;
         const tokens = values.flatMap((value) => {
@@ -272,17 +342,49 @@ export function normalizeParsedMetadata(
     ? normalizedString(mappingValue(record, definition.resolvedPrompt), definition) ?? ""
     : "";
   const category = registry.categories.get(definition.schema);
+  const displayConfig = registry.displays.get(definition.schema);
+  const displayName = displayConfig ? tags[displayConfig.nameTag] : undefined;
+  const subtitle = displayConfig?.subtitleTag ? tags[displayConfig.subtitleTag] : undefined;
+  const configuredSubtitleUrl = displayConfig?.subtitleUrlTag ? tags[displayConfig.subtitleUrlTag] : undefined;
+  let subtitleUrl: string | undefined;
+  if (configuredSubtitleUrl) {
+    try {
+      const candidate = new URL(configuredSubtitleUrl);
+      if (candidate.protocol === "http:" || candidate.protocol === "https:") subtitleUrl = candidate.href;
+    } catch {
+      // An invalid or unsafe link remains available as a tag but is not rendered as a link.
+    }
+  }
+
+  const facets: Record<string, string[]> = {};
+  if (definition.facetsPath) {
+    const facetValues = valueAtPath(record, definition.facetsPath);
+    if (Array.isArray(facetValues)) {
+      const values = [...new Set(facetValues.flatMap((value) => {
+        const normalized = normalizedString(value, definition);
+        return normalized === undefined ? [] : [normalized];
+      }))];
+      if (values.length > 0) facets[definition.facetsPath.split(".").at(-1)!] = values;
+    }
+  }
+  const metadataDisplay = displayName ? {
+    name: displayName,
+    ...(subtitle ? { subtitle } : {}),
+    ...(subtitleUrl ? { subtitleUrl } : {}),
+  } : undefined;
   return {
     schema: definition.schema,
     supported: true,
     enabled: true,
     ...(category ? { category } : {}),
+    ...(metadataDisplay ? { metadataDisplay } : {}),
     metadata: {
       schema: definition.schema,
       ...(category ? { category } : {}),
       resolvedPrompt,
       tags,
       searchTokens,
+      facets,
     },
   };
 }

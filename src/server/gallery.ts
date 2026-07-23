@@ -95,6 +95,7 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
       let metadataSchema;
       let metadataSupported;
       let metadataEnabled;
+      let metadataDisplay;
       let shortName;
       const metadataPath = metadataFiles.get(path.basename(entry.name, path.extname(entry.name)));
       if (metadataPath) {
@@ -105,6 +106,7 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
           metadataSchema = result.schema;
           metadataSupported = result.supported;
           metadataEnabled = result.enabled;
+          metadataDisplay = result.metadataDisplay;
           if (includeDetails) metadata = result.metadata;
         } catch (error) {
           metadataInvalid = true;
@@ -152,6 +154,7 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
         ...(metadataSupported === undefined ? {} : { metadataSupported }),
         ...(metadataEnabled === undefined ? {} : { metadataEnabled }),
         ...(metadata ? { metadata } : {}),
+        ...(metadataDisplay ? { metadataDisplay } : {}),
         ...(shortName ? { shortName } : {}),
       });
     }
@@ -208,6 +211,7 @@ export async function readGalleryImageDetails(root: string, requestedPath: strin
   let metadataSchema;
   let metadataSupported;
   let metadataEnabled;
+  let metadataDisplay;
   let shortName;
   try {
     metadataPresent = true;
@@ -217,6 +221,7 @@ export async function readGalleryImageDetails(root: string, requestedPath: strin
     metadataSchema = result.schema;
     metadataSupported = result.supported;
     metadataEnabled = result.enabled;
+    metadataDisplay = result.metadataDisplay;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       metadataPresent = undefined;
@@ -240,6 +245,7 @@ export async function readGalleryImageDetails(root: string, requestedPath: strin
     ...(metadataSupported === undefined ? {} : { metadataSupported }),
     ...(metadataEnabled === undefined ? {} : { metadataEnabled }),
     ...(metadata ? { metadata } : {}),
+    ...(metadataDisplay ? { metadataDisplay } : {}),
     ...(shortName ? { shortName } : {}),
   };
 }

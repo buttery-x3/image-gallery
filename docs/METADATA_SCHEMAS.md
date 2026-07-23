@@ -12,6 +12,19 @@ The gallery keeps file organization separate from metadata interpretation. `proc
   "metadata": {
     "schemas": {
       "anime_waifu_lite/v1": { "enabled": true, "typeLabel": "Waifus", "category": "women" },
+      "tenor/v1": {
+        "enabled": true,
+        "typeLabel": "GIFs",
+        "filename": {
+          "tag": "title",
+          "collisionTag": "tenor_id"
+        },
+        "display": {
+          "nameTag": "title",
+          "subtitleTag": "username",
+          "subtitleUrlTag": "username_url"
+        }
+      },
       "anime_creature_lite_v4/v1": { "enabled": true, "typeLabel": "Beastais", "category": "creatures" },
       "future_men/v1": { "enabled": false, "typeLabel": "Husbundai", "category": "men" }
     }
@@ -24,6 +37,10 @@ When `metadata.schemas` is omitted, every non-draft definition is enabled withou
 `typeLabel` is the browser-facing name for that exact source schema. With `showTypeToggle: true`, only labels whose schemas are present in the current gallery are rendered. The selector is hidden with zero or one present type. Each schema remains a distinct fast bucket, so eight present configured schemas produce eight type choices without scanning tags.
 
 Category remains a separate product-level policy independent of reusable tag mappings and the schema type selector. A male creature source can remain in `creatures`; a future men-only source can be assigned to `men` while displaying the label `Husbundai`.
+
+`display` optionally sources the image-overlay name, subtitle, and subtitle link from normalized canonical tags. It does not rename media or generate a `.gallery-name.json` sidecar. `subtitleUrlTag` is rendered as a link only when its value is an HTTP or HTTPS URL.
+
+`filename` directly derives a lowercase, hyphenated media filename from a canonical metadata tag without invoking a name-generation definition. When multiple records produce the same filename, `collisionTag` supplies a deterministic suffix. Existing batched files change only through the explicit `--rename-existing` maintenance mode; use `--dry-run` first.
 
 ## Add a schema
 
@@ -59,9 +76,13 @@ The tool reads samples but never changes them or writes inside `gallery/`.
 {
   "definitionVersion": 1,
   "schema": "example/v1",
+  "detect": {
+    "requiredPaths": ["id", "title"]
+  },
   "recordPath": "optional_wrapper",
   "resolvedPrompt": { "path": "resolved_prompt" },
   "searchTokensPath": "search_tokens",
+  "facetsPath": "tags",
   "tags": {
     "hair_style": { "path": "selections.hair_style" },
     "outfit": {
@@ -89,10 +110,12 @@ The tool reads samples but never changes them or writes inside `gallery/`.
 The mapper intentionally supports a small set of operations:
 
 - `path` reads a string through a dotted object path.
+- `detect.requiredPaths` recognizes a schema-less record when every declared path is present. Detection succeeds only when exactly one definition matches.
 - `select` chooses a source path from the string value at another path.
 - `excludeWhen` omits a value when a source field equals a scalar value.
 - `resolvedPrompt` identifies the prompt string.
-- `searchTokensPath` imports a record whose values are string arrays.
+- `searchTokensPath` imports either a string array or a record whose values are string arrays. A direct array uses the path's final segment as its search-token field name.
+- `facetsPath` imports a string array as individually searchable and selectable Advanced-filter values.
 - `valueRules` trims values and omits empty or unresolved template strings.
 
 Use lowercase snake-case canonical tag names. Equivalent concepts should share a name across definitions—for example, different source fields representing a scene should all map to `scene`. Schema-specific concepts such as `creature_family` may remain distinct.

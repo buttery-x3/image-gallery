@@ -1,0 +1,19 @@
+{
+  "definitionVersion": 1,
+  "schema": "tenor/v1",
+  "detect": {
+    "requiredPaths": ["id", "title", "username", "user_url", "tenor_url"]
+  },
+  "facetsPath": "tags",
+  "tags": {
+    "tenor_id": { "path": "id" },
+    "title": { "path": "title" },
+    "username": { "path": "username" },
+    "username_url": { "path": "user_url" },
+    "tenor_url": { "path": "tenor_url" }
+  },
+  "valueRules": {
+    "trim": true,
+    "omitEmpty": true
+  }
+}

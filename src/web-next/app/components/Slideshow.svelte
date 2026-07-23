@@ -87,7 +87,20 @@
   <figure data-name-position={namePosition} data-watermark-position={effectiveWatermarkPosition} style={`--slideshow-name-fill:${colors.fill};--slideshow-name-outline:${colors.outline};`}>
     {#if previousImage}<img class="slideshow-image outgoing" src={absoluteMediaUrl(previousImage)} alt="" aria-hidden="true" />{/if}
     {#key image.path}<img class="slideshow-image incoming" src={absoluteMediaUrl(image)} alt={displayName(image)} />{/key}
-    {#if showNames && (image.shortName?.en || image.shortName?.ja)}
+    {#if showNames && image.metadataDisplay}
+      <div class="slideshow-name-overlay">
+        <button class="overlay-name-return" type="button" onclick={() => onreturn(image)}>
+          <span class="slideshow-short-name-en">{image.metadataDisplay.name}</span>
+        </button>
+        {#if image.metadataDisplay.subtitle}
+          {#if image.metadataDisplay.subtitleUrl}
+            <a class="slideshow-short-name-ja overlay-subtitle-link" href={image.metadataDisplay.subtitleUrl} target="_blank" rel="noopener noreferrer">{image.metadataDisplay.subtitle}</a>
+          {:else}
+            <button class="slideshow-short-name-ja overlay-name-return" type="button" onclick={() => onreturn(image)}>{image.metadataDisplay.subtitle}</button>
+          {/if}
+        {/if}
+      </div>
+    {:else if showNames && (image.shortName?.en || image.shortName?.ja)}
       <button class="slideshow-name-overlay" type="button" onclick={() => onreturn(image)}>
         {#if image.shortName?.en}<span class="slideshow-short-name-en">{image.shortName.en}</span>{/if}
         {#if image.shortName?.ja}<span class="slideshow-short-name-ja" lang="ja">{image.shortName.ja}</span>{/if}

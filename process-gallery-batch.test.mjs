@@ -59,6 +59,112 @@ test("the removed environment naming switch fails with migration guidance", asyn
   );
 });
 
+test("schema-less Tenor GIF metadata is preserved without invoking name generation", async () => {
+  const temporaryRoot = await mkdtemp(path.join(tmpdir(), "image-gallery-tenor-batch-test-"));
+  const galleryDirectory = path.join(temporaryRoot, "gallery");
+  const previewDirectory = path.join(temporaryRoot, "previews");
+  await mkdir(galleryDirectory);
+  try {
+    const metadata = {
+      id: "85887463331712354",
+      title: "Reaching Stare",
+      username: "strangerthings",
+      user_url: "https://tenor.com/users/strangerthings",
+      tenor_url: "https://tenor.com/view/reaching-stare-gif-14538912",
+    };
+    await Promise.all([
+      writeFile(path.join(galleryDirectory, "85887463331712354_reaching-stare.gif"), new Uint8Array([1, 2, 3, 4])),
+      writeFile(path.join(galleryDirectory, "85887463331712354_reaching-stare.json"), JSON.stringify(metadata)),
+    ]);
+    const { stdout } = await execFileAsync(process.execPath, ["process-gallery-batch.mjs", "--dry-run"], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        GALLERY_DIR: galleryDirectory,
+        PREVIEW_CACHE_DIR: previewDirectory,
+        BATCH_NAME_STYLE: "",
+      },
+    });
+
+    assert.match(stdout, /85887463331712354_reaching-stare\.gif -> reaching-stare\.gif/);
+    assert.match(stdout, /85887463331712354_reaching-stare\.json -> reaching-stare\.json/);
+    assert.match(stdout, /Source metadata files that would be preserved: 1/);
+    assert.match(stdout, /Images that would be renamed: 1/);
+    assert.match(stdout, /Generated name metadata files that would be added: 0/);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("duplicate Tenor titles use their ids as deterministic filename collision suffixes", async () => {
+  const temporaryRoot = await mkdtemp(path.join(tmpdir(), "image-gallery-tenor-collision-test-"));
+  const galleryDirectory = path.join(temporaryRoot, "gallery");
+  const previewDirectory = path.join(temporaryRoot, "previews");
+  await mkdir(galleryDirectory);
+  try {
+    await Promise.all([
+      writeFile(path.join(galleryDirectory, "first.gif"), new Uint8Array([1, 2, 3])),
+      writeFile(path.join(galleryDirectory, "first.json"), JSON.stringify({
+        id: "111",
+        title: "Kyootbot",
+        username: "first",
+        user_url: "https://tenor.com/users/first",
+        tenor_url: "https://tenor.com/view/first",
+      })),
+      writeFile(path.join(galleryDirectory, "second.gif"), new Uint8Array([4, 5, 6, 7])),
+      writeFile(path.join(galleryDirectory, "second.json"), JSON.stringify({
+        id: "222",
+        title: "Kyootbot",
+        username: "second",
+        user_url: "https://tenor.com/users/second",
+        tenor_url: "https://tenor.com/view/second",
+      })),
+    ]);
+    const { stdout } = await execFileAsync(process.execPath, ["process-gallery-batch.mjs", "--dry-run"], {
+      cwd: projectRoot,
+      env: { ...process.env, GALLERY_DIR: galleryDirectory, PREVIEW_CACHE_DIR: previewDirectory },
+    });
+
+    assert.match(stdout, /first\.gif -> kyootbot-111\.gif/);
+    assert.match(stdout, /second\.gif -> kyootbot-222\.gif/);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("rename-existing previews direct title filenames for schema-less Tenor sidecars", async () => {
+  const temporaryRoot = await mkdtemp(path.join(tmpdir(), "image-gallery-tenor-existing-test-"));
+  const galleryDirectory = path.join(temporaryRoot, "gallery");
+  const previewDirectory = path.join(temporaryRoot, "previews");
+  const batchDirectory = path.join(galleryDirectory, "existing-batch");
+  await mkdir(batchDirectory, { recursive: true });
+  try {
+    await Promise.all([
+      writeFile(path.join(batchDirectory, "85887463331712354_reaching-stare.gif"), new Uint8Array([1, 2, 3, 4])),
+      writeFile(path.join(batchDirectory, "85887463331712354_reaching-stare.json"), JSON.stringify({
+        id: "85887463331712354",
+        title: "Reaching Stare",
+        username: "strangerthings",
+        user_url: "https://tenor.com/users/strangerthings",
+        tenor_url: "https://tenor.com/view/reaching-stare",
+      })),
+    ]);
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      ["process-gallery-batch.mjs", "--rename-existing", "--dry-run"],
+      {
+        cwd: projectRoot,
+        env: { ...process.env, GALLERY_DIR: galleryDirectory, PREVIEW_CACHE_DIR: previewDirectory },
+      },
+    );
+
+    assert.match(stdout, /existing-batch\/85887463331712354_reaching-stare\.gif -> existing-batch\/reaching-stare\.gif/);
+    assert.match(stdout, /85887463331712354_reaching-stare\.json -> reaching-stare\.json/);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
 test("an invalid metadata definition stops the batch before gallery files are changed", async () => {
   const temporaryRoot = await mkdtemp(path.join(tmpdir(), "image-gallery-invalid-metadata-test-"));
   const galleryDirectory = path.join(temporaryRoot, "gallery");

@@ -9,6 +9,15 @@ export interface MetadataSchemaRuntimeConfig {
   enabled: boolean;
   category?: GalleryCategory;
   typeLabel?: string;
+  filename?: {
+    tag: string;
+    collisionTag?: string;
+  };
+  display?: {
+    nameTag: string;
+    subtitleTag?: string;
+    subtitleUrlTag?: string;
+  };
   nameGeneration?: {
     definition: string;
     pipeline?: "contextual/v1";
@@ -61,7 +70,58 @@ function readGalleryRuntimeConfig(): {
             throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.typeLabel must be a non-empty string.`);
           }
           let nameGeneration: MetadataSchemaRuntimeConfig["nameGeneration"];
+          let filename: MetadataSchemaRuntimeConfig["filename"];
+          if (schema.filename !== undefined) {
+            if (!schema.enabled) {
+              throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.filename cannot be configured when enabled is false.`);
+            }
+            if (!schema.filename || typeof schema.filename !== "object" || Array.isArray(schema.filename)) {
+              throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.filename must be an object.`);
+            }
+            const filenameRecord = schema.filename as Record<string, unknown>;
+            for (const key of ["tag", "collisionTag"] as const) {
+              const value = filenameRecord[key];
+              if (key === "tag" && value === undefined) {
+                throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.filename.tag must be configured.`);
+              }
+              if (value !== undefined && (typeof value !== "string" || !/^[a-z][a-z0-9_]*$/.test(value))) {
+                throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.filename.${key} must be a canonical tag name.`);
+              }
+            }
+            filename = {
+              tag: filenameRecord.tag as string,
+              ...(typeof filenameRecord.collisionTag === "string" ? { collisionTag: filenameRecord.collisionTag } : {}),
+            };
+          }
+          let display: MetadataSchemaRuntimeConfig["display"];
+          if (schema.display !== undefined) {
+            if (!schema.enabled) {
+              throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.display cannot be configured when enabled is false.`);
+            }
+            if (!schema.display || typeof schema.display !== "object" || Array.isArray(schema.display)) {
+              throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.display must be an object.`);
+            }
+            const displayRecord = schema.display as Record<string, unknown>;
+            const configuredTags = ["nameTag", "subtitleTag", "subtitleUrlTag"] as const;
+            for (const key of configuredTags) {
+              const value = displayRecord[key];
+              if (key === "nameTag" && value === undefined) {
+                throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.display.nameTag must be configured.`);
+              }
+              if (value !== undefined && (typeof value !== "string" || !/^[a-z][a-z0-9_]*$/.test(value))) {
+                throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.display.${key} must be a canonical tag name.`);
+              }
+            }
+            display = {
+              nameTag: displayRecord.nameTag as string,
+              ...(typeof displayRecord.subtitleTag === "string" ? { subtitleTag: displayRecord.subtitleTag } : {}),
+              ...(typeof displayRecord.subtitleUrlTag === "string" ? { subtitleUrlTag: displayRecord.subtitleUrlTag } : {}),
+            };
+          }
           if (schema.nameGeneration !== undefined) {
+            if (filename) {
+              throw new Error(`gallery.config.json metadata.schemas.${sourceSchema} cannot configure both filename and nameGeneration.`);
+            }
             if (!schema.enabled) {
               throw new Error(`gallery.config.json metadata.schemas.${sourceSchema}.nameGeneration cannot be configured when enabled is false.`);
             }
@@ -92,6 +152,8 @@ function readGalleryRuntimeConfig(): {
             enabled: schema.enabled,
             ...(schema.category ? { category: schema.category as GalleryCategory } : {}),
             ...(typeof schema.typeLabel === "string" ? { typeLabel: schema.typeLabel.trim() } : {}),
+            ...(filename ? { filename } : {}),
+            ...(display ? { display } : {}),
             ...(nameGeneration ? { nameGeneration } : {}),
           };
         }

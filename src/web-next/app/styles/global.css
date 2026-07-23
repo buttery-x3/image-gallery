@@ -191,6 +191,9 @@ main { padding: 16px clamp(8px, 2vw, 24px) 40px; }
 .lightbox-action-report { border-color:rgba(255,150,142,.46); color:#ffaaa2; }
 .lightbox-action-report:hover { border-color:rgba(255,185,178,.76); color:#ffd0cc; background:rgba(74,24,25,.94); }
 .lightbox-name-overlay { position:absolute; z-index:2; display:flex; flex-direction:column; align-items:flex-start; width:calc(100% - clamp(20px,4vw,48px)); padding:0; border:0; background:transparent; font-family:inherit; }
+.overlay-name-return { display:block; max-width:100%; padding:0; border:0; color:inherit; background:transparent; font:inherit; text-align:inherit; }
+.overlay-subtitle-link { position:relative; color:#000; text-decoration:none; }
+.overlay-subtitle-link:hover { text-decoration:underline; text-decoration-thickness:.08em; text-underline-offset:.18em; }
 .lightbox-media[data-name-position="top-left"] .lightbox-name-overlay { top:clamp(10px,2vw,24px); left:clamp(10px,2vw,24px); }
 .lightbox-media[data-name-position="top-right"] .lightbox-name-overlay { top:clamp(10px,2vw,24px); right:clamp(10px,2vw,24px); align-items:flex-end; }
 .lightbox-media[data-name-position="bottom-left"] .lightbox-name-overlay { bottom:clamp(10px,2vw,24px); left:clamp(10px,2vw,24px); }

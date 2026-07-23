@@ -48,6 +48,21 @@ export function validateMetadataContextDefinition(value, source = "Metadata defi
   }
   const schema = nonEmptyString(value.schema, `${source}.schema`);
   if (!isRecord(value.tags)) throw new Error(`${source}.tags must be an object.`);
+  let detect;
+  if (value.detect !== undefined) {
+    if (
+      !isRecord(value.detect) || !Array.isArray(value.detect.requiredPaths) ||
+      value.detect.requiredPaths.length === 0
+    ) throw new Error(`${source}.detect.requiredPaths must be a non-empty array.`);
+    detect = {
+      requiredPaths: value.detect.requiredPaths.map((entry, index) =>
+        nonEmptyString(entry, `${source}.detect.requiredPaths.${index}`)
+      ),
+    };
+    if (new Set(detect.requiredPaths).size !== detect.requiredPaths.length) {
+      throw new Error(`${source}.detect.requiredPaths must not contain duplicates.`);
+    }
+  }
   const tags = {};
   for (const [tag, mapping] of Object.entries(value.tags)) {
     if (!/^[a-z][a-z0-9_]*$/.test(tag)) throw new Error(`${source}.tags.${tag} is not a canonical tag name.`);
@@ -74,11 +89,15 @@ export function validateMetadataContextDefinition(value, source = "Metadata defi
     definitionVersion: 1,
     ...(value.draft === true ? { draft: true } : {}),
     schema,
+    ...(detect ? { detect } : {}),
     ...(value.recordPath === undefined ? {} : { recordPath: nonEmptyString(value.recordPath, `${source}.recordPath`) }),
     ...(resolvedPrompt ? { resolvedPrompt } : {}),
     tags,
     ...(value.searchTokensPath === undefined ? {} : {
       searchTokensPath: nonEmptyString(value.searchTokensPath, `${source}.searchTokensPath`),
+    }),
+    ...(value.facetsPath === undefined ? {} : {
+      facetsPath: nonEmptyString(value.facetsPath, `${source}.facetsPath`),
     }),
     ...(valueRules ? { valueRules } : {}),
   };
@@ -122,7 +141,8 @@ function normalizedString(value, rules) {
 
 export function extractMetadataContext(parsed, definition) {
   const record = definition.recordPath ? valueAtPath(parsed, definition.recordPath) : parsed;
-  if (!isRecord(record) || record.schema !== definition.schema) return {};
+  const detected = definition.detect?.requiredPaths.every((requiredPath) => valueAtPath(parsed, requiredPath) !== undefined);
+  if (!isRecord(record) || (record.schema !== definition.schema && !detected)) return {};
   const context = {};
   for (const [tag, mapping] of Object.entries(definition.tags)) {
     const value = normalizedString(mappedValue(record, mapping), definition.valueRules);

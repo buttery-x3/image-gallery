@@ -88,6 +88,11 @@
         counts.set(value, (counts.get(value) ?? 0) + 1);
         result.set(key, counts);
       }
+      for (const [key, facetValues] of Object.entries(indexByPath.get(image.path)?.facets ?? {})) {
+        const counts = result.get(key) ?? new Map<string, number>();
+        for (const value of facetValues) counts.set(value, (counts.get(value) ?? 0) + 1);
+        result.set(key, counts);
+      }
     }
     return [...result].map(([key, counts]) => ({ key, values: [...counts].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true })) }));
   });
@@ -101,7 +106,7 @@
       const searchable = index?.searchText ?? `${image.displayName}\n${image.name}\n${image.path}`.normalize("NFKC").toLocaleLowerCase();
       if (terms.some((term) => !searchable.includes(term))) return false;
       for (const [key, value] of Object.entries(activeFilters)) {
-        if (value && index?.tags[key] !== value) return false;
+        if (value && index?.tags[key] !== value && !index?.facets?.[key]?.includes(value)) return false;
       }
       return true;
     });
@@ -136,6 +141,15 @@
     return label.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   }
 
+  function externalHttpUrl(value: string): string | undefined {
+    try {
+      const url = new URL(value);
+      return url.protocol === "http:" || url.protocol === "https:" ? url.href : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   function routeTail(): string | undefined {
     return window.location.pathname.split("/").filter(Boolean).at(-1)?.toLocaleLowerCase();
   }
@@ -157,6 +171,8 @@
 
   function displayName(image: GalleryImage): string {
     if (!showNames) return image.displayName;
+    const metadataDisplay = image.metadataDisplay ?? indexByPath.get(image.path)?.metadataDisplay;
+    if (metadataDisplay?.name) return metadataDisplay.name;
     const shortName = image.shortName ?? indexByPath.get(image.path)?.shortName;
     return (language === "ja" ? shortName?.ja ?? shortName?.en : shortName?.en ?? shortName?.ja) ?? image.displayName;
   }
@@ -410,6 +426,7 @@
       indexByPath = loadedIndex;
       for (const image of images) {
         const indexed = loadedIndex.get(image.path);
+        if (indexed?.metadataDisplay) image.metadataDisplay = indexed.metadataDisplay;
         if (indexed?.shortName) image.shortName = indexed.shortName;
       }
       if (routeTail() === "slideshow" && filteredImages.length >= 2) slideshowImages = shuffle(filteredImages);
@@ -505,7 +522,7 @@
 
 <dialog bind:this={detailsDialog} class="settings-dialog metadata-dialog" aria-labelledby="details-title" onclick={(event) => { if (event.target === detailsDialog) detailsDialog?.close(); }}>
   <form method="dialog"><header><h2 id="details-title">{copy[language].information}</h2><button value="close" aria-label="Close">×</button></header>
-    <div class="metadata-content">{#if detailsLoading}<p>Loading…</p>{:else if detailsImage && details}<dl><dt>File</dt><dd>{detailsImage.name}</dd><dt>Path</dt><dd>{detailsImage.path}</dd><dt>Type</dt><dd>{detailsImage.type}</dd>{#if detailsImage.width && detailsImage.height}<dt>Dimensions</dt><dd>{detailsImage.width} × {detailsImage.height}</dd>{/if}{#if details.metadata?.schema}<dt>Schema</dt><dd>{details.metadata.schema}</dd>{/if}{#each Object.entries(details.metadata?.tags ?? {}) as [key, value]}<dt>{key.replaceAll("_", " ")}</dt><dd>{value}</dd>{/each}{#if details.metadata?.resolvedPrompt}<dt>Resolved prompt</dt><dd>{details.metadata.resolvedPrompt}</dd>{/if}</dl>{:else}<p>No metadata is available.</p>{/if}</div>
+    <div class="metadata-content">{#if detailsLoading}<p>Loading…</p>{:else if detailsImage && details}<dl><dt>File</dt><dd>{detailsImage.name}</dd><dt>Path</dt><dd>{detailsImage.path}</dd><dt>Type</dt><dd>{detailsImage.type}</dd>{#if detailsImage.width && detailsImage.height}<dt>Dimensions</dt><dd>{detailsImage.width} × {detailsImage.height}</dd>{/if}{#if details.metadata?.schema}<dt>Schema</dt><dd>{details.metadata.schema}</dd>{/if}{#each Object.entries(details.metadata?.tags ?? {}) as [key, value]}<dt>{key.replaceAll("_", " ")}</dt><dd>{#if externalHttpUrl(value)}<a href={externalHttpUrl(value)} target="_blank" rel="noopener noreferrer">{value}</a>{:else}{value}{/if}</dd>{/each}{#each Object.entries(details.metadata?.facets ?? {}) as [key, values]}<dt>{key.replaceAll("_", " ")}</dt><dd>{values.join(", ")}</dd>{/each}{#if details.metadata?.resolvedPrompt}<dt>Resolved prompt</dt><dd>{details.metadata.resolvedPrompt}</dd>{/if}</dl>{:else}<p>No metadata is available.</p>{/if}</div>
     <footer><button value="close">Close</button></footer>
   </form>
 </dialog>
