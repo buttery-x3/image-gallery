@@ -2,7 +2,12 @@ import { lstat, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { GalleryImage, ImageDetailsResponse, ImageKind } from "../shared/types.js";
 import { readImageMetadataResult, readImageNameMetadata } from "./metadata.js";
-import { imagePreviewIsCached, imagePreviewProfile } from "./previews.js";
+import {
+  imagePosterIsCached,
+  imagePosterProfile,
+  imagePreviewIsCached,
+  imagePreviewProfile,
+} from "./previews.js";
 import { ImageDimensionCache } from "./dimensions.js";
 
 const supportedExtensions = new Map<string, ImageKind>([
@@ -88,6 +93,9 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
       const previewUrl = type === "gif" || type === "png"
         ? `previews/${toUrlPath(relativePath)}?v=${Math.trunc(stats.mtimeMs)}-${stats.size}-${imagePreviewProfile}`
         : undefined;
+      const posterUrl = type === "gif"
+        ? `posters/${toUrlPath(relativePath)}?v=${Math.trunc(stats.mtimeMs)}-${stats.size}-${imagePosterProfile}`
+        : undefined;
       let metadata;
       let category;
       let metadataPresent;
@@ -127,13 +135,16 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
       }
 
       let previewCached: boolean | undefined;
-      if (previewUrl && options.includePreviewStatus && options.previewCacheDir) {
-        previewCached = await imagePreviewIsCached(
-          relativePath,
-          stats.size,
-          stats.mtimeMs,
-          options.previewCacheDir,
-        );
+      let posterCached: boolean | undefined;
+      if (options.includePreviewStatus && options.previewCacheDir) {
+        [previewCached, posterCached] = await Promise.all([
+          previewUrl
+            ? imagePreviewIsCached(relativePath, stats.size, stats.mtimeMs, options.previewCacheDir)
+            : undefined,
+          posterUrl
+            ? imagePosterIsCached(relativePath, stats.size, stats.mtimeMs, options.previewCacheDir)
+            : undefined,
+        ]);
       }
 
       images.push({
@@ -143,6 +154,8 @@ export async function readGalleryImages(root: string, options: GalleryReadOption
         url: `media/${toUrlPath(relativePath)}`,
         ...(previewUrl ? { previewUrl } : {}),
         ...(previewCached === undefined ? {} : { previewCached }),
+        ...(posterUrl ? { posterUrl } : {}),
+        ...(posterCached === undefined ? {} : { posterCached }),
         modifiedAt: stats.mtime.toISOString(),
         ...(dimensions ?? {}),
         type,

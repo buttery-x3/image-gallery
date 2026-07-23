@@ -114,7 +114,7 @@ if (
 const requestedBaseUrl = positionalArguments[0];
 const galleryRoot = path.resolve(process.env.GALLERY_DIR ?? "gallery");
 const previewCacheRoot = path.resolve(process.env.PREVIEW_CACHE_DIR ?? ".cache/previews");
-const previewCacheProfile = "v2-600-q86";
+const previewCacheProfiles = ["v3-360-q55", "v1-360-q45"];
 const nameGenerationDefinitionsRoot = path.resolve("name-generation-schemas");
 const metadataDefinitionsRoot = path.resolve("metadata-schemas");
 let validatedNameDefinitions = new Map();
@@ -637,9 +637,9 @@ function generateNameForRecord(record, definitions, usedNames, usedShortNames, b
   return generateName(definition, policy.shortNames, usedNames, usedShortNames, record.generationContext);
 }
 
-function previewCacheKey(identifier, size, modifiedAt) {
+function previewCacheKey(profile, identifier, size, modifiedAt) {
   return createHash("sha256")
-    .update(previewCacheProfile)
+    .update(profile)
     .update("\0")
     .update(identifier)
     .update("\0")
@@ -649,52 +649,56 @@ function previewCacheKey(identifier, size, modifiedAt) {
     .digest("hex");
 }
 
-function previewCachePath(identifier, size, modifiedAt) {
-  const key = previewCacheKey(identifier, size, modifiedAt);
+function previewCachePath(profile, identifier, size, modifiedAt) {
+  const key = previewCacheKey(profile, identifier, size, modifiedAt);
   return path.join(previewCacheRoot, key.slice(0, 2), `${key}.webp`);
 }
 
-async function preserveCachedPreview(imageMove) {
+async function preserveCachedPreviews(imageMove) {
   const extension = path.extname(imageMove.sourcePath).toLowerCase();
-  if (extension !== ".png" && extension !== ".gif") return undefined;
+  if (extension !== ".png" && extension !== ".gif") return [];
 
   const sourceStats = await lstat(imageMove.sourcePath);
-  const targetCachePath = previewCachePath(
-    path.posix.basename(imageMove.targetRelativePath),
-    sourceStats.size,
-    sourceStats.mtimeMs,
-  );
-  if (await exists(targetCachePath)) return undefined;
+  const profiles = extension === ".gif" ? previewCacheProfiles : previewCacheProfiles.slice(0, 1);
+  const createdPaths = [];
+  for (const profile of profiles) {
+    const targetCachePath = previewCachePath(
+      profile,
+      path.posix.basename(imageMove.targetRelativePath),
+      sourceStats.size,
+      sourceStats.mtimeMs,
+    );
+    if (await exists(targetCachePath)) continue;
 
-  const sourceCandidates = [
-    previewCachePath(path.posix.basename(imageMove.sourceRelativePath), sourceStats.size, sourceStats.mtimeMs),
-    previewCachePath(imageMove.sourceRelativePath, sourceStats.size, sourceStats.mtimeMs),
-  ];
-  let cachedSource;
-  for (const candidate of sourceCandidates) {
-    if (candidate !== targetCachePath && await exists(candidate)) {
-      cachedSource = candidate;
-      break;
+    const sourceCandidates = [
+      previewCachePath(profile, path.posix.basename(imageMove.sourceRelativePath), sourceStats.size, sourceStats.mtimeMs),
+      previewCachePath(profile, imageMove.sourceRelativePath, sourceStats.size, sourceStats.mtimeMs),
+    ];
+    let cachedSource;
+    for (const candidate of sourceCandidates) {
+      if (candidate !== targetCachePath && await exists(candidate)) {
+        cachedSource = candidate;
+        break;
+      }
+    }
+    if (!cachedSource) continue;
+
+    await mkdir(path.dirname(targetCachePath), { recursive: true });
+    try {
+      await copyFile(cachedSource, targetCachePath, fileSystemConstants.COPYFILE_EXCL);
+      createdPaths.push(targetCachePath);
+    } catch (error) {
+      if (!error || typeof error !== "object" || !("code" in error) || error.code !== "EEXIST") throw error;
     }
   }
-  if (!cachedSource) return undefined;
-
-  await mkdir(path.dirname(targetCachePath), { recursive: true });
-  try {
-    await copyFile(cachedSource, targetCachePath, fileSystemConstants.COPYFILE_EXCL);
-    return targetCachePath;
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "EEXIST") return undefined;
-    throw error;
-  }
+  return createdPaths;
 }
 
 async function preparePreviewCopies(imageMoves) {
   const createdCachePaths = [];
   try {
     for (const imageMove of imageMoves) {
-      const createdPath = await preserveCachedPreview(imageMove);
-      if (createdPath) createdCachePaths.push(createdPath);
+      createdCachePaths.push(...await preserveCachedPreviews(imageMove));
     }
     return createdCachePaths;
   } catch (error) {
@@ -773,29 +777,34 @@ async function cacheMissingPreviews(batchName) {
     (image) => image && typeof image.previewUrl === "string" && (!batchName ||
       (typeof image.path === "string" && image.path.startsWith(`${batchName}/`))),
   );
-  const cachedCount = previewImages.filter((image) => image.previewCached === true).length;
-  const previewUrls = previewImages
-    .filter((image) => image.previewCached !== true)
-    .map((image) => image.previewUrl);
+  const previewAssets = previewImages.flatMap((image) => [
+    image.previewCached === true ? undefined : image.previewUrl,
+    image.posterUrl && image.posterCached !== true ? image.posterUrl : undefined,
+  ]).filter(Boolean);
+  const assetCount = previewImages.reduce(
+    (count, image) => count + 1 + (image.posterUrl ? 1 : 0),
+    0,
+  );
+  const cachedCount = assetCount - previewAssets.length;
 
   if (cachedCount > 0) {
     console.log(`${cachedCount} preview${cachedCount === 1 ? " is" : "s are"} already cached.`);
   }
-  if (previewUrls.length === 0) {
+  if (previewAssets.length === 0) {
     console.log(batchName
       ? `No PNG or GIF previews need caching in ${batchName}.`
       : "No PNG or GIF previews need caching.");
     return;
   }
 
-  console.log(`Caching ${previewUrls.length} missing preview${previewUrls.length === 1 ? "" : "s"} through ${baseUrl.href}`);
+  console.log(`Caching ${previewAssets.length} missing preview asset${previewAssets.length === 1 ? "" : "s"} through ${baseUrl.href}`);
   let nextIndex = 0;
   let completed = 0;
   const failures = [];
 
   async function cacheNextPreview() {
-    while (nextIndex < previewUrls.length) {
-      const previewUrl = new URL(previewUrls[nextIndex], baseUrl);
+    while (nextIndex < previewAssets.length) {
+      const previewUrl = new URL(previewAssets[nextIndex], baseUrl);
       nextIndex += 1;
       try {
         const response = await fetch(previewUrl, { method: "HEAD", cache: "no-store" });
@@ -804,13 +813,13 @@ async function cacheMissingPreviews(batchName) {
         failures.push(`${previewUrl.href}: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
         completed += 1;
-        process.stdout.write(`\rCached ${completed}/${previewUrls.length}`);
+        process.stdout.write(`\rCached ${completed}/${previewAssets.length}`);
       }
     }
   }
 
   await Promise.all(Array.from(
-    { length: Math.min(4, previewUrls.length) },
+    { length: Math.min(4, previewAssets.length) },
     () => cacheNextPreview(),
   ));
   process.stdout.write("\n");

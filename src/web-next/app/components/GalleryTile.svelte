@@ -3,7 +3,7 @@
   import type { GalleryImage } from "../../../shared/types";
   import type { MasonryRect } from "../layout/masonry-layout";
   import type { GalleryAppearancePreferencesV1 } from "../preferences";
-  import { tileMediaUrl } from "../api/gallery-api";
+  import { posterMediaUrl, tileMediaUrl } from "../api/gallery-api";
   import type { MediaLoadScheduler } from "../services/media-loader";
   import Icon from "./Icon.svelte";
 
@@ -26,6 +26,8 @@
 
   let { image, rect, loadPriority, appearance, scheduler, favorite, displayName, showName, onopen, onfavorite, oncopyimage, oncopylink, oninfo, onreport }: Props = $props();
   let src = $state<string>();
+  let animatedLoaded = $state(false);
+  let posterLoaded = $state(false);
   let settle: ((completed: boolean) => void) | undefined;
   let loadTimeout: number | undefined;
 
@@ -52,7 +54,8 @@
     loadTimeout = undefined;
     settle?.(completed);
     settle = undefined;
-    if (!completed) src = undefined;
+    if (completed) animatedLoaded = true;
+    else src = undefined;
   }
 </script>
 
@@ -65,10 +68,20 @@
   style={`transform: translate3d(${rect.x}px, ${rect.y}px, 0); width: ${rect.width}px; height: ${rect.height}px;`}
 >
   <button class="image-open" type="button" aria-label={`Open ${displayName}`} onclick={onopen}>
+    <span class="image-skeleton" aria-hidden="true"></span>
+    {#if image.posterUrl}
+      <img
+        class="gallery-poster"
+        class:is-loaded={posterLoaded}
+        src={posterMediaUrl(image)}
+        alt=""
+        aria-hidden="true"
+        draggable="false"
+        onload={() => { posterLoaded = true; }}
+      />
+    {/if}
     {#if src}
-      <img class="gallery-image" {src} alt={displayName} draggable="false" onload={() => loaded(true)} onerror={() => loaded(false)} />
-    {:else}
-      <span class="image-skeleton" aria-hidden="true"></span>
+      <img class="gallery-image" class:is-loaded={animatedLoaded} {src} alt={displayName} draggable="false" onload={() => loaded(true)} onerror={() => loaded(false)} />
     {/if}
     {#if showName}<span class="tile-name">{displayName}</span>{/if}
   </button>

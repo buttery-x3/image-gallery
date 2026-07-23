@@ -33,6 +33,8 @@ export interface GalleryImage {
   url: string;
   previewUrl?: string;
   previewCached?: boolean;
+  posterUrl?: string;
+  posterCached?: boolean;
   modifiedAt: string;
   width?: number;
   height?: number;

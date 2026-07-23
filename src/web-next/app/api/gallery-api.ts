@@ -62,3 +62,7 @@ export function absoluteMediaUrl(image: GalleryImage): string {
 export function tileMediaUrl(image: GalleryImage): string {
   return applicationUrl(image.previewUrl ?? image.url).href;
 }
+
+export function posterMediaUrl(image: GalleryImage): string | undefined {
+  return image.posterUrl ? applicationUrl(image.posterUrl).href : undefined;
+}

@@ -3,7 +3,12 @@ import { mkdir, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { config } from "../server/config.js";
-import { imagePreviewPath, imagePreviewProfile } from "../server/previews.js";
+import {
+  imagePosterPath,
+  imagePosterProfile,
+  imagePreviewPath,
+  imagePreviewProfile,
+} from "../server/previews.js";
 
 const previewExtensions = new Set([".gif", ".png"]);
 
@@ -45,7 +50,10 @@ async function main(): Promise<void> {
   assertSafeCacheRoot();
   const sources = await findPreviewSources(config.galleryDir);
   if (!process.argv.includes("--apply")) {
-    console.log(`Dry run: ${sources.length} PNG/GIF preview${sources.length === 1 ? "" : "s"} would be rebuilt using ${imagePreviewProfile}.`);
+    console.log(
+      `Dry run: ${sources.length} PNG/GIF animated preview${sources.length === 1 ? "" : "s"} and ` +
+      `GIF first-frame posters would be rebuilt using ${imagePreviewProfile} and ${imagePosterProfile}.`,
+    );
     console.log("No files changed. Re-run with -- --apply to replace the derived preview cache.");
     return;
   }
@@ -59,7 +67,12 @@ async function main(): Promise<void> {
     while (nextIndex < sources.length) {
       const source = sources[nextIndex++]!;
       try {
-        await imagePreviewPath(source.absolutePath, source.relativePath, config.previewCacheDir);
+        await Promise.all([
+          imagePreviewPath(source.absolutePath, source.relativePath, config.previewCacheDir),
+          path.extname(source.relativePath).toLocaleLowerCase() === ".gif"
+            ? imagePosterPath(source.absolutePath, source.relativePath, config.previewCacheDir)
+            : undefined,
+        ]);
       } catch (error) {
         failures.push(`${source.relativePath}: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
@@ -71,7 +84,10 @@ async function main(): Promise<void> {
   await Promise.all(Array.from({ length: Math.min(4, sources.length) }, () => worker()));
   if (sources.length > 0) process.stdout.write("\n");
   if (failures.length > 0) throw new Error(`Some previews could not be rebuilt:\n${failures.join("\n")}`);
-  console.log(`Rebuilt ${sources.length} preview${sources.length === 1 ? "" : "s"} using ${imagePreviewProfile}.`);
+  console.log(
+    `Rebuilt ${sources.length} animated preview${sources.length === 1 ? "" : "s"} and GIF first-frame posters ` +
+    `using ${imagePreviewProfile} and ${imagePosterProfile}.`,
+  );
 }
 
 main().catch((error) => {

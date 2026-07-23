@@ -5,7 +5,7 @@ import path from "node:path";
 import express from "express";
 import { config } from "./config.js";
 import { GalleryDirectoryError, imageKindFor, readGalleryImageDetails, readGalleryImages, resolveSafeMediaPath } from "./gallery.js";
-import { imagePreviewPath } from "./previews.js";
+import { imagePosterPath, imagePreviewPath } from "./previews.js";
 import { injectSpaBase } from "./spa-base.js";
 import type {
   ErrorResponse,
@@ -232,10 +232,33 @@ app.get(/^\/previews\/(.+)$/, async (request, response, next) => {
 
   try {
     const previewPath = await imagePreviewPath(mediaPath, requestedPath, config.previewCacheDir);
-    response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    response.setHeader("Cache-Control", "public, max-age=31536000, s-maxage=31536000, immutable");
     response.type("webp");
     response.sendFile(path.basename(previewPath), {
       root: path.dirname(previewPath),
+      dotfiles: "deny",
+      lastModified: true,
+    }, (error) => {
+      if (error && !response.headersSent) next(error);
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get(/^\/posters\/(.+)$/, async (request, response, next) => {
+  const requestedPath = request.params[0];
+  if (!requestedPath || imageKindFor(requestedPath) !== "gif") return void response.sendStatus(404);
+
+  const mediaPath = await resolveSafeMediaPath(config.galleryDir, requestedPath);
+  if (!mediaPath) return void response.sendStatus(404);
+
+  try {
+    const posterPath = await imagePosterPath(mediaPath, requestedPath, config.previewCacheDir);
+    response.setHeader("Cache-Control", "public, max-age=31536000, s-maxage=31536000, immutable");
+    response.type("webp");
+    response.sendFile(path.basename(posterPath), {
+      root: path.dirname(posterPath),
       dotfiles: "deny",
       lastModified: true,
     }, (error) => {

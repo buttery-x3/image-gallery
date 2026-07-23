@@ -65,7 +65,7 @@ The Svelte 5 interface in `src/web-next/` is the default development and product
 | Variable | Default | Description |
 | --- | --- | --- |
 | `GALLERY_DIR` | `./gallery` | Directory scanned recursively for media |
-| `PREVIEW_CACHE_DIR` | `./.cache/previews` | Directory outside the gallery for generated GIF and PNG WebP previews |
+| `PREVIEW_CACHE_DIR` | `./.cache/previews` | Directory outside the gallery for generated WebP previews and GIF first-frame posters |
 | `DIMENSION_CACHE_PATH` | `./.cache/catalog-dimensions.json` | File outside the gallery that caches intrinsic media dimensions for masonry layout |
 | `GALLERY_DESCRIPTION` | `A simple private image gallery.` | Description used in browser and social metadata (applied at build time) |
 | `SITE_URL` | unset | Full public gallery URL used for canonical and absolute social-preview URLs (applied at build time) |
@@ -87,7 +87,7 @@ The included configuration labels `anime_waifu_lite/v1` as **Waifus** and `anime
 
 When configured short-name representations are requested, generated names also receive a `<long-name>.gallery-name.json` sidecar using the `image-gallery/name/v2` schema. It records the source metadata schema, generator schema, and whichever of `en` and `ja` were requested. Legacy `image-gallery/name/v1` sidecars remain readable. When `showNames` is enabled, available names appear in tiles and lightbox overlays; if the selected language is absent, the gallery falls back to the other representation and then the filename. Generated names become searchable when `searchMetadata` is enabled.
 
-GIF and PNG tiles use automatically generated 600px-wide, high-quality WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. Previews are created on first view and cached outside the gallery; the lightbox displays the cached preview immediately while loading the original. It also preloads the adjacent originals. Copy image and Copy link continue to use the original media.
+GIF and PNG tiles use automatically generated 360px-wide WebP previews. GIF previews remain animated, and WebP preserves PNG transparency. GIFs also receive a very small first-frame WebP poster, which is displayed immediately while the animated preview waits for an available media-loading slot. Derived assets are created on first view and cached outside the gallery with content-profiled URLs and one-year immutable browser and shared-cache headers. The lightbox displays the poster and cached animated preview while loading the original, and preloads adjacent originals. Copy image and Copy link continue to use the original media.
 
 After upgrading an installation that has older previews, stop the gallery service and rebuild the derived preview cache directly from the unchanged source media:
 
@@ -96,7 +96,7 @@ npm run rebuild-previews
 npm run rebuild-previews -- --apply
 ```
 
-The first command is a dry run. The second removes only `PREVIEW_CACHE_DIR` and regenerates every PNG/GIF preview; it does not modify anything in `GALLERY_DIR`. Restart the service afterward. The preview profile is included in browser-facing URLs so previously cached low-resolution responses are not reused.
+The first command is a dry run. The second removes only `PREVIEW_CACHE_DIR` and regenerates every PNG/GIF preview plus every GIF poster; it does not modify anything in `GALLERY_DIR`. Restart the service afterward. Each derived profile is included in browser-facing URLs so stale cached responses are not reused.
 
 To organize every root-level image into a timestamped batch and cache only that batch's missing previews, run this while the server is running:
 
@@ -106,7 +106,7 @@ bash ./process-batch.sh
 
 Images without JSON metadata are included. When a same-name JSON sidecar is present, its JSON syntax is validated and it is moved alongside its image without requiring a recognized schema. Source JSON without a same-name image is skipped, moved recoverably into `GALLERY_DIR/.duplicates/<timestamp>/`, and counted in the batch report so valid pairs can continue. Invalid JSON paired with an image still stops the batch before anything moves. Before moving anything, the batcher indexes existing metadata and file sizes, then SHA-256 hashes only plausible same-size duplicate candidates. Exact duplicate image/JSON pairs use the same hidden quarantine; metadata matches with different image content stay in the normal batch and are reported. Duplicate images are also detected when metadata is missing or has changed.
 
-For each incoming image, the batcher reads the source metadata schema and applies its `nameGeneration` policy from `gallery.config.json`. Schemas without that policy retain their original filenames. A policy may generate filenames only or also request `en`, `ja`, or both short-name representations. Advanced contextual generation requires the explicit per-source `pipeline: "contextual/v1"` flag. It consumes canonical tags from that source's metadata definition and gracefully falls back when optional record values are absent. Composed names are checked for filename and display-name collisions and retried without numeric suffixes. Existing previews remain valid across moves and renames, and only missing previews are requested, with up to four concurrent requests. The removed `BATCH_NAME_STYLE` variable now produces a migration error instead of being silently ignored.
+For each incoming image, the batcher reads the source metadata schema and applies its `nameGeneration` policy from `gallery.config.json`. Schemas without that policy retain their original filenames. A policy may generate filenames only or also request `en`, `ja`, or both short-name representations. Advanced contextual generation requires the explicit per-source `pipeline: "contextual/v1"` flag. It consumes canonical tags from that source's metadata definition and gracefully falls back when optional record values are absent. Composed names are checked for filename and display-name collisions and retried without numeric suffixes. Existing previews and GIF posters remain valid across moves and renames, and only missing derived assets are requested, with up to four concurrent requests. The removed `BATCH_NAME_STYLE` variable now produces a migration error instead of being silently ignored.
 
 Use `bash ./process-batch.sh --dry-run` to inspect the proposed batch and duplicate quarantine without changing files, or pass the public base URL as the final argument when the service is not available on its configured local port. Running the command when there are no root-level images checks the full gallery and generates only missing previews, which also provides the retry path if preview warming previously failed.
 

@@ -118,9 +118,11 @@ Refresh the gallery page to see additions or removals. The application never mod
 
 Supported formats are JPEG, PNG, GIF, WebP, and AVIF. Hidden files, hidden directories, symbolic links, and other formats are ignored.
 
-GIF and PNG gallery tiles use automatically generated 600px-wide high-quality WebP previews. GIF previews remain animated,
-and WebP preserves PNG transparency. The previews are cached in `PREVIEW_CACHE_DIR`; the original file is served
-unchanged when its tile is opened or its link is copied.
+GIF and PNG gallery tiles use automatically generated 360px-wide WebP previews. GIF previews remain animated,
+and WebP preserves PNG transparency. GIFs also receive a small first-frame WebP poster so a tile can display immediately
+while the animated preview is queued. Derived assets are cached in `PREVIEW_CACHE_DIR` and served with content-profiled
+URLs and one-year immutable browser and shared-cache headers. The original is served unchanged when its tile is opened
+or its link is copied.
 
 After an upgrade changes the preview profile, stop the service and rebuild the derived cache, then restart it:
 
@@ -131,7 +133,7 @@ sudo -u image-gallery npm run rebuild-previews -- --apply
 sudo systemctl start image-gallery
 ```
 
-The first rebuild command is a dry run. Applying it removes only `PREVIEW_CACHE_DIR` and recreates previews from unchanged gallery media.
+The first rebuild command is a dry run. Applying it removes only `PREVIEW_CACHE_DIR` and recreates previews and GIF posters from unchanged gallery media.
 
 For regular uploads, place the new images and any same-name JSON sidecars directly in `/srv/image-gallery/images`, then run:
 
@@ -139,7 +141,7 @@ For regular uploads, place the new images and any same-name JSON sidecars direct
 sudo -u image-gallery bash /opt/image-gallery/process-batch.sh
 ```
 
-The command moves every unique root-level image into one timestamped batch subdirectory and caches only that batch's missing previews. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. Orphan source JSON is skipped, reported, and moved recoverably into the hidden `.duplicates/<timestamp>/` quarantine; invalid JSON paired with an image still blocks the transaction. Existing metadata and file sizes provide a cheap duplicate candidate index, and SHA-256 confirms image equality before an incoming image is rejected. Exact duplicate pairs use the same quarantine; equal metadata with different image content is reported and retained. Source schemas with a configured `nameGeneration` policy receive generated names; other schemas retain their filenames. A contextual `pipeline/v1` generator runs only when its source policy explicitly sets `pipeline: "contextual/v1"`; it uses canonical values from the source's metadata definition and may emit semantic Japanese display vocabulary when `ja` is requested. Existing previews remain valid across moves and renames and are skipped. Add `--dry-run` to inspect both the batch and quarantine without changing files.
+The command moves every unique root-level image into one timestamped batch subdirectory and caches only that batch's missing previews and GIF posters. Images without metadata are included; same-name JSON sidecars are validated and moved with their images. Orphan source JSON is skipped, reported, and moved recoverably into the hidden `.duplicates/<timestamp>/` quarantine; invalid JSON paired with an image still blocks the transaction. Existing metadata and file sizes provide a cheap duplicate candidate index, and SHA-256 confirms image equality before an incoming image is rejected. Exact duplicate pairs use the same quarantine; equal metadata with different image content is reported and retained. Source schemas with a configured `nameGeneration` policy receive generated names; other schemas retain their filenames. A contextual `pipeline/v1` generator runs only when its source policy explicitly sets `pipeline: "contextual/v1"`; it uses canonical values from the source's metadata definition and may emit semantic Japanese display vocabulary when `ja` is requested. Existing derived assets remain valid across moves and renames and are skipped. Add `--dry-run` to inspect both the batch and quarantine without changing files.
 
 To apply generated names once to images already organized into batch directories, inspect and then run the explicit alternate command:
 

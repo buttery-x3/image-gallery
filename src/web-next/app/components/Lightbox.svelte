@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { GalleryImage } from "../../../shared/types";
-  import { absoluteMediaUrl, tileMediaUrl } from "../api/gallery-api";
+  import { absoluteMediaUrl, posterMediaUrl, tileMediaUrl } from "../api/gallery-api";
   import type { OverlayColors } from "../overlay-colors";
   import Icon from "./Icon.svelte";
 
@@ -116,7 +116,8 @@
     <section class="lightbox-content">
       <button class="lightbox-nav previous" type="button" aria-label="Previous image" disabled={!previousImage} onclick={() => onnavigate(-1)}><Icon name="chevron-left" /></button>
       <div class="lightbox-media" data-name-position={namePosition} data-watermark-position={effectiveWatermarkPosition} style={`--lightbox-name-fill:${colors.fill};--lightbox-name-outline:${colors.outline};--lightbox-name-en-size:${englishNameSize}px;--lightbox-name-ja-size:${englishNameSize / 2}px;`}>
-        <div class="lightbox-image-stack" class:has-preview={Boolean(image.previewUrl)} style={`--lightbox-image-aspect:${imageAspectRatio};`}>
+        <div class="lightbox-image-stack" class:has-preview={Boolean(image.previewUrl || image.posterUrl)} style={`--lightbox-image-aspect:${imageAspectRatio};`}>
+          {#if image.posterUrl}<img class="lightbox-poster" src={posterMediaUrl(image)} alt="" aria-hidden="true" width={image.width} height={image.height} />{/if}
           {#if image.previewUrl}<img class="lightbox-preview" src={tileMediaUrl(image)} alt="" aria-hidden="true" width={image.width} height={image.height} />{/if}
           <img bind:this={imageElement} class="lightbox-original" class:is-loaded={loadedOriginalPath === image.path} src={absoluteMediaUrl(image)} alt={displayName} width={image.width} height={image.height} onload={() => { loadedOriginalPath = image.path; }} />
         </div>
