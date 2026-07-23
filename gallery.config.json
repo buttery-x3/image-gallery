@@ -4,6 +4,15 @@
   "showTypeToggle": true,
   "showLanguageToggle": true,
   "showNames": true,
+  "defaultAppearance": {
+    "tileWidth": "adaptive",
+    "tileRatio": "natural",
+    "tileFit": "cover",
+    "tileZoom": "moderate",
+    "tileActions": "minimal",
+    "theme": "neon",
+    "stickyHeader": false
+  },
   "metadata": {
     "schemas": {
       "anime_waifu_lite/v1": {
@@ -62,6 +71,7 @@
       "<p>Do you agree you will report any images using the red button which you find sexually explicit?</p>"
     ],
     "buttonLabel": "I agree",
+    "headerButtonLabel": "Disclaimer",
     "expansionLabel": "more information (disclaimer)",
     "expansionHtml": [
       "<p>The reason for this is to gain clearer understanding.</p>",

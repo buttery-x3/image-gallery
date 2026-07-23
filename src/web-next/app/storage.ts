@@ -2,8 +2,11 @@ import { defaultAppearancePreferences, parseAppearancePreferences, type GalleryA
 
 export const appearanceStorageKey = "image-gallery:appearance:v1";
 
-export function loadAppearance(storage: Pick<Storage, "getItem"> = window.localStorage): GalleryAppearancePreferencesV1 {
-  return parseAppearancePreferences(storage.getItem(appearanceStorageKey));
+export function loadAppearance(
+  storage: Pick<Storage, "getItem"> = window.localStorage,
+  defaults: GalleryAppearancePreferencesV1 = defaultAppearancePreferences,
+): GalleryAppearancePreferencesV1 {
+  return parseAppearancePreferences(storage.getItem(appearanceStorageKey), defaults);
 }
 
 export function saveAppearance(
@@ -13,7 +16,10 @@ export function saveAppearance(
   storage.setItem(appearanceStorageKey, JSON.stringify(value));
 }
 
-export function resetAppearance(storage: Pick<Storage, "removeItem"> = window.localStorage): GalleryAppearancePreferencesV1 {
+export function resetAppearance(
+  storage: Pick<Storage, "removeItem"> = window.localStorage,
+  defaults: GalleryAppearancePreferencesV1 = defaultAppearancePreferences,
+): GalleryAppearancePreferencesV1 {
   storage.removeItem(appearanceStorageKey);
-  return { ...defaultAppearancePreferences };
+  return { ...defaults };
 }

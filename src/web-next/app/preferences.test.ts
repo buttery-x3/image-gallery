@@ -34,4 +34,14 @@ describe("appearance preferences", () => {
   it("falls back atomically for invalid state", () => {
     expect(parseAppearancePreferences('{"version":1,"tileWidth":"huge"}')).toEqual(defaultAppearancePreferences);
   });
+
+  it("uses site-configured defaults when no valid browser preference exists", () => {
+    const siteDefaults = {
+      ...defaultAppearancePreferences,
+      tileWidth: "adaptive" as const,
+      tileRatio: "natural" as const,
+    };
+    expect(parseAppearancePreferences(null, siteDefaults)).toEqual(siteDefaults);
+    expect(parseAppearancePreferences('{"version":1,"tileWidth":"huge"}', siteDefaults)).toEqual(siteDefaults);
+  });
 });

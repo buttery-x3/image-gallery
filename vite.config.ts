@@ -22,11 +22,31 @@ type GalleryConfig = {
     title: string;
     initialHtml: string;
     buttonLabel: string;
+    headerButtonLabel: string;
     expansionLabel: string;
     expansionHtml: string;
   };
+  defaultAppearance: {
+    tileWidth: "compact" | "standard" | "large" | "adaptive";
+    tileRatio: "natural" | "square" | "portrait" | "landscape";
+    tileFit: "cover" | "contain";
+    tileZoom: "off" | "subtle" | "moderate";
+    tileActions: "hover" | "always" | "menu" | "minimal";
+    theme: "editorial" | "glass" | "studio" | "classic" | "daylight" | "neon" | "accessible";
+    stickyHeader: boolean;
+  };
   metadata?: { schemas?: Record<string, unknown> };
   typeLabels: Record<string, string>;
+};
+
+const defaultAppearance: GalleryConfig["defaultAppearance"] = {
+  tileWidth: "compact",
+  tileRatio: "portrait",
+  tileFit: "cover",
+  tileZoom: "moderate",
+  tileActions: "minimal",
+  theme: "classic",
+  stickyHeader: false,
 };
 
 const defaultContentNotice: GalleryConfig["contentNotice"] = {
@@ -39,6 +59,7 @@ const defaultContentNotice: GalleryConfig["contentNotice"] = {
     "<p>Do you agree you will report any images using the red button which you find sexually explicit?</p>",
   ].join("\n"),
   buttonLabel: "I agree",
+  headerButtonLabel: "Disclaimer",
   expansionLabel: "more information (disclaimer)",
   expansionHtml: [
     "<p>The reason for this is to gain clearer understanding.</p>",
@@ -65,6 +86,19 @@ function requiredHtml(record: Record<string, unknown>, key: string, prefix: stri
     return value.map((fragment) => fragment.trim()).join("\n");
   }
   throw new Error(`${prefix}.${key} must be non-empty HTML or an array of non-empty HTML fragments.`);
+}
+
+function requiredChoice<const T extends string>(
+  record: Record<string, unknown>,
+  key: string,
+  choices: readonly T[],
+  prefix: string,
+): T {
+  const value = record[key];
+  if (typeof value !== "string" || !choices.includes(value as T)) {
+    throw new Error(`${prefix}.${key} must be one of: ${choices.join(", ")}.`);
+  }
+  return value as T;
 }
 
 function readGalleryConfig(): GalleryConfig {
@@ -110,8 +144,31 @@ function readGalleryConfig(): GalleryConfig {
       title: requiredText(notice, "title", prefix),
       initialHtml: requiredHtml(notice, "initialHtml", prefix),
       buttonLabel: requiredText(notice, "buttonLabel", prefix),
+      headerButtonLabel: notice.headerButtonLabel === undefined
+        ? defaultContentNotice.headerButtonLabel
+        : requiredText(notice, "headerButtonLabel", prefix),
       expansionLabel: requiredText(notice, "expansionLabel", prefix),
       expansionHtml: requiredHtml(notice, "expansionHtml", prefix),
+    };
+  }
+  let configuredAppearance = defaultAppearance;
+  if (record.defaultAppearance !== undefined) {
+    if (!record.defaultAppearance || typeof record.defaultAppearance !== "object" || Array.isArray(record.defaultAppearance)) {
+      throw new Error("gallery.config.json defaultAppearance must be an object.");
+    }
+    const appearance = record.defaultAppearance as Record<string, unknown>;
+    const prefix = "gallery.config.json defaultAppearance";
+    if (typeof appearance.stickyHeader !== "boolean") {
+      throw new Error(`${prefix}.stickyHeader must be true or false.`);
+    }
+    configuredAppearance = {
+      tileWidth: requiredChoice(appearance, "tileWidth", ["compact", "standard", "large", "adaptive"], prefix),
+      tileRatio: requiredChoice(appearance, "tileRatio", ["natural", "square", "portrait", "landscape"], prefix),
+      tileFit: requiredChoice(appearance, "tileFit", ["cover", "contain"], prefix),
+      tileZoom: requiredChoice(appearance, "tileZoom", ["off", "subtle", "moderate"], prefix),
+      tileActions: requiredChoice(appearance, "tileActions", ["hover", "always", "menu", "minimal"], prefix),
+      theme: requiredChoice(appearance, "theme", ["editorial", "glass", "studio", "classic", "daylight", "neon", "accessible"], prefix),
+      stickyHeader: appearance.stickyHeader,
     };
   }
   let metadata: GalleryConfig["metadata"];
@@ -153,6 +210,7 @@ function readGalleryConfig(): GalleryConfig {
     watermarkText,
     watermarkPosition: watermarkPosition as GalleryConfig["watermarkPosition"],
     contentNotice,
+    defaultAppearance: configuredAppearance,
     typeLabels,
     ...(metadata ? { metadata } : {}),
   };
@@ -251,6 +309,7 @@ function galleryHtml(
         .replace("__GALLERY_WATERMARK_TEXT__", escapeHtml(config.watermarkText))
         .replace("__GALLERY_WATERMARK_POSITION__", config.watermarkPosition)
         .replace("__GALLERY_CONTENT_NOTICE__", escapeHtml(JSON.stringify(config.contentNotice)))
+        .replace("__GALLERY_DEFAULT_APPEARANCE__", escapeHtml(JSON.stringify(config.defaultAppearance)))
         .replace(
           "<!-- gallery-support-button -->",
           supportEmbed

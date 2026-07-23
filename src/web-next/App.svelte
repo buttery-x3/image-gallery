@@ -7,7 +7,7 @@
   import Slideshow from "./app/components/Slideshow.svelte";
   import VirtualGallery from "./app/components/VirtualGallery.svelte";
   import {
-    defaultAppearancePreferences, tileActions, tileFits, tileRatios, tileWidths, tileZooms,
+    tileActions, tileFits, tileRatios, tileWidths, tileZooms,
     type GalleryAppearancePreferencesV1,
   } from "./app/preferences";
   import { copyImage, copyText } from "./app/services/clipboard";
@@ -21,9 +21,11 @@
     title: string;
     initialHtml: string;
     buttonLabel: string;
+    headerButtonLabel: string;
     expansionLabel: string;
     expansionHtml: string;
   };
+  type DefaultAppearance = Omit<GalleryAppearancePreferencesV1, "version"> & { theme: Theme };
 
   const root = document.documentElement;
   const siteName = document.title;
@@ -36,6 +38,16 @@
   const watermark = root.dataset.galleryShowWatermark === "true" ? root.dataset.galleryWatermarkText : undefined;
   const watermarkPosition = (root.dataset.galleryWatermarkPosition ?? "bottom-right") as Corner;
   const contentNotice = JSON.parse(root.dataset.galleryContentNotice ?? "{}") as ContentNotice;
+  const defaultAppearance = JSON.parse(root.dataset.galleryDefaultAppearance ?? "{}") as DefaultAppearance;
+  const defaultAppearancePreferences: GalleryAppearancePreferencesV1 = {
+    version: 1,
+    tileWidth: defaultAppearance.tileWidth,
+    tileRatio: defaultAppearance.tileRatio,
+    tileFit: defaultAppearance.tileFit,
+    tileZoom: defaultAppearance.tileZoom,
+    tileActions: defaultAppearance.tileActions,
+    stickyHeader: defaultAppearance.stickyHeader,
+  };
   const typeLabels = new Map<string, string>(Object.entries(JSON.parse(root.dataset.galleryTypeLabels ?? "{}") as Record<string, string>));
   configureApplicationBase([...typeLabels.values()].map((label) => label.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")));
   const favoritesKey = "image-gallery:favorites:v1";
@@ -68,7 +80,7 @@
   let activeFilters = $state<Record<string, string>>({});
   let draftFilters = $state<Record<string, string>>({});
   let language = $state<Language>("en");
-  let theme = $state<Theme>("classic");
+  let theme = $state<Theme>(defaultAppearance.theme);
   let appearance = $state<GalleryAppearancePreferencesV1>({ ...defaultAppearancePreferences });
   let activePath = $state<string>();
   let slideshowImages = $state<GalleryImage[]>();
@@ -278,6 +290,13 @@
     if (path) await scrollGalleryToPath(path);
   }
 
+  function resetSiteAppearance(): void {
+    appearance = resetAppearance(window.localStorage, defaultAppearancePreferences);
+    localStorage.removeItem(themeKey);
+    theme = defaultAppearance.theme;
+    root.dataset.theme = theme;
+  }
+
   async function scrollGalleryToPath(path: string): Promise<void> {
     await tick();
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
@@ -328,12 +347,12 @@
   }
 
   onMount(() => {
-    appearance = loadAppearance();
+    appearance = loadAppearance(window.localStorage, defaultAppearancePreferences);
     favorites = readStringSet(favoritesKey);
     reported = readStringSet(reportedKey);
     language = localStorage.getItem(languageKey) === "ja" ? "ja" : "en";
     const storedTheme = localStorage.getItem(themeKey) as Theme | null;
-    theme = storedTheme && themes.includes(storedTheme) ? storedTheme : "classic";
+    theme = storedTheme && themes.includes(storedTheme) ? storedTheme : defaultAppearance.theme;
     root.dataset.theme = theme;
     root.lang = language;
     try {
@@ -344,7 +363,7 @@
     if (localStorage.getItem(consentKey) !== "agreed") consentDialog?.showModal();
     else document.body.classList.remove("consent-pending");
     const handleStorage = (event: StorageEvent): void => {
-      if (event.key === appearanceStorageKey) appearance = loadAppearance();
+      if (event.key === appearanceStorageKey) appearance = loadAppearance(window.localStorage, defaultAppearancePreferences);
       if (event.key === favoritesKey) favorites = readStringSet(favoritesKey);
     };
     window.addEventListener("storage", handleStorage);
@@ -486,6 +505,7 @@
   </div>
   <div class="header-meta">
     <p class="image-count" aria-live="polite">{loading ? copy[language].loading : imageCountText}</p>
+    <button class="header-icon-button header-labeled-button disclaimer-button" type="button" aria-label={contentNotice.headerButtonLabel} title={contentNotice.headerButtonLabel} onclick={() => consentDialog?.showModal()}><Icon name="info" /><span class="header-button-label">{contentNotice.headerButtonLabel}</span></button>
     <button class="header-icon-button header-labeled-button" type="button" aria-label={copy[language].appearance} title={copy[language].appearance} onclick={() => appearanceDialog?.showModal()}><Icon name="palette" /><span class="header-button-label">{copy[language].appearance}</span></button>
     {#if showGitHubLink}<a class="header-icon-button github-link" href="https://github.com/buttery-x3/image-gallery" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" title="GitHub repository"><Icon name="github" /></a>{/if}
   </div>
@@ -517,7 +537,7 @@
       <label>Visual style<select aria-label="Visual style" value={theme} onchange={(event) => setTheme(event.currentTarget.value as Theme)}>{#each themes as value}<option {value}>{themeLabels[value]}</option>{/each}</select></label>
       <label class="settings-toggle"><input type="checkbox" checked={appearance.stickyHeader} onchange={(event) => updateAppearance("stickyHeader", event.currentTarget.checked)} /> Keep header visible while scrolling</label>
     </div>
-    <footer><button type="button" onclick={() => { appearance = resetAppearance(); setTheme("classic"); }}>Reset appearance</button><button value="close">Done</button></footer>
+    <footer><button type="button" onclick={resetSiteAppearance}>Reset appearance</button><button value="close">Done</button></footer>
   </form>
 </dialog>
 

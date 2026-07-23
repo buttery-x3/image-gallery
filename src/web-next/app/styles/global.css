@@ -93,6 +93,8 @@ body.consent-pending > .support-card { visibility: hidden; }
 @container gallery-app (max-width: 1650px) {
   .header-labeled-button { display:inline-grid; width:34px; padding:0 !important; }
   .header-button-label { display:none; }
+  .disclaimer-button { display:inline-flex; width:auto; padding-inline:8px !important; }
+  .disclaimer-button .header-button-label { display:inline; }
 }
 
 @container gallery-app (max-width: 1500px) {
@@ -110,6 +112,8 @@ body.consent-pending > .support-card { visibility: hidden; }
 }
 @container gallery-app (max-width: 620px) {
   .image-count { display: none; }
+  .disclaimer-button { display:inline-grid; width:34px; padding:0 !important; }
+  .disclaimer-button .header-button-label { display:none; }
 }
 @container gallery-app (max-width: 400px) {
   .search-field { min-width:100px; }

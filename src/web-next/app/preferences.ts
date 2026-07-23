@@ -34,8 +34,11 @@ function isMember<T extends string>(value: unknown, choices: readonly T[]): valu
   return typeof value === "string" && choices.includes(value as T);
 }
 
-export function parseAppearancePreferences(value: string | null): GalleryAppearancePreferencesV1 {
-  if (!value) return { ...defaultAppearancePreferences };
+export function parseAppearancePreferences(
+  value: string | null,
+  defaults: GalleryAppearancePreferencesV1 = defaultAppearancePreferences,
+): GalleryAppearancePreferencesV1 {
+  if (!value) return { ...defaults };
   try {
     const parsed = JSON.parse(value) as Partial<GalleryAppearancePreferencesV1>;
     if (
@@ -46,9 +49,9 @@ export function parseAppearancePreferences(value: string | null): GalleryAppeara
       !isMember(parsed.tileZoom, tileZooms) ||
       !isMember(parsed.tileActions, tileActions) ||
       (parsed.stickyHeader !== undefined && typeof parsed.stickyHeader !== "boolean")
-    ) return { ...defaultAppearancePreferences };
+    ) return { ...defaults };
     return { ...(parsed as Omit<GalleryAppearancePreferencesV1, "stickyHeader">), stickyHeader: parsed.stickyHeader ?? false };
   } catch {
-    return { ...defaultAppearancePreferences };
+    return { ...defaults };
   }
 }
