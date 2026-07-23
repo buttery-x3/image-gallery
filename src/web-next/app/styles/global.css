@@ -187,8 +187,8 @@ main { padding: 16px clamp(8px, 2vw, 24px) 40px; }
 .lightbox-original { z-index:2; opacity:0; }
 .lightbox-preview.is-loaded, .lightbox-original.is-loaded { opacity:1; transition:opacity .16s ease-out; }
 .lightbox-nav { z-index:3; display:grid; width:38px; min-height:42px; padding:0; place-items:center; border-color:rgba(255,255,255,.3); color:#fff; background:rgba(12,13,14,.78); }
-.lightbox-nav.previous { grid-column:1; grid-row:1; justify-self:end; margin-right:8px; }
-.lightbox-nav.next { grid-column:3; grid-row:1; justify-self:start; margin-left:8px; }
+.lightbox-nav.previous { grid-column:1; grid-row:1; justify-self:start; margin-left:8px; }
+.lightbox-nav.next { grid-column:3; grid-row:1; justify-self:end; margin-right:8px; }
 .lightbox-nav .icon { width:24px; height:24px; }
 .lightbox-actions { grid-column:1 / -1; grid-row:2; display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin-top:7px; }
 .lightbox-actions button { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding:4px 7px; font-size:.76rem; }
